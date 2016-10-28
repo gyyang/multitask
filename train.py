@@ -10,149 +10,75 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-import theano
-import theano.tensor as T
 
-from fuel.streams import DataStream
-from fuel.datasets import IterableDataset
-from blocks.model import Model
-from blocks.algorithms import GradientDescent, Adam, CompositeRule, StepClipping
-from blocks.graph import ComputationGraph
-from blocks.extensions import FinishAfter, Printing, ProgressBar, Timing
-from blocks.extensions.saveload import Checkpoint
-from blocks.extensions.monitoring import (DataStreamMonitoring,
-                                          TrainingDataMonitoring)
-from blocks.filter import VariableFilter
-from blocks.roles import WEIGHT, BIAS, INITIAL_STATE
-from blocks.main_loop import MainLoop
+import tensorflow as tf
+from tensorflow.python.ops import rnn, rnn_cell
 
 from task import *
-from network import MyNetwork
+from network import LeakyRNNCell
+
+tf.reset_default_graph()
+HDIM = 50
+N_RING = 16
 
 
-def train(HDIM=200, N_RING=16, save_main_loop=False):
-    config = {'h_type'      : 'leaky_rec_ei',
-              'alpha'       : 0.2, # \Delta t/tau
-              'dt'          : 0.2*TAU,
-              'HDIM'        : HDIM,
-              'N_RING'      : N_RING,
-              'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : 'latestei_'+str(HDIM)+'_'+str(N_RING)}
+config = {'h_type'      : 'leaky_rec_ei',
+          'alpha'       : 0.2, # \Delta t/tau
+          'dt'          : 0.2*TAU,
+          'HDIM'        : HDIM,
+          'N_RING'      : N_RING,
+          'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
+          'save_addon'  : 'tf_'+str(HDIM)}
 
-    ###############################   Setup  ##################################
-    # Training parameters
-    batch_size  = 10 # Number of examples in a single batch.
-    num_batches = 2000 # Number of batches in the training dataset.
-    num_epochs  = 50 # Number of epochs to do.
 
-    # Rules to train and the proportion of them
-    rules = [FIXATION, GO, INHGO, DELAYGO, CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,
-             CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,
-             REMAP, INHREMAP, DELAYREMAP, DELAYMATCHGO, DELAYMATCHNOGO, DMCGO]
-    rule_set = rules[:]
-    rules += [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2] * 4
-    rules += [DELAYMATCHGO, DELAYMATCHNOGO] * 4
-    rules += [DMCGO] * 4
+# Parameters
+learning_rate = 0.001
+training_iters = 50000
+batch_size = 10
+display_step = 100
 
-    # rules = [DMCGO]
-    # rule_set = rules[:]
+# Network Parameters
+n_input, n_hidden, n_output = config['shape']
 
-    # Generating the dataset
-    dataset_train = IterableDataset(generate_data(config, batch_size, num_batches, rules))
-    dataset_test = IterableDataset(generate_data(config, batch_size, 1000, rules))
+# tf Graph input
+x = tf.placeholder("float", [None, None, n_input]) # time * batch * n_input
+y = tf.placeholder("float", [None, n_output])
+c_mask = tf.placeholder("float", [None, n_output])
 
-    stream_train = DataStream(dataset=dataset_train)
-    stream_test = DataStream(dataset=dataset_test)
+# Define weights
+w_out = tf.Variable(tf.random_normal([n_hidden, n_output]))
+b_out = tf.Variable(tf.random_normal([n_output]))
 
-    # Generating the network
-    x = T.tensor3('x')
-    y_hat = T.tensor3('y_hat')
-    y_hat_loc = T.vector('y_hat_loc') # Vector of size batchsize
-    c_mask = T.tensor3('c_mask')
-    mynet = MyNetwork(config)
-    cost, performance = mynet.cost(x, y_hat, y_hat_loc, c_mask)
-    cost.name = 'cost'
-    performance.name = 'performance'
-    model = Model(cost)
+# Recurrent activity
+rnn_cell = LeakyRNNCell(n_hidden)
+h, states = rnn.dynamic_rnn(rnn_cell, x, dtype=tf.float32)
 
-    mynet.initialize()
+# Output
+y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, n_hidden)), w_out) + b_out)
 
-    # Setting up the learning
-    step_rule = CompositeRule([StepClipping(1.),
-                               Adam(learning_rate=0.002, beta1=0.1,
-                                    beta2=0.001, epsilon=1e-8)])
-    
-    cg = ComputationGraph(cost)
-    trained_parameters = VariableFilter(roles=[WEIGHT, BIAS])(cg.parameters) # don't train initial state
-    # trained_parameters = VariableFilter(roles=[WEIGHT, BIAS, INITIAL_STATE])(cg.parameters) # train initial state
-    algorithm = GradientDescent(cost=cost,
-                                parameters=trained_parameters,
-                                step_rule=step_rule, on_unused_sources='warn')
+# Loss
+cost = tf.reduce_mean((y-y_hat)**2*c_mask)
+optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
 
-    # Monitor the progress
-    test_monitor = DataStreamMonitoring(variables=[cost, performance],
-                                        data_stream=stream_test, prefix="test")
-    train_monitor = TrainingDataMonitoring(variables=[cost, performance], prefix="train",
-                                           after_epoch=True)
+# Initializing the variables
+init = tf.initialize_all_variables()
 
-    extensions = [test_monitor, train_monitor, FinishAfter(after_n_epochs=num_epochs),
-                  Printing(), ProgressBar(), Timing(),
-                  Checkpoint('data/task_multi'+config['save_addon']+'.tar',
-                             every_n_epochs=10, save_separately=["model", "log"],
-                             save_main_loop=save_main_loop)]
-
-    # Rule specific monitors
-    dataset = dict()
-    stream = dict()
-    monitor = dict()
-    for rule in rule_set:
-        dataset[rule] = IterableDataset(generate_data(config, batch_size, 200, [rule]))
-        stream[rule]  = DataStream(dataset=dataset[rule])
-        monitor[rule] = DataStreamMonitoring(variables=[cost, performance],
-                                             data_stream=stream[rule],
-                                             prefix=rule_name[rule])
-    extensions += monitor.values()
-
-    ###############################   Training  ###############################
-
-    main_loop = MainLoop(model=model, algorithm=algorithm, data_stream=stream_train,
-                         extensions=extensions)
-    main_loop.run()
-
-    ########################## Get Training Progress #########################
-    log = main_loop.log
-    batch_plot = list() # batch
-    traintime_plot = list() # training time
-    cost_plot = list() # cost
-    rule_cost_plot = dict() # cost of individual rule
-    rule_performance_plot = dict()
-    for rule in rule_set:
-        rule_cost_plot[rule] = []
-        rule_performance_plot[rule] = []
-    for i in log:
-        if (len(log[i].keys())>0) and ('test_cost' in log[i].keys()):
-            # prefix test + monitored variable name (cost.name)
-            if i == 0:
-                traintime_plot.append(0)
-            else:
-                traintime_plot.append(log[i]['time_train_total'])
-            cost_plot.append(log[i]['test_cost'])
-            batch_plot.append(i)
-            for rule in rule_set:
-                rule_cost_plot[rule].append(log[i][rule_name[rule]+'_cost'])
-                rule_performance_plot[rule].append(log[i][rule_name[rule]+'_performance'])
-
-    ########################## Save Configuration #############################
-
-    config['rule_cost_plot'] = rule_cost_plot
-    config['rule_performance_plot'] = rule_performance_plot
-    config['batch_plot'] = batch_plot
-    config['traintime_plot'] = traintime_plot
-    config['batch_size'] = batch_size
-    with open('data/config'+config['save_addon']+'.pkl','wb') as f:
-        pickle.dump(config,f)
-
-if __name__ == '__main__':
-    # Debug now
-    train(HDIM=200, N_RING=16)
-    pass
+# Launch the graph
+with tf.Session() as sess:
+    sess.run(init)
+    step = 1
+    # Keep training until reach max iterations
+    while step * batch_size < training_iters:
+        task = generate_onebatch(GO, config, 'random', batch_size=batch_size)
+        sess.run(optimizer, feed_dict={x: task.x,
+                                       y: task.y.reshape((-1,n_output)),
+                                       c_mask: task.c_mask.reshape((-1,n_output))})
+        if step % display_step == 0:
+            # Calculate batch accuracy
+            c_sample = sess.run(cost, feed_dict={x: task.x,
+                                       y: task.y.reshape((-1,n_output)),
+                                       c_mask: task.c_mask.reshape((-1,n_output))})
+            print("Iter " + str(step*batch_size) + ", Minibatch Loss= " + \
+                  "{:.6f}".format(c_sample))
+        step += 1
+    print("Optimization Finished!")

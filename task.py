@@ -68,10 +68,10 @@ class Task(object):
         self.batch_size = batch_size
         self.tdim       = tdim
         self.x          = np.zeros((tdim, batch_size, XDIM), dtype=self.float_type)
-        self.y_hat      = np.zeros((tdim, batch_size, YDIM), dtype=self.float_type)
-        self.y_hat[:,:,:] = 0.05
-        # y_hat_loc is the target location of the output, -1 for fixation, (0,2 pi) for response
-        self.y_hat_loc  = -np.ones((tdim, batch_size)      , dtype=self.float_type)
+        self.y          = np.zeros((tdim, batch_size, YDIM), dtype=self.float_type)
+        self.y[:,:,:]   = 0.05
+        # y_loc is the target location of the output, -1 for fixation, (0,2 pi) for response
+        self.y_loc      = -np.ones((tdim, batch_size)      , dtype=self.float_type)
         self.c_mask     = np.zeros((tdim, batch_size, YDIM), dtype=self.float_type)
 
     def expand(self, var):
@@ -95,10 +95,10 @@ class Task(object):
                 self.x[ons[i]:offs[i],i,self.slices[loc_type]] += self.add_x_loc(locs[i])*strengths[i]
             elif loc_type == 'fix_out':
                 # Notice this shouldn't be set at 1, because the output is logistic and saturates at 1
-                self.y_hat[ons[i]:offs[i],i,self.slices[loc_type]] = 0.8
+                self.y[ons[i]:offs[i],i,self.slices[loc_type]] = 0.8
             elif loc_type == 'out':
-                self.y_hat[ons[i]:offs[i],i,self.slices[loc_type]] += self.add_y_hat_loc(locs[i])*strengths[i]
-                self.y_hat_loc[ons[i]:offs[i],i] = locs[i]
+                self.y[ons[i]:offs[i],i,self.slices[loc_type]] += self.add_y_loc(locs[i])*strengths[i]
+                self.y_loc[ons[i]:offs[i],i] = locs[i]
             else:
                 raise ValueError('Unknown loc_type')
 
@@ -139,11 +139,11 @@ class Task(object):
         dist /= np.pi/8
         return 0.8*np.exp(-dist**2/2)
 
-    def add_y_hat_loc(self, y_hat_loc):
-        dist = get_dist(y_hat_loc-self.pref) # periodic boundary
+    def add_y_loc(self, y_loc):
+        dist = get_dist(y_loc-self.pref) # periodic boundary
         dist /= np.pi/8
-        y_hat = 0.8*np.exp(-dist**2/2)
-        return y_hat
+        y    = 0.8*np.exp(-dist**2/2)
+        return y
 
 def test_init(config, mode, **kwargs):
     '''
@@ -1641,33 +1641,10 @@ def generate_onebatch(rule, config, mode, **kwargs):
         # rule_off = int(200/dt) #TODO: Study this
 
     if 'add_rule' in kwargs:
-            rule = kwargs['add_rule'] # overwrite current rule for input
+        rule = kwargs['add_rule'] # overwrite current rule for input
 
     if rule is not TEST_INIT:
         task.add_rule(rule, on=rule_on, off=rule_off)
 
     return task
 
-
-def generate_data(config, batch_size, num_batches, rules):
-    '''
-    Generate data. Used for training. Unable to provide parameters explicitly
-    :param batch_size: Batch size
-    :param num_batches: Number of batches
-    :param rules: A list of rules where each batch will randomly select from
-    :return: dictionary of list of data.
-    '''
-    x = []
-    y_hat = []
-    y_hat_loc = []
-    c_mask = []
-    # Loop over batches
-    for i_batch in range(num_batches):
-        rule = np.random.choice(rules)
-        task = generate_onebatch(rule, config, 'random', batch_size=batch_size)
-
-        x.append(task.x)
-        y_hat.append(task.y_hat)
-        y_hat_loc.append(task.y_hat_loc[-1,:]) # only use the last time point for now
-        c_mask.append(task.c_mask)
-    return {'x': x, 'y_hat': y_hat, 'y_hat_loc': y_hat_loc, 'c_mask': c_mask}
