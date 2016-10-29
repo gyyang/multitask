@@ -20,7 +20,7 @@ from tensorflow.python.util import nest
 class LeakyRNNCell(RNNCell):
     """The most basic RNN cell."""
 
-    def __init__(self, num_units, alpha=1.0, input_size=None, activation=tf.nn.softplus):
+    def __init__(self, num_units, alpha, input_size=None, activation=tf.nn.softplus):
         if input_size is not None:
             logging.warn("%s: The input_size parameter is deprecated.", self)
         self._num_units = num_units
@@ -40,7 +40,7 @@ class LeakyRNNCell(RNNCell):
         """Leaky RNN: output = new_state = (1-alpha)*state + alpha*activation(W * input + U * state + B)."""
         with vs.variable_scope(scope or type(self).__name__):    # "LeakyRNNCell"
             output = (1-self._alpha)*state + \
-                     self._alpha*self._activation(_linear([inputs, state], self._num_units, True))
+                     self._alpha * self._activation(_linear([inputs, state], self._num_units, True))
         return output, output
 
 def _linear(args, output_size, bias, bias_start=0.0, scope=None):

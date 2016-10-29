@@ -41,6 +41,8 @@ rule_weights = np.ones(len(rules))
 rule_weights[[rules.index(r) for r in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]]] = 10
 rule_weights[[rules.index(r) for r in [DELAYMATCHNOGO, DELAYMATCHGO, DMCNOGO, DMCGO]]] = 5
 
+rules = [FIXATION, GO]
+rule_weights = np.ones(len(rules))
 
 # Parameters
 learning_rate = 0.0001
@@ -62,7 +64,10 @@ w_out = tf.Variable(tf.random_normal([n_hidden, n_output]))
 b_out = tf.Variable(tf.random_normal([n_output]))
 
 # Recurrent activity
-h, states = rnn.dynamic_rnn(LeakyRNNCell(n_hidden), x, dtype=tf.float32)
+cell = LeakyRNNCell(n_hidden, config['alpha'])
+h, states = rnn.dynamic_rnn(cell, x, dtype=tf.float32, time_major=True) # time_major is important
+
+
 
 # Output
 y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, n_hidden)), w_out) + b_out)
@@ -115,8 +120,8 @@ with tf.Session() as sess:
                     cost_tests[rule].append(c_test)
                     perf_tests[rule].append(perf_test)
                     print('{:15s}'.format(rule_name[rule]) +
-                          '| cost {:0.2f}'.format(c_test)  +
-                          '| perf {:0.2f}'.format(perf_test))
+                          '| cost {:0.5f}'.format(c_test)  +
+                          '  | perf {:0.2f}'.format(perf_test))
             step += 1
         except KeyboardInterrupt:
             break
