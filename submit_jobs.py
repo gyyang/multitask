@@ -28,7 +28,7 @@ def mkdir_p(path):
 
 
 def write_jobfile(cmd, jobname, pbspath, scratchpath,
-                  nodes=1, ppn=1, gpus=0, mem=64, nhours=36):
+                  nodes=1, ppn=1, gpus=0, mem=12, nhours=24):
     """
     Create a job file.
 
@@ -92,6 +92,7 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
             + '#PBS -l nodes={}:ppn={}{}\n'.format(nodes, ppn, gpus)
             + '#PBS -l mem={}GB\n'.format(mem)
             + '#PBS -l walltime={}:00:00\n'.format(nhours)
+            + '#PBS -l feature=ivybridge\n' # Have to run it on Ivy Bridge CPUs
             + '#PBS -q s48\n'
             + '#PBS -N {}\n'.format(jobname[0:16])
             + '#PBS -e {}log/${{PBS_JOBNAME}}.e${{PBS_JOBID}}\n'.format(scratchpath)

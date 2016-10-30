@@ -123,7 +123,10 @@ def get_perf(y_hat, y_loc):
 
     # Fixating? Correctly saccading?
     corr_fix = y_hat_fix > 0.5
-    corr_loc = abs(y_loc - y_hat_loc)<0.3*np.pi
+
+    original_dist = y_loc - y_hat_loc
+    dist = np.minimum(abs(original_dist), 2*np.pi-abs(original_dist))
+    corr_loc = dist < 0.3*np.pi
 
     # Should fixate?
     should_fix = y_loc < 0

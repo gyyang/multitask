@@ -45,7 +45,7 @@ def train(HDIM):
     # rule_weights = np.ones(len(rules))
 
     # Parameters
-    learning_rate = 0.0001
+    learning_rate = 0.001
     training_iters = 1500000
     batch_size_train = 10
     batch_size_test = 200
@@ -82,7 +82,7 @@ def train(HDIM):
     y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, n_hidden)), w_out) + b_out)
 
     # Loss
-    cost = tf.reduce_mean((((y-y_hat)*c_mask)**2))
+    cost = tf.reduce_mean(tf.square((y-y_hat)*c_mask))
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
 
     # Initializing the variables
@@ -124,7 +124,7 @@ def train(HDIM):
                         task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test)
                         y_hat_test = sess.run(y_hat, feed_dict={x: task.x})
                         y_hat_test = y_hat_test.reshape((-1,batch_size_test,n_output))
-                        c_test = np.mean(task.c_mask*(y_hat_test-task.y)**2)
+                        c_test = np.mean(((y_hat_test-task.y)*task.c_mask)**2)
                         perf_test = get_perf(y_hat_test, task.y_loc)
                         cost_tests[rule].append(c_test)
                         perf_tests[rule].append(perf_test)
