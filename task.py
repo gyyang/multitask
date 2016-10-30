@@ -1627,8 +1627,7 @@ def generate_onebatch(rule, config, mode, **kwargs):
     dt = config['dt']
     task = rule_mapping[rule](config, mode, **kwargs)
     if mode in ['random', 'sample', 'psychometric']:
-        # task.add_x_noise(dt)
-        pass # temp
+        task.add_x_noise(dt)
 
     # Add rule input to every task
     if 'rule_on' in kwargs:

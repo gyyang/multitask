@@ -20,7 +20,7 @@ from network import LeakyRNNCell, get_perf
 
 tf.reset_default_graph()
 
-HDIM = 300
+HDIM = 100
 N_RING = 16
 
 config = {'h_type'      : 'leaky_rec',
@@ -45,35 +45,47 @@ rules = [FIXATION, GO]
 rule_weights = np.ones(len(rules))
 
 # Parameters
-learning_rate = 0.0001
-training_iters = 1500000
+#==============================================================================
+# learning_rate = 0.0001
+# training_iters = 1500000
+# batch_size_train = 10
+# batch_size_test = 200
+# display_step = 1000
+#==============================================================================
+
+learning_rate = 0.0002
+training_iters = 100000
 batch_size_train = 10
 batch_size_test = 200
-display_step = 1000
+#batch_size_test = 10
+display_step = 500
+
 
 # Network Parameters
 n_input, n_hidden, n_output = config['shape']
 
 # tf Graph input
-x = tf.placeholder("float", [None, None, n_input]) # time * batch * n_input
+x = tf.placeholder("float", [None, None, n_input]) # (time, batch, n_input)
 y = tf.placeholder("float", [None, n_output])
 c_mask = tf.placeholder("float", [None, n_output])
 
 # Define weights
-w_out = tf.Variable(tf.random_normal([n_hidden, n_output]))
-b_out = tf.Variable(tf.random_normal([n_output]))
+w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)))
+b_out = tf.Variable(tf.zeros([n_output]))
+
+# Initial state
+h_init = tf.Variable(0.3*tf.ones([1, n_hidden]))
+h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
 
 # Recurrent activity
 cell = LeakyRNNCell(n_hidden, config['alpha'])
-h, states = rnn.dynamic_rnn(cell, x, dtype=tf.float32, time_major=True) # time_major is important
-
-
+h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc), dtype=tf.float32, time_major=True) # time_major is important
 
 # Output
 y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, n_hidden)), w_out) + b_out)
 
 # Loss
-cost = tf.reduce_mean((y-y_hat)**2*c_mask)
+cost = tf.reduce_mean((((y-y_hat)*c_mask)**2))
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
 
 # Initializing the variables
