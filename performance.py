@@ -14,16 +14,8 @@ import scipy.stats as stats
 from scipy.optimize import curve_fit, minimize
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from mpl_toolkits.mplot3d import Axes3D
-import theano
-import theano.tensor as T
-from blocks.model import Model
-from blocks.serialization import load_parameters
-from sklearn.decomposition import PCA, RandomizedPCA
 import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
 from task import *
-from network import MyNetwork
 
 mpl.rcParams['xtick.direction'] = 'out'
 mpl.rcParams['ytick.direction'] = 'out'
@@ -34,6 +26,49 @@ color_rules = np.array([
             [157,204,0],[194,0,136],[0,51,128],[255,164,5],[255,168,187],[66,102,0],
             [255,0,16],[94,241,242],[0,153,143],[224,255,102],[116,10,255],
             [153,0,0],[255,255,128],[255,255,0],[255,80,5]])/255.
+
+def plot_trainingprogress(save_addon, rule_plot=None, save=True):
+    # Plot Training Progress
+    with open('data/config'+save_addon+'.pkl', 'rb') as f:
+        config = pickle.load(f)
+
+    trials      = config['trials']
+    times       = config['times']
+    cost_tests  = config['cost_tests']
+    perf_tests  = config['perf_tests']
+
+    fig = plt.figure(figsize=(5,3))
+    d1, d2 = 0.01, 0.35
+    ax1 = fig.add_axes([0.15,0.5+d1,   0.5,d2])
+    ax2 = fig.add_axes([0.15,0.5-d1-d2,0.5,d2])
+    lines = list()
+    labels = list()
+
+    x_plot = np.array(trials)/1000.
+    if rule_plot == None:
+        rule_plot = cost_tests.keys()
+
+    for i, rule in enumerate(rule_plot):
+        line = ax1.plot(x_plot, np.log10(cost_tests[rule]),color=color_rules[i%26])
+        ax2.plot(x_plot, perf_tests[rule],color=color_rules[i%26])
+        lines.append(line[0])
+        labels.append(rule_name[rule])
+
+    ax1.tick_params(axis='both', which='major', labelsize=7)
+    ax2.tick_params(axis='both', which='major', labelsize=7)
+
+    ax2.set_ylim([-0.05, 1.05])
+    ax2.set_xlabel('Total trials (1,000)',fontsize=7)
+    ax2.set_ylabel('performance',fontsize=7)
+    ax1.set_ylabel('log(cost)',fontsize=7)
+    ax1.set_xticklabels([])
+    ax1.set_title('Training time {:0.0f} s'.format(times[-1]),fontsize=7)
+    lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.65,0.5),
+                    fontsize=7,labelspacing=0.3,loc=6)
+    plt.setp(lg.get_title(),fontsize=7)
+    if save:
+        plt.savefig('figure/Training_Progress'+config['save_addon']+'.pdf', transparent=True)
+    plt.show()
 
 
 def psychometric(self, rule, **kwargs):
@@ -339,3 +374,6 @@ def plot_psychometric_choice(self, xdatas, ydatas, labels, colors, **kwargs):
     plt.show()
     return fits
 
+
+
+plot_trainingprogress('tf_debug_400')
