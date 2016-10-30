@@ -28,7 +28,7 @@ def mkdir_p(path):
 
 
 def write_jobfile(cmd, jobname, pbspath, scratchpath,
-                  nodes=1, ppn=1, gpus=0, mem=8, nhours=15):
+                  nodes=1, ppn=1, gpus=0, mem=64, nhours=36):
     """
     Create a job file.
 
@@ -113,16 +113,12 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 # Submit a job
 #=========================================================================================
 
-nunits = range(5,501,5)
+nunits = range(5,501,5)[::-1]
 for nunit in nunits:
     jobname = 'job_{:d}'.format(nunit)
     cmd     = 'python -u main.py -n {:d}'.format(nunit)
     pbspath = './pbs/'
-    scratchpath = '/scratch/gy441/MultiTask/'
-
-    # # Create necessary directories
-    # for path in [datapath, figspath, scratchpath, trialspath]:
-    #     mkdir_p(path)
+    scratchpath = '/scratch/gy441/multitask/'
 
     jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
                                      ppn=1, gpus=0)

@@ -1548,7 +1548,7 @@ rule_mapping = {TEST_INIT               : test_init,
                 DELAYMATCHGO            : delaymatchgo,
                 DELAYMATCHNOGO          : delaymatchnogo,
                 DMCGO                   : delaymatchcategorygo,
-                DMCNOGO                 : delaymatchcategorygo,
+                DMCNOGO                 : delaymatchcategorynogo,
                 INHGO                   : inhgo,
                 INHREMAP                : inhremapgo,
                 INTREPRO                : intervalreproduction}
