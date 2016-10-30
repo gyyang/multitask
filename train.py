@@ -70,7 +70,7 @@ def train(HDIM):
     w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)))
     b_out = tf.Variable(tf.zeros([n_output]))
 
-    # Initial state
+    # Initial state (requires tensorflow later than 0.10)
     h_init = tf.Variable(0.3*tf.ones([1, n_hidden]))
     h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
 
@@ -118,8 +118,6 @@ def train(HDIM):
                     times.append(time.time()-t_start)
                     print('Trial {:7d}'.format(trials[-1]) +
                           '  | Time {:0.2f} s'.format(times[-1]))
-                    # Calculate batch accuracy
-                    c_tests = list()
                     for rule in rules:
                         task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test)
                         y_hat_test = sess.run(y_hat, feed_dict={x: task.x})
@@ -150,4 +148,4 @@ def train(HDIM):
 
 
 if __name__ == '__main__':
-    train(HDIM=300)
+    train(HDIM=10)

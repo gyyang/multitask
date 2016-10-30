@@ -15,15 +15,17 @@ from scipy.optimize import curve_fit, minimize
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from mpl_toolkits.mplot3d import Axes3D
-import theano
-import theano.tensor as T
 from blocks.model import Model
 from blocks.serialization import load_parameters
 from sklearn.decomposition import PCA, RandomizedPCA
 import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
+
+import tensorflow as tf
+from tensorflow.python.ops import rnn
+from tensorflow.python.client.session import Session
+
 from task import *
-from network import MyNetwork
+from network_old import LeakyRNNCell, LeakyEIRNNCell, get_performance, get_loc
 
 mpl.rcParams['xtick.direction'] = 'out'
 mpl.rcParams['ytick.direction'] = 'out'
@@ -35,81 +37,102 @@ color_rules = np.array([
             [255,0,16],[94,241,242],[0,153,143],[224,255,102],[116,10,255],
             [153,0,0],[255,255,128],[255,255,0],[255,80,5]])/255.
 
-class GeneralAnalysis(object):
+tf.reset_default_graph()
+
+class GeneralAnalysis(Session):
     def __init__(self, save_addon, inh_id=None, inh_output=True):
         '''
         save_addon: add on for loading and saving
         inh_id    : Ids of units to inhibit inputs or outputs
         inh_output: If True, the inhibit the output of neurons, otherwise inhibit inputs to neurons
         '''
+
+        tf.reset_default_graph()
+
+        super(GeneralAnalysis, self).__init__()
+
         ############################## Load Results ###################################
         print('Analyzing network ' + save_addon)
         # Load config
         with open('data/config'+save_addon+'.pkl','rb') as f:
             config = pickle.load(f)
 
+        rule_performance_plot = config['rule_performance_plot']
+        if rule_performance_plot[DMCGO][-1] < 0.1: #TODO: Given that it exists
+            self.success = False
+            print(save_addon + ' failed to converge')
+        else:
+            self.success = True
+
         alpha_original = config['alpha']
         config['dt'] = 1.
         config['alpha'] = config['dt']/TAU # For sample running, we set the time step to be 1ms. So alpha = 1/tau
-        x_dim, h_dim, y_dim = config['shape']
-        mynet = MyNetwork(config)
-        x = T.tensor3('x')
-        y_hat = T.tensor3('y_hat')
-        y_hat_loc = T.vector('y_hat_loc') # Vector of size batchsize
-        c_mask = T.tensor3('c_mask')
+        n_input, n_hidden, n_output = config['shape']
 
-        h = mynet.get_h(x)
-        y = mynet.get_y_from_h(h)
-        y_loc = mynet.popvec.apply(y[-1,:,-config['N_RING']:])
-        cost, performance = mynet.get_cost_from_y(y, y_hat, y_hat_loc, c_mask)
+        # Build the network
+        # Notice here hs and outputs are 3-tensors instead of 2-tensor.
+        # It's easier for analysis this way
+        # tf Graph input
+        x = tf.placeholder("float", [None, None, n_input]) # Input (time, batch, units)
+        y = tf.placeholder("float", [None, None, n_output]) # Correct output
+        c_mask = tf.placeholder("float", [None, None, n_output]) # Cost mask
 
-        model = Model(cost)
-        with open('data/task_multi'+config['save_addon']+'.tar', 'rb') as f:
-            p_dict = load_parameters(f)
+        # Define weights
+        w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)), name='w_out')
+        b_out = tf.Variable(tf.random_normal([n_output], stddev=0.0), name='b_out')
 
-        if inh_id is not None: # No inhibition of units
-            control_array = np.ones(h_dim, dtype=p_dict['/mynetwork/h_rec.W'].dtype)
-            control_array[inh_id] = 0
+        basicrnn_cell = LeakyRNNCell(n_hidden, alpha=config['alpha'])
+        h, states = rnn.dynamic_rnn(basicrnn_cell, x, dtype=tf.float32, time_major=True)
 
-            if inh_output: # Inhibit the unit output
-                p_dict['/mynetwork/h_rec.W'] = (control_array*p_dict['/mynetwork/h_rec.W'].T).T
-                p_dict['/mynetwork/h_to_o.W'] = (control_array*p_dict['/mynetwork/h_to_o.W'].T).T
-            else: # Inhibit the unit input
-                p_dict['/mynetwork/h_rec.W'] = control_array*p_dict['/mynetwork/h_rec.W']
-                p_dict['/mynetwork/x_to_h.W'] = control_array*p_dict['/mynetwork/x_to_h.W']
-                p_dict['/mynetwork/x_to_h.b'] = control_array*p_dict['/mynetwork/x_to_h.b']
+        # h = tf.reshape(h, [-1, n_hidden])
+        y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, [-1, n_hidden]), w_out) + b_out) # tf.matmul only takes matrix
+        y_hat = tf.reshape(y_hat, [tf.shape(h)[0], tf.shape(h)[1], n_output])
+
+        # Define loss
+        cost = tf.reduce_mean(tf.square((y_hat - y)*c_mask))
+
+        # Add ops to save and restore all the variables.
+        saver = tf.train.Saver()
+
+        saver.restore(self, 'data/model_'+config['save_addon']+'.ckpt')
+
+        self.f_h = lambda batch_x : self.run(h, feed_dict={x: batch_x})
+        self.f_y = lambda batch_h : self.run(y_hat, feed_dict={h: batch_h})
+        self.f_cost = lambda batch_x, batch_y_hat, batch_c_mask : \
+            self.run(cost, feed_dict={x: batch_x, y_hat:batch_y_hat, c_mask:batch_c_mask})
+
+        self.f_y_loc = lambda batch_y: get_loc(batch_y)[-1] # get y_loc of last time points
+        self.f_y_loc_from_x = lambda batch_x : self.f_y_loc(self.f_y(self.f_h(batch_x)))
+        self.f_perf = get_performance # TODO: probably need work
+
+        # with open('data/task_multi'+config['save_addon']+'.tar', 'rb') as f:
+        #     p_dict = load_parameters(f)
+        #
+        # if inh_id is not None: # No inhibition of units
+        #     control_array = np.ones(h_dim, dtype=p_dict['/mynetwork/h_rec.W'].dtype)
+        #     control_array[inh_id] = 0
+        #
+        #     if inh_output: # Inhibit the unit output
+        #         p_dict['/mynetwork/h_rec.W'] = (control_array*p_dict['/mynetwork/h_rec.W'].T).T
+        #         p_dict['/mynetwork/h_to_o.W'] = (control_array*p_dict['/mynetwork/h_to_o.W'].T).T
+        #     else: # Inhibit the unit input
+        #         p_dict['/mynetwork/h_rec.W'] = control_array*p_dict['/mynetwork/h_rec.W']
+        #         p_dict['/mynetwork/x_to_h.W'] = control_array*p_dict['/mynetwork/x_to_h.W']
+        #         p_dict['/mynetwork/x_to_h.b'] = control_array*p_dict['/mynetwork/x_to_h.b']
 
 
-        model.set_parameter_values(p_dict)
 
-        f_h = theano.function([x],h)
-        f_y = theano.function([h],y)
-        f_y_loc = theano.function([y], y_loc)
-        f_cost  = theano.function([x, y_hat, y_hat_loc, c_mask], [cost, performance], on_unused_input='warn')
-
-        params = model.get_parameter_dict()
         # Notice this weight is originally used as r*W, so transpose them
-        Wrec = params['/mynetwork/h_rec.W'].get_value().T
-        Wout = params['/mynetwork/h_to_o.W'].get_value().T
-        Win  = params['/mynetwork/x_to_h.W'].get_value().T
+        # Wrec = params['/mynetwork/h_rec.W'].get_value().T
+        # Wout = params['/mynetwork/h_to_o.W'].get_value().T
+        # Win  = params['/mynetwork/x_to_h.W'].get_value().T
 
-        if config['h_type'] == 'leaky_rec_ei':
-            dimE = mynet.h_layer.dimE
-            dimI = mynet.h_layer.dimI
-            Wrec = (np.array([1.]*dimE+[-1.]*dimI))*abs(Wrec)
+        # if config['h_type'] == 'leaky_rec_ei':
+        #     dimE = mynet.h_layer.dimE
+        #     dimI = mynet.h_layer.dimI
+        #     Wrec = (np.array([1.]*dimE+[-1.]*dimI))*abs(Wrec)
 
         self.config = config
-
-        self.f_h  = f_h
-        self.f_y  = f_y
-        self.f_y_loc = f_y_loc
-        self.f_y_loc_from_x = lambda x : f_y_loc(f_y(f_h(x)))
-        self.f_cost = f_cost
-
-        self.Wrec = Wrec
-        self.Wout = Wout
-        self.Win  = Win
-        self.p_dict = p_dict
 
         self.rules = self.config['rule_cost_plot'].keys()
 
@@ -351,11 +374,9 @@ class GeneralAnalysis(object):
     def plot_trainingprogress(self, rule_plot=None, save=True):
         # Plot Training Progress
 
-
         rule_cost_plot = self.config['rule_cost_plot']
         rule_performance_plot = self.config['rule_performance_plot']
-        batch_plot = self.config['batch_plot']
-        batch_size = self.config['batch_size']
+
         traintime_plot = self.config['traintime_plot']
 
         fig = plt.figure(figsize=(5,3))
@@ -365,7 +386,7 @@ class GeneralAnalysis(object):
         lines = list()
         labels = list()
 
-        x_plot = np.array(batch_plot)*batch_size/1000.
+        x_plot = np.array(self.config['trial_plot'])/1000.
         if rule_plot == None:
             rule_plot = rule_cost_plot.keys()
 
@@ -754,78 +775,6 @@ class GeneralAnalysis(object):
 
         dprimes = abs(np.mean(h_cat0,axis=0)-np.mean(h_cat1,axis=0))/np.sqrt((np.var(h_cat0,axis=0)+np.var(h_cat1,axis=0))/2)
         return dprimes
-
-    def plot_hunits_obsolete(self, rule, ind_unit):
-        plt.figure()
-        _ = plt.plot(h_samples[rule][:,:,ind_unit])
-        plt.xlabel('Time (ms)')
-        plt.ylabel('Rec units activity')
-
-        #plt.savefig('figure/'+rule_name[rule]+'_sampleactivity.pdf')
-
-    def plot_weight_obsolete(self, Wrec):
-        #---------------------------------------------------------------------------------
-        # Display connection matrix
-        #---------------------------------------------------------------------------------
-
-        f_norm = lambda x: x/abs(x).max()
-        Wrec_plot = f_norm(Wrec*(Wrec>0)) + f_norm(Wrec*(Wrec<0))
-        plt.figure()
-        plt.imshow(Wrec_plot, cmap='seismic_r', interpolation='nearest', aspect='equal',
-                   vmin=-1, vmax=1)
-        plt.savefig('figure/weight.pdf')
-
-    def get_vars_obsolete(self, rules, norm_by='none'):
-        for j, rule in enumerate(rules):
-            print 'Running rule ' + rule_name[rule] + '...'
-            task = generate_onebatch(rule=rule, config=self.config, mode='test',
-                                     t_tot=1000)
-            data = self.f_h(task.x)[:,:,:] # (Time, Batch, Units)
-            data = data[range(0,data.shape[0],int(data.shape[0]/100)),:,:] # Downsample in time
-
-            if j == 0:
-                # (Rule, Time, Batch, Units)
-                data_all = np.zeros((len(rules), data.shape[0], data.shape[1], data.shape[2]))
-            data_all[j] = data
-
-        # data_all = (Rule, Time, Batch, Units)
-        # These are quite arbitrary now
-        vars = dict()
-        vars['task'] = data_all.mean(axis=1).mean(axis=1).var(axis=0)
-        vars['stim'] = data_all.var(axis=2).mean(axis=0).mean(axis=0)
-        vars['time'] = data_all.mean(axis=2).var(axis=1).mean(axis=0)
-        vars['all']  = data_all.reshape((-1, data.shape[2])).var(axis=0)
-        mean_all = data_all.mean(axis=0).mean(axis=0).mean(axis=0)
-
-
-        from scipy.stats import spearmanr
-        fig = plt.figure(figsize=(4,2))
-        for left, xtype, ytype in zip([0.15,0.65],['stim','stim'],['task','time']):
-            ax = fig.add_axes([left,0.2,0.3,0.6])
-            if norm_by == 'total_var':
-                x_scatter, y_scatter = vars[xtype]/vars['all'], vars[ytype]/vars['all']
-            elif norm_by == 'total_mean':
-                x_scatter, y_scatter = np.sqrt(vars[xtype])/mean_all, np.sqrt(vars[ytype])/mean_all
-            elif norm_by == 'none':
-                x_scatter, y_scatter = vars[xtype], vars[ytype]
-
-            ax.scatter(x_scatter, y_scatter, s=1.5, color=sns.xkcd_rgb['denim blue'])
-            plt.xlabel(xtype + ' std', fontsize=7)
-            plt.ylabel(ytype + ' std', fontsize=7)
-            plt.xlim([0-x_scatter.max()*0.1, x_scatter.max()*1.1])
-            plt.ylim([0-y_scatter.max()*0.1, y_scatter.max()*1.2])
-            plt.title('Normalized by '+norm_by,fontsize=7)
-
-            rho, pval = spearmanr(x_scatter, y_scatter)
-            ax.text(0.05, 0.9, r'$\rho={:0.3f}, P={:0.1e}$'.format(rho,pval), transform=ax.transAxes, fontsize=7)
-
-            ax.tick_params(axis='both', which='major', labelsize=7)
-            ax.spines["right"].set_visible(False)
-            ax.spines["top"].set_visible(False)
-            ax.xaxis.set_ticks_position('bottom')
-            ax.yaxis.set_ticks_position('left')
-        plt.savefig('figure/unitstd_normby'+norm_by+self.config['save_addon']+'.pdf')
-        plt.show()
 
     def get_sumstat(self, rules=None, do_PCA=True):
         '''
@@ -1256,189 +1205,68 @@ class GeneralAnalysis(object):
 
 
 
-
 rules = [FIXATION, GO, INHGO, DELAYGO, CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,
          CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,
          REMAP, INHREMAP, DELAYREMAP, DELAYMATCHGO, DELAYMATCHNOGO]
 
-
-def plot_subconn_fixgo(rules):
-    HDIMs = range(190,208)
-    #HDIMs = [200]
-    N_RINGs = [16] * len(HDIMs)
-
-    # HDIMs = [200]
-    # N_RINGs = [16]
-
-    j = 0
-    w_subconns = OrderedDict()
-    w_ins      = OrderedDict()
-    w_outs     = OrderedDict()
-    for HDIM, N_RING in zip(HDIMs, N_RINGs):
-        save_addon = 'latest_'+str(HDIM)+'_'+str(N_RING)
-        A = GeneralAnalysis(save_addon=save_addon)
-        A.run_test(rules)
-        A.get_subconn(plot_fig=False)
-
-        for key in A.w_sub:
-            if j == 0:
-                w_subconns[key] = [A.w_sub[key]]
-            else:
-                w_subconns[key] += [A.w_sub[key]]
-
-        for key in A.w_out:
-            if j == 0:
-                w_ins[key]  = A.w_in[key]
-                w_outs[key] = A.w_out[key]
-            else:
-                w_ins[key]  = np.concatenate((w_ins[key], A.w_in[key]), axis=0)
-                w_outs[key] = np.concatenate((w_outs[key], A.w_out[key]), axis=1)
-
-        j += 1
-
-    ################################## Plot sub-connectivity #####################
-    n_network = len(HDIMs)
-
-    w_subconn_mean = OrderedDict()
-    w_subconn_se   = OrderedDict()
-    for key, val in w_subconns.iteritems():
-        w_subconn_mean[key] = np.mean(val)
-        w_subconn_se[key]   = np.std(val)/np.sqrt(len(val))
-
-    ename = {'go1' : 'go', 'tar1' : 'fix', 'delay1' : 'delay', 'all' : 'all'}
-    color = sns.xkcd_palette(['cerulean'])[0]
-    n = len(w_subconn_mean.values())
-    fig = plt.figure(figsize=(3,1.5))
-    ax = fig.add_axes([0.2,0.3,0.7,0.6])
-    ax.bar(np.arange(n)-0.25, w_subconn_mean.values(), width=0.5,
-           yerr=w_subconn_se.values(), color=color, ecolor=color, edgecolor='none')
-    xticklabels = [ename[e0]+' to '+ename[e1] for e0, e1 in w_subconn_mean.keys()]
-    plt.xticks(np.arange(n), xticklabels, rotation=45)
-    plt.ylabel('Mean conn. weight (a.u.)', fontsize=7)
-    plt.yticks([0,-0.5,-1])
-    plt.ylim([np.min(w_subconn_mean.values())*1.1,0.1])
-    plt.title('Average of {:d} networks'.format(n_network), fontsize=7)
-    ax.tick_params(axis='both', which='major', labelsize=7)
-    plt.savefig('figure/fixgo_subconnectivity_averaged.pdf', transparent=True)
-    plt.show()
-
-    epoch_types = ['go1', 'tar1', 'all']
-    W = np.zeros((3,3))
-    for i0, epoch_type0 in enumerate(epoch_types):
-        for i1, epoch_type1 in enumerate(epoch_types):
-            W[i1,i0] = w_subconn_mean[(epoch_type0,epoch_type1)]
-    vmax = np.ceil(abs(W).max()*10)/10
-    fig = plt.figure(figsize=(2,2))
-    ax = fig.add_axes([0.2,0.2,0.6,0.6])
-    cmap = sns.diverging_palette(240, 10, as_cmap=True)
-    im = ax.imshow(W, interpolation='nearest', cmap=cmap,
-                   vmin=-vmax, vmax=vmax, origin='lower', aspect='auto')
-    plt.xticks([0,1,2],[ename[e] for e in epoch_types])
-    plt.yticks([0,1,2],[ename[e] for e in epoch_types])
-    plt.xlabel('from', fontsize=7,labelpad=1)
-    plt.ylabel('to', fontsize=7,labelpad=1)
-    ax.tick_params(axis='both', which='major', labelsize=7)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    cb = plt.colorbar(im, cax=cax, ticks=[-vmax,vmax])
-    cb.set_label('mean conn. weight', fontsize=7, labelpad=-7)
-    plt.tick_params(axis='both', which='major', labelsize=7)
-    plt.savefig('figure/fixgo_subconnectivity_averaged_matrix.pdf', transparent=True)
-    plt.show()
-
-    ###################### Plot input/output connectivity #####################
-    w_ins_mean  = OrderedDict()
-    w_ins_se    = OrderedDict()
-    w_outs_mean = OrderedDict()
-    w_outs_se   = OrderedDict()
-    for key in w_ins.keys():
-        w_ins_mean[key]  = np.mean(w_ins[key],axis=0)
-        w_ins_se[key]    = np.std(w_ins[key],axis=0)/np.sqrt(w_ins[key].shape[0])
-        w_outs_mean[key] = np.mean(w_outs[key],axis=1)
-        w_outs_se[key]   = np.std(w_outs[key],axis=1)/np.sqrt(w_outs[key].shape[1])
-
-    for j in [0, 1]:
-        if j == 0:
-            plot_mean, plotse, xlabel, lgtitle = w_ins_mean, w_ins_se, 'input', 'to'
-        else:
-            plot_mean, plotse, xlabel, lgtitle = w_outs_mean, w_outs_se, 'output', 'from'
-        n = A.config['N_RING']+1
-        fig = plt.figure(figsize=(2.5,1.5))
-        ax = fig.add_axes([0.2,0.25,0.5,0.6])
-        for key, val in plot_mean.iteritems():
-            ax.errorbar(range(n), val[:n], fmt='o-', yerr=plotse[key][:n], label=ename[key], markersize=3)
-        # get handles
-        handles, labels = ax.get_legend_handles_labels()
-        # remove the errorbars
-        handles = [h[0] for h in handles]
-        # use them in the legend
-        lg = ax.legend(handles, labels, loc='upper left',numpoints=1, title=lgtitle,
-                       ncol=1, bbox_to_anchor=(1.1,1.0), fontsize=7,labelspacing=0.3)
-        plt.setp(lg.get_title(),fontsize=7)
-        plt.xlim([-1,n])
-        plt.xticks([0, int(n/2)], ['fix.', 'ring'])
-        plt.xlabel(xlabel + ' units', fontsize=7, labelpad=2)
-        plt.ylabel('Mean conn. weight (a.u.)', fontsize=7)
-        plt.locator_params(axis='y', nbins=3)
-        plt.title('Average of {:d} networks'.format(n_network), fontsize=7)
-        ax.tick_params(axis='both', which='major', labelsize=7)
-        plt.savefig('figure/fixgo_'+xlabel+'connectivity_averaged.pdf', transparent=True)
-        plt.show()
-
-def plot_standardanalysis():
-    HDIM = 200
-    N_RING = 16
-    save_addon = 'dmc_'+str(HDIM)+'_'+str(N_RING)
-    A = GeneralAnalysis(save_addon=save_addon)
-    A.plot_neuron_condition(rules=[INHGO, INHREMAP], condition='epochselective', plot_ids=[0,0])
-    A.plot_meanstd()
-    A.plot_neuron_condition(rules=[INHGO], condition='stimselective', epoch_types = ['tar1'], plot_ids=[7])
-
 def test_init():
+    tf.reset_default_graph()
+    # Set up network
     HDIM = 200
     N_RING = 16
-    config = {'h_type'      : 'leaky_rec_ca',
+    config = {'h_type'      : 'leaky_rec_ei',
               'alpha'       : 0.2, # \Delta t/tau
               'dt'          : 0.2*TAU,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : 'chanceabbott_'+str(HDIM)+'_'+str(N_RING)}
-    x = T.tensor3('x')
-    y_hat = T.tensor3('y_hat')
-    y_hat_loc = T.vector('y_hat_loc') # Vector of size batchsize
-    c_mask = T.tensor3('c_mask')
-    mynet = MyNetwork(config)
-    cost, performance = mynet.cost(x, y_hat, y_hat_loc, c_mask)
-    cost.name = 'cost'
-    performance.name = 'performance'
-    model = Model(cost)
-    mynet.initialize()
+              'save_addon'  : 'tfei_'+str(HDIM)+'_'+str(N_RING)}
 
-    h = mynet.get_h(x)
-    y = mynet.get_y_from_h(h)
-    y_loc = mynet.popvec.apply(y[-1,:,-config['N_RING']:])
-    cost, performance = mynet.cost(x, y_hat, y_hat_loc, c_mask)
+    # Network Parameters
+    n_input = config['shape'][0] # input units
+    n_hidden = HDIM # recurrent units
+    n_output = config['shape'][-1] # output units
 
-    f_h = theano.function([x],h)
-    f_y = theano.function([h],y)
-    f_y_loc = theano.function([y], y_loc)
-    f_perf  = theano.function([x, y_hat_loc], performance, on_unused_input='warn')
+    # Build the network
+    # Notice here hs and outputs are 3-tensors instead of 2-tensor.
+    # It's easier for analysis this way
+    # tf Graph input
+    x = tf.placeholder("float", [None, None, n_input]) # Input (time, batch, units)
+    y = tf.placeholder("float", [None, None, n_output]) # Correct output
+    c_mask = tf.placeholder("float", [None, None, n_output]) # Cost mask
 
-    task = generate_onebatch(rule=CHOICEATTEND_MOD2, config=config, mode='sample', t_tot=1000)
+    # Define weights
+    w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)), name='w_out')
+    b_out = tf.Variable(tf.random_normal([n_output], stddev=0.0), name='b_out')
 
-    h_sample = f_h(task.x)
-    y_sample = f_y(h_sample)
+    if config['h_type'] == 'leaky_rec':
+        basicrnn_cell = LeakyRNNCell(n_hidden, alpha=config['alpha'])
+    elif config['h_type'] == 'leaky_rec_ei':
+        basicrnn_cell = LeakyEIRNNCell(n_hidden, alpha=config['alpha'])
+    h, states = rnn.dynamic_rnn(basicrnn_cell, x, dtype=tf.float32, time_major=True)
+
+    # h = tf.reshape(h, [-1, n_hidden])
+    y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, [-1, n_hidden]), w_out) + b_out) # tf.matmul only takes matrix
+    y_hat = tf.reshape(y_hat, [tf.shape(h)[0], tf.shape(h)[1], n_output])
+
+    # Initializing the variables
+    init = tf.initialize_all_variables()
+
+    task = generate_onebatch(rule=DMCGO, config=config, mode='sample', t_tot=1000)
+    with tf.Session() as sess:
+        sess.run(init)
+        h_sample = sess.run(h, feed_dict={x:task.x})
+        y_sample = sess.run(y_hat, feed_dict={x:task.x})
+
     plt.plot(h_sample[:,0,:])
     plt.show()
 
     plt.plot(y_sample[:,0,:])
     plt.show()
 
-def plot_finalperformance():
+def plot_finalperformance(save_type='tf'):
     # Initialization. Dictionary comprehension.
     HDIM, N_RING = 200, 16
-    save_type  = 'latestei' # should be named latest, temporary now
     save_addon = save_type+'_'+str(HDIM)+'_'+str(N_RING)
     with open('data/config'+save_addon+'.pkl','rb') as f:
         config = pickle.load(f)
@@ -1446,6 +1274,7 @@ def plot_finalperformance():
     final_cost        = {k: [] for k in rule_cost_plot}
     final_performance = {k: [] for k in rule_cost_plot}
     HDIM_plot = list()
+    training_time_plot = list()
     # Recording performance and cost for networks
     HDIMs = range(1000)
     for HDIM in HDIMs:
@@ -1457,13 +1286,15 @@ def plot_finalperformance():
             config = pickle.load(f)
         rule_cost_plot = config['rule_cost_plot']
         rule_performance_plot = config['rule_performance_plot']
-        for key in rule_performance_plot.keys():
-            final_performance[key] += [float(rule_performance_plot[key][-1])]
-            final_cost[key]        += [float(rule_cost_plot[key][-1])]
-        HDIM_plot.append(HDIM)
+        if rule_performance_plot[DMCGO][-1] > 0.1:
+            for key in rule_performance_plot.keys():
+                final_performance[key] += [float(rule_performance_plot[key][-1])]
+                final_cost[key]        += [float(rule_cost_plot[key][-1])]
+            HDIM_plot.append(HDIM)
+            training_time_plot.append(config['traintime_plot'][-1])
     
-    n_trial = config['batch_plot'][-1]*config['batch_size']
-    x_plot = HDIM_plot
+    n_trial = config['trial_plot'][-1]
+    x_plot = np.array(HDIM_plot)
     rule_plot = None
     if rule_plot == None:
         rule_plot = rule_performance_plot.keys()
@@ -1486,7 +1317,7 @@ def plot_finalperformance():
     ax2.set_ylim(top=1.05)
     ax2.set_xlabel('Number of Recurrent Units',fontsize=7)
     ax2.set_ylabel('performance',fontsize=7)
-    ax1.set_ylabel('log(cost)',fontsize=7)
+    ax1.set_ylabel(r'$log_{10}$(cost)',fontsize=7)
     ax1.set_xticklabels([])
     ax1.set_title('After {:.1E} trials'.format(n_trial),fontsize=7)
     lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.65,0.5),
@@ -1494,34 +1325,42 @@ def plot_finalperformance():
     plt.setp(lg.get_title(),fontsize=7)
     plt.savefig('figure/FinalCostPerformance_'+save_type+'.pdf', transparent=True)
     plt.show()
+    
+    x_plot = np.array(HDIM_plot)/100.
+    y_plot = np.array(training_time_plot)/3600.
+    fig = plt.figure(figsize=(5,1.5))
+    ax  = fig.add_axes([0.15, 0.25, 0.5, 0.7])
+    p = np.polyfit(x_plot[x_plot<5], y_plot[x_plot<5], 2) # Temporary
+    #p = np.polyfit(x_plot, y_plot, 2)
+    ax.plot(x_plot, p[0]*x_plot**2+p[1]*x_plot+p[2], color='black')
+    ax.plot(x_plot, y_plot, color=sns.xkcd_palette(['cerulean'])[0])
+    ax.text(0.05, 0.7, 'Number of Hours = \n {:0.2f}$(N/100)^2$+{:0.2f}$(N/100)$+{:0.2f}'.format(*p), fontsize=7, transform=ax.transAxes)
+    ax.set_xlabel('Number of Recurrent Units $N$ (100)',fontsize=7)
+    ax.set_ylabel('Training time (hours)',fontsize=7)
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
+    plt.show()
+
 
 if __name__ == '__main__':
-    save_addon = 'latestei_'+str(200)+'_'+str(16)
-    # A = GeneralAnalysis(save_addon=save_addon)
-    # A.plot_trainingprogress()
-    #A.sample_plot(DMCGO)
-    # A.get_sumstat(do_PCA=True)
-    # A.schematic_plot()
-    # A.plot_activation()
-    # A.psychometric(CHOICE_MOD1)
-    # A.psychometric(CHOICEATTEND_MOD1, no_ylabel=True)
-    # A.psychometric(CHOICE_INT, no_ylabel=True)
-    # A.psychometric(CHOICEDELAY_MOD1)
+    save_addon = 'tf_'+str(500)+'_'+str(16)
+    # with GeneralAnalysis(save_addon=save_addon) as A:
+    #     A.sample_plot(DMCGO)
+    #     A.plot_trainingprogress()
+    #     A.get_sumstat(do_PCA=True)
+    #     A.schematic_plot()
+    #     A.plot_activation()
+    #     A.psychometric(CHOICE_MOD1)
+    #     A.psychometric(CHOICEATTEND_MOD1, no_ylabel=True)
+    #     A.psychometric(CHOICE_INT, no_ylabel=True)
+    #     A.psychometric(CHOICEDELAY_MOD1)
     
     # plot_subconn_fixgo(A.rules)
     # A.run_test()
     # A.plot_meanstd()
     # A.plot_tasknonselective(rules=[INHGO, INHREMAP], save_fig=True, plot_ids=[0,1])
 
-
-    # Interval Reproduction Task
-    # HDIM = 200
-    # N_RING = 16
-    # save_addon = 'intrepro_'+str(HDIM)+'_'+str(N_RING)
-    # A = GeneralAnalysis(save_addon=save_addon)
-    # _ = A.sample_plot(INTREPRO)
-    # A.psychometric(INTREPRO)
-    # A.plot_trainingprogress('all')
+    # plot_finalperformance('tfei')
 
 
 #==============================================================================
