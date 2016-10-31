@@ -43,12 +43,8 @@ keys = h_all_byepoch.keys()
 ind_key_sort = np.lexsort(zip(*keys))
 h_all_byepoch = OrderedDict([(keys[i], h_all_byepoch[keys[i]]) for i in ind_key_sort])
 
-with Run(save_addon) as R:
-    params = R.params
-    w_rec  = R.w_rec
-    w_in   = R.w_in
-
-n_x, n_h, n_y = config['shape']
+nx, nh, ny = config['shape']
+n_ring = config['N_RING']
 
 if data_type == 'rule':
     h_all = h_all_byrule
@@ -61,9 +57,9 @@ elif data_type == 'epoch':
 else:
     raise ValueError
 
-h_var_all = np.zeros((n_h, len(h_all.keys())))
+h_var_all = np.zeros((nh, len(h_all.keys())))
 for i, val in enumerate(h_all.values()):
-    h_var_all[:, i] = val[t_start:].reshape((-1, n_h)).var(axis=0)
+    h_var_all[:, i] = val[t_start:].reshape((-1, nh)).var(axis=0)
 
 # Plot total variance distribution
 fig = plt.figure(figsize=(1.5,1.2))
@@ -84,9 +80,9 @@ plt.show()
 
 # First only get active units. Total variance across tasks larger than 1e-3
 ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
-ind_original = np.arange(n_h)
+ind_orig   = np.arange(nh)
 h_var_all  = h_var_all[ind_active, :]
-ind_original = ind_original[ind_active]
+ind_orig   = ind_orig[ind_active]
 
 # Normalize by the total variance across tasks
 h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
@@ -111,9 +107,9 @@ labels = labels2
 ind_sort = np.argsort(labels)
 labels = labels[ind_sort]
 h_normvar_all = h_normvar_all[ind_sort, :]
-ind_original = ind_original[ind_sort]
+ind_orig = ind_orig[ind_sort]
 
-################################## Plotting ###################################
+######################### Plotting Variance ###################################
 # Plot Normalized Variance
 if data_type == 'rule':
     figsize = (3.5,2.5)
@@ -180,6 +176,51 @@ ax2.set_ylim([0, len(labels)])
 ax1.axis('off')
 ax2.axis('off')
 plt.savefig('figure/feature_similarity_by'+data_type+'.pdf', transparent=True)
+plt.show()
+
+######################### Plotting Connectivity ###############################
+with Run(save_addon) as R:
+    params = R.params
+    w_rec  = R.w_rec
+    w_in   = R.w_in
+    w_out  = R.w_out
+    b_rec  = R.b_rec
+    b_out  = R.b_out
+
+nh = len(ind_orig)
+nr = n_ring
+l = 0.25
+l0 = (1-1.5*l)/nh
+plot_infos = [(w_rec[ind_orig,:][:,ind_orig], [l               ,l          ,nh*l0       ,nh*l0]),
+              (w_in[ind_orig,:nr]           , [l-(nx+12)*l0    ,l          ,nr*l0       ,nh*l0]),
+              (w_in[ind_orig,nr:2*nr]       , [l-(nx-nr+9)*l0  ,l          ,nr*l0       ,nh*l0]),
+              (w_in[ind_orig,2*nr:]         , [l-(nx-2*nr+6)*l0,l          ,(nx-2*nr)*l0,nh*l0]),
+              (w_out[:, ind_orig]           , [l               ,l-(ny+6)*l0,nh*l0       ,ny*l0]),
+              (b_rec[ind_orig, np.newaxis]  , [l+(nh+6)*l0     ,l          ,l0          ,nh*l0]),
+              (b_out[:, np.newaxis]         , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0          ,ny*l0])]
+
+cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
+fig = plt.figure(figsize=(4,4))
+for plot_info in plot_infos:
+    ax = fig.add_axes(plot_info[1])
+    vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [5,50,95])
+    _ = ax.imshow(plot_info[0], interpolation='none', cmap=cmap, aspect='auto',
+                  vmin=vmid-(vmax-vmin)/2, vmax=vmid+(vmax-vmin)/2)
+    ax.axis('off')
+
+ax1 = fig.add_axes([l     , l+nh*l0, nh*l0, 6*l0])
+ax2 = fig.add_axes([l-6*l0, l      , 6*l0 , nh*l0])
+for l in range(n_cluster):
+    ind_l = np.where(labels==l)[0][[0, -1]]+np.array([0,1])
+    ax1.plot(ind_l, [0,0], linewidth=2, solid_capstyle='butt',
+            color=sns.color_palette('deep', n_cluster)[l])
+    ax2.plot([0,0], len(labels)-ind_l, linewidth=2, solid_capstyle='butt',
+            color=sns.color_palette('deep', n_cluster)[l])
+ax1.set_xlim([0, len(labels)])
+ax2.set_ylim([0, len(labels)])
+ax1.axis('off')
+ax2.axis('off')
+plt.savefig('figure/connectivity_by'+data_type+'.pdf', transparent=True)
 plt.show()
 
 
