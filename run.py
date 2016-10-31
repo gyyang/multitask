@@ -69,7 +69,8 @@ class Run(Session):
         # self.run(assign_op)
 
         self.f_h = lambda x0 : self.run(h, feed_dict={x : x0})
-        self.f_y = lambda h0 : self.run(y_hat, feed_dict={h : h0})
+        self.f_y = lambda h0 : self.run(y_hat, feed_dict={h : h0}).reshape(
+            (h0.shape[0],h0.shape[1],n_output))
         self.f_y_loc = lambda y0 : popvec(y0[...,1:])
         self.f_cost  = lambda y0, y_hat0, c_mask0: np.mean((c_mask0*(y_hat0-y0))**2)
 
@@ -90,7 +91,7 @@ class Run(Session):
 if __name__ == "__main__":
 
     save = False
-    save_addon = 'tf_debug_300'
+    save_addon = 'tf_debug_400'
 
     rule = DMCNOGO
 
@@ -150,7 +151,7 @@ if __name__ == "__main__":
             plt.imshow(y_sample[:,0,1:].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
             # plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
             plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
-            plt.xticks([0,500,1000])
+            plt.xticks([0,1000,2000])
             plt.xlabel('Time (ms)',fontsize=7)
             ax.spines["bottom"].set_visible(True)
         plt.ylabel(ylabels[i],fontsize=7)

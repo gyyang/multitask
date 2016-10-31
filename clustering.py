@@ -7,34 +7,41 @@ from __future__ import division
 import os
 import numpy as np
 import pickle
+from collections import OrderedDict
 import matplotlib.pyplot as plt
 import seaborn.apionly as sns
 
 from task import *
 from run import Run
-from general_analysis import GeneralAnalysis
 
 ########################## Running the network ################################
 save_addon = 'tf_debug_400'
+data_type = 'epoch'
 
 rules = [GO, INHGO, DELAYGO,\
     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
     CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
     REMAP, INHREMAP, DELAYREMAP,\
-    DELAYMATCHGO, DELAYMATCHNOGO, DMCGO]
-rules += [DMCNOGO]
+    DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
 
 n_rules = len(rules)
 
-h_all = dict()
-
+h_all_byrule  = OrderedDict()
+h_all_byepoch = OrderedDict()
 # with GeneralAnalysis(save_addon) as R:
 with Run(save_addon) as R:
     config = R.config
     for rule in rules:
         task = generate_onebatch(rule=rule, config=config, mode='test')
-        h_all[rule] = R.f_h(task.x)
+        h_all_byrule[rule] = R.f_h(task.x)
+        for e_name, e_time in task.epochs.iteritems():
+            if 'fix' not in e_name:
+                h_all_byepoch[(rule, e_name)] = h_all_byrule[rule][e_time[0]:e_time[1],:,:]
 
+# Reorder h_all_byepoch by epoch-first
+keys = h_all_byepoch.keys()
+ind_key_sort = np.lexsort(zip(*keys))
+h_all_byepoch = OrderedDict([(keys[i], h_all_byepoch[keys[i]]) for i in ind_key_sort])
 
 with Run(save_addon) as R:
     params = R.params
@@ -43,11 +50,20 @@ with Run(save_addon) as R:
 
 n_x, n_h, n_y = config['shape']
 
-h_var_all = np.zeros((n_h, n_rules))
-for i, rule in enumerate(rules):
-    t_start = 400 # Important: Ignore the initial transition
-    h_all_rule = h_all[rule][t_start:, :, :]
-    h_var_all[:, i] = h_all_rule.reshape((-1, n_h)).var(axis=0)
+if data_type == 'rule':
+    h_all = h_all_byrule
+    t_start = 500 # Important: Ignore the initial transition
+    n_cluster = 12
+elif data_type == 'epoch':
+    h_all = h_all_byepoch
+    t_start = None
+    n_cluster = 15
+else:
+    raise ValueError
+
+h_var_all = np.zeros((n_h, len(h_all.keys())))
+for i, val in enumerate(h_all.values()):
+    h_var_all[:, i] = val[t_start:].reshape((-1, n_h)).var(axis=0)
 
 # Plot total variance distribution
 fig = plt.figure(figsize=(1.5,1.2))
@@ -77,7 +93,6 @@ h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
 ################################## Clustering ################################
 # Clustering
-n_cluster = 10
 from sklearn.cluster import AgglomerativeClustering
 ac = AgglomerativeClustering(n_cluster, affinity='cosine', linkage='average')
 ac.fit(h_var_all) # n_samples, n_features = n_units, n_rules/n_epochs
@@ -100,11 +115,21 @@ ind_original = ind_original[ind_sort]
 
 ################################## Plotting ###################################
 # Plot Normalized Variance
-fig = plt.figure(figsize=(3.5,2.5))
+if data_type == 'rule':
+    figsize = (3.5,2.5)
+    tick_names = [rule_name[r] for r in rules]
+elif data_type == 'epoch':
+    figsize = (3.5,4.5)
+    tick_names = [rule_name[key[0]]+' '+key[1] for key in h_all.keys()]
+else:
+    raise ValueError
+
+vmin, vmax = 0, 0.5
+fig = plt.figure(figsize=figsize)
 ax = fig.add_axes([0.25, 0.2, 0.6, 0.7])
 im = ax.imshow(h_normvar_all.T, cmap='hot',
-               aspect='auto', interpolation='none', vmin=0, vmax=1)
-tick_names = [rule_name[r] for r in rules]
+               aspect='auto', interpolation='none', vmin=vmin, vmax=vmax)
+
 plt.yticks(range(len(tick_names)), tick_names,
            rotation=0, va='center', fontsize=6)
 plt.xticks([])
@@ -112,7 +137,7 @@ ax.tick_params('both', length=0)
 for loc in ['bottom','top','left','right']:
     ax.spines[loc].set_visible(False)
 ax = fig.add_axes([0.87, 0.2, 0.03, 0.7])
-cb = plt.colorbar(im, cax=ax, ticks=[0,1])
+cb = plt.colorbar(im, cax=ax, ticks=[vmin,vmax])
 cb.outline.set_linewidth(0.5)
 cb.set_label('Normalized Variance', fontsize=7, labelpad=0)
 plt.tick_params(axis='both', which='major', labelsize=7)
@@ -125,7 +150,7 @@ for l in range(n_cluster):
 ax.set_xlim([0, len(labels)])
 ax.axis('off')
 
-plt.savefig('figure/feature_map.pdf', transparent=True)
+plt.savefig('figure/feature_map_by'+data_type+'.pdf', transparent=True)
 plt.show()
 
 # Plot similarity matrix
@@ -154,5 +179,16 @@ ax1.set_xlim([0, len(labels)])
 ax2.set_ylim([0, len(labels)])
 ax1.axis('off')
 ax2.axis('off')
-plt.savefig('figure/feature_similarity.pdf', transparent=True)
+plt.savefig('figure/feature_similarity_by'+data_type+'.pdf', transparent=True)
 plt.show()
+
+
+
+#==============================================================================
+# with Run(save_addon) as R:
+#     config = R.config
+#     rule = DMCGO
+#     task = generate_onebatch(rule=rule, config=config, mode='test')
+#     h0 = R.f_h(task.x)
+#     y0 = R.f_y(h0)
+#==============================================================================

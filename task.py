@@ -237,10 +237,10 @@ def go(config, mode, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**BS_EXPO
         batch_size = 2**BS_EXPO
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_mod   = 1
 
@@ -306,12 +306,12 @@ def inhgo(config, mode, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**BS_EXPO
         batch_size = 2**BS_EXPO
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
-        tar_ons   = int(400/dt)
+        tar_ons   = int(500/dt)
         tar_mod   = 1
 
     # time to check the saccade location
@@ -381,17 +381,17 @@ def choicego_(config, mode, tar_mod, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**(BS_EXPO//3)
         batch_size = 2**BS_EXPO
         ind_tar_loc, ind_tar1_strength, ind_tar2_strength = np.unravel_index(range(batch_size),(a,a,a))
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
 
         tar1_locs = 2*np.pi*ind_tar_loc/a
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
         tar1_strengths = 0.4*ind_tar1_strength/a+0.8
         tar2_strengths = 0.4*ind_tar2_strength/a+0.8
-        tar_ons  = int(400/dt)
+        tar_ons  = int(500/dt)
 
     elif mode == 'psychometric':
         p = kwargs['params']
@@ -491,11 +491,11 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**(BS_EXPO//3)
         batch_size = 2**BS_EXPO
         ind_tar_loc, ind_tar_mod1_strength, ind_tar_mod2_strength = np.unravel_index(range(batch_size),(a,a,a))
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
 
         tar1_locs = 2*np.pi*ind_tar_loc/a
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
@@ -503,7 +503,7 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
         tar2_mod1_strengths = 2 - tar1_mod1_strengths
         tar1_mod2_strengths = 0.4*ind_tar_mod2_strength/a+0.8
         tar2_mod2_strengths = 2 - tar1_mod2_strengths
-        tar_ons  = int(400/dt)
+        tar_ons  = int(500/dt)
 
     elif mode == 'psychometric':
         p = kwargs['params']
@@ -610,18 +610,18 @@ def choicego_int(config, mode, **kwargs):  ##TODO: Finish this
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**(BS_EXPO//3)
         batch_size = 2**BS_EXPO
         ind_tar_loc, ind_tar1_strength, ind_tar2_strength = np.unravel_index(range(batch_size),(a,a,a))
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
 
         tar1_locs = 2*np.pi*ind_tar_loc/a
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
         tar1_mod1_strengths = 0.4*ind_tar1_strength/a+0.8
         tar2_mod1_strengths = 0.4*ind_tar2_strength/a+0.8
         tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
-        tar_ons  = int(400/dt)
+        tar_ons  = int(500/dt)
 
     elif mode == 'psychometric':
         p = kwargs['params']
@@ -720,19 +720,19 @@ def choicedelaygo_(config, mode, tar_mod, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**(BS_EXPO//3)
         batch_size = 2**BS_EXPO
         ind_tar_loc, ind_tar1_strength, ind_tar2_strength = np.unravel_index(range(batch_size),(a,a,a))
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
         tar1_locs = 2*np.pi*ind_tar_loc/a
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
         tar1_strengths = 1.0*ind_tar1_strength/a+0.5
         tar2_strengths = 1.0*ind_tar2_strength/a+0.5
-        tar1_ons = int(400/dt)
-        tar1_offs = int(600/dt)
-        tar2_ons = int(1200/dt)
-        tar2_offs = int(1400/dt)
+        tar1_ons = int(500/dt)
+        tar1_offs = int(800/dt)
+        tar2_ons = int(1600/dt)
+        tar2_offs = int(1900/dt)
 
     elif mode == 'psychometric':
         p = kwargs['params']
@@ -825,14 +825,14 @@ def delaygo(config, mode, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**BS_EXPO
         batch_size = 2**BS_EXPO
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
-        tar_ons   = int(400/dt)
+        tar_ons   = int(500/dt)
         tar_mod   = 1
-        tar_offs  = int(800/dt)
+        tar_offs  = int(700/dt)
 
     check_ons= fix_offs + int(100/dt)
 
@@ -898,10 +898,10 @@ def delaytimedgo(config, mode, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**BS_EXPO
         batch_size = 2**BS_EXPO
-        sac_ons   = int(1500/dt)
+        sac_ons   = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_ons   = int(500/dt)
         tar_offs  = int(1000/dt)
@@ -971,11 +971,11 @@ def delayremapgo(config, mode, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**BS_EXPO
         batch_size = 2**BS_EXPO
-        fix_offs  = int(1600/dt)
-        tar_ons   = int(400/dt)
+        fix_offs  = int(2000/dt)
+        tar_ons   = int(500/dt)
         tar_offs  = int(800/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_mod   = 1
@@ -1111,10 +1111,10 @@ def remapgo(config, mode, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**BS_EXPO
         batch_size = 2**BS_EXPO
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_mod   = 1
 
@@ -1180,12 +1180,12 @@ def inhremapgo(config, mode, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**BS_EXPO
         batch_size = 2**BS_EXPO
-        fix_offs  = int(1600/dt)
+        fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
-        tar_ons   = int(400/dt)
+        tar_ons   = int(500/dt)
         tar_mod   = 1
 
     # time to check the saccade location
@@ -1271,15 +1271,15 @@ def delaymatch_(config, mode, matchnogo, **kwargs):
 
     elif mode == 'test':
         # Set this test so the model always respond
-        tdim = int(2000/dt)
+        tdim = int(2500/dt)
         a = 2**BS_EXPO
         batch_size = 2**BS_EXPO
         tar1_locs = 2*np.pi*np.arange(a)/a
         matchs = (1 - matchnogo)*np.ones(batch_size) # make sure the response is Go
         tar2_locs = (tar1_locs+np.pi*(1-matchs))%(2*np.pi)
-        tar1_ons  = int(400/dt)
+        tar1_ons  = int(500/dt)
         tar1_offs = int(800/dt)
-        tar2_ons  = int(1600/dt)
+        tar2_ons  = int(2000/dt)
         tar1_mod = 1
         tar2_mod = 1
 
@@ -1473,14 +1473,15 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
 
     elif mode == 'test':
         # Set this test so the model always respond
-        a = 2**BS_EXPO
+        a = 2**(BS_EXPO-1)
         batch_size = 2**BS_EXPO
-        tar1_locs = 2*np.pi*np.arange(a)/a ##TODO: Change it so it doesn't include boundary case!
+        #tar1_locs = 2*np.pi*np.arange(a)/a ##TODO: Change it so it doesn't include boundary case!
+        tar1_locs = np.concatenate(((0.1+0.8*np.arange(a)/a),(1.1+0.8*np.arange(a)/a)))*np.pi
         matchs = (1 - matchnogo)*np.ones(batch_size) # make sure the response is Go
         tar2_locs = (tar1_locs+np.pi*(1-matchs))%(2*np.pi)
-        tar1_ons  = int(300/dt)
+        tar1_ons  = int(500/dt)
         tar1_offs = tar1_ons + int(300/dt)
-        tar2_ons  = tar1_offs + int(1000/dt)
+        tar2_ons  = tar1_offs + int(1200/dt)
         tar1_mod = 1
         tar2_mod = 1
         tdim = tar2_ons + int(500/dt)
