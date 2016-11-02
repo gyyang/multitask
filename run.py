@@ -72,6 +72,7 @@ class Run(Session):
         self.f_y = lambda h0 : self.run(y_hat, feed_dict={h : h0}).reshape(
             (h0.shape[0],h0.shape[1],n_output))
         self.f_y_loc = lambda y0 : popvec(y0[...,1:])
+        self.f_y_loc_from_x = lambda x0 : self.f_y_loc(self.f_y(self.f_h(x0)))
         self.f_cost  = lambda y0, y_hat0, c_mask0: np.mean((c_mask0*(y_hat0-y0))**2)
 
         # Notice this weight is originally used as r*W, so transpose them
