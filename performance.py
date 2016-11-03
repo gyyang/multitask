@@ -451,6 +451,6 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 # plot_finalperformance('tf')
 
 # psychometric_choice('tf_500')
-psychometric_delaychoice('tf_500')
-psychometric_choiceattend('tf_500')
-psychometric_choiceint('tf_500')
+# psychometric_delaychoice('tf_500')
+psychometric_choiceattend('tf_choiceattend_200')
+psychometric_choiceint('tf_choiceattend_200')

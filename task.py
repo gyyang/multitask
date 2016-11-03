@@ -129,7 +129,8 @@ class Task(object):
             self.c_mask[pre_on:pre_offs[i], i, :] = 1.
             if post_ons[i] is not None:
                 self.c_mask[post_ons[i]:, i, :] = (pre_offs[i]-pre_on)/(self.tdim-post_ons[i])
-        self.c_mask[:, :, 0] *= self.N_RING # Fixation is important
+        #self.c_mask[:, :, 0] *= self.N_RING # Fixation is important
+        self.c_mask[:, :, 0] *= 2 # Fixation is important
 
     def add_rule(self, rule, on=None, off=None):
         self.x[on:off,:,self.slices['rule_start']+rule] = 1. # Have rule input
@@ -448,6 +449,10 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
     The output should be fixation location for (0, fix_off)
     Otherwise the location of the stronger target
 
+    In this task, if the model's strategy is to ignore context, and integrate both,
+    then the maximum performance is 75%. So we need to make the highest correct performance
+    much higher than that.
+
     :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
@@ -459,21 +464,29 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
     if mode == 'random': # Randomly generate parameters
         batch_size = kwargs['batch_size']
         # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,3000)/dt)
+        tdim = int(np.random.uniform(1500,3000)/dt)
 
         # A list of locations of fixation points and fixation off time
-        fix_offs = (0.7*np.ones(batch_size)*tdim).astype(int)
+        fix_offs = tdim - (np.ones(batch_size)*500/dt).astype(int)
 
         # A list of locations of targets, same locations for both modalities
         tar_dist = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
         tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
         tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
 
-        tar1_mod1_strengths = np.random.uniform(0.8,1.2,(batch_size,))
-        tar2_mod1_strengths = np.random.uniform(0.8,1.2,(batch_size,))
+        tars_mod1_mean = np.random.uniform(0.8,1.2,(batch_size,))
+        tars_mod1_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        tars_mod1_sign = np.random.choice([1,-1], (batch_size,))
 
-        tar1_mod2_strengths = np.random.uniform(0.8,1.2,(batch_size,))
-        tar2_mod2_strengths = np.random.uniform(0.8,1.2,(batch_size,))
+        tar1_mod1_strengths = tars_mod1_mean + tars_mod1_diff*tars_mod1_sign/2
+        tar2_mod1_strengths = tars_mod1_mean - tars_mod1_diff*tars_mod1_sign/2
+
+        tars_mod2_mean = np.random.uniform(0.8,1.2,(batch_size,))
+        tars_mod2_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        tars_mod2_sign = np.random.choice([1,-1], (batch_size,))
+
+        tar1_mod2_strengths = tars_mod2_mean + tars_mod2_diff*tars_mod2_sign/2
+        tar2_mod2_strengths = tars_mod2_mean - tars_mod2_diff*tars_mod2_sign/2
 
         # Time of targets on/off
         tar_ons = (np.ones(batch_size)*np.random.uniform(100,400)/dt).astype(int)
@@ -579,18 +592,22 @@ def choicego_int(config, mode, **kwargs):  ##TODO: Finish this
     if mode == 'random': # Randomly generate parameters
         batch_size = kwargs['batch_size']
         # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,3000)/dt)
+        tdim = int(np.random.uniform(1500,3000)/dt)
 
         # A list of locations of fixation points and fixation off time
-        fix_offs = (0.7*np.ones(batch_size)*tdim).astype(int)
+        fix_offs = tdim - (np.ones(batch_size)*500/dt).astype(int)
 
         # A list of locations of targets, same locations for both modalities
         tar_dist = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
         tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
         tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
 
-        tar1_mod1_strengths = np.random.uniform(0.8,1.2,(batch_size,))
-        tar2_mod1_strengths = np.random.uniform(0.8,1.2,(batch_size,))
+        tars_mod1_mean = np.random.uniform(0.8,1.2,(batch_size,))
+        tars_mod1_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        tars_mod1_sign = np.random.choice([1,-1], (batch_size,))
+
+        tar1_mod1_strengths = tars_mod1_mean + tars_mod1_diff*tars_mod1_sign/2
+        tar2_mod1_strengths = tars_mod1_mean - tars_mod1_diff*tars_mod1_sign/2
 
         # Always the same as mod 1
         tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths

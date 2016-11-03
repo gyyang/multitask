@@ -29,7 +29,7 @@ def train(HDIM):
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : 'tf_debug_'+str(HDIM)}
+              'save_addon'  : 'tf_latest_'+str(HDIM)}
 
     # Rules
     rules = [FIXATION, GO, INHGO, DELAYGO,\
@@ -38,24 +38,25 @@ def train(HDIM):
     REMAP, INHREMAP, DELAYREMAP,\
     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
     rule_weights = np.ones(len(rules))
-    rule_weights[[rules.index(r) for r in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]]] = 5
+    # rule_weights[[rules.index(r) for r in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]]] = 5
     # rule_weights[[rules.index(r) for r in [DELAYMATCHNOGO, DELAYMATCHGO, DMCNOGO, DMCGO]]] = 5
 
-    # rules = [FIXATION, GO]
+    # rules = [DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+    # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
     # rule_weights = np.ones(len(rules))
 
     # Parameters
     learning_rate = 0.001
     training_iters = 1500000
-    batch_size_train = 10
+    batch_size_train = 50
     batch_size_test = 200
-    display_step = 1000
+    display_step = 200
 
-    # learning_rate = 0.0002
-    # training_iters = 100000
+    # learning_rate = 0.001
+    # training_iters = 200000
     # batch_size_train = 10
     # batch_size_test = 200
-    # display_step = 1000
+    # display_step = 500
 
 
     # Network Parameters
@@ -148,4 +149,4 @@ def train(HDIM):
 
 
 if __name__ == '__main__':
-    train(HDIM=10)
+    train(HDIM=300)
