@@ -162,12 +162,12 @@ def psychometric_choice(save_addon, **kwargs):
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-        tar_str_range = 0.16
+        tar_str_range = 0.2
         tar1_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar/(n_tar-1)
         tar2_strengths = 2 - tar1_strengths
 
         ydatas = list()
-        tar_times = [100, 400, 800]
+        tar_times = [200, 400, 800]
         for tar_time in tar_times:
             params = {'tar1_locs' : tar1_locs,
                       'tar2_locs' : tar2_locs,
@@ -310,7 +310,7 @@ def psychometric_choiceint(save_addon, **kwargs):
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-        tar_str_range = 0.25
+        tar_str_range = 0.1
         tar1_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar1_strength/(n_tar-1)
         tar2_strengths = 2 - tar1_strengths
 
@@ -447,10 +447,10 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 
 
 
-# plot_trainingprogress('tf_500')
-# plot_finalperformance('tf')
+# plot_trainingprogress('tf_latest_400')
+# plot_finalperformance('tf_latest')
 
-# psychometric_choice('tf_500')
+psychometric_choice('tf_latest_500')
+# psychometric_choiceattend('tf_latest_400')
+# psychometric_choiceint('tf_latest_400')
 # psychometric_delaychoice('tf_500')
-psychometric_choiceattend('tf_choiceattend_200')
-psychometric_choiceint('tf_choiceattend_200')
