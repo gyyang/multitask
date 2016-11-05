@@ -18,13 +18,15 @@ from mpl_toolkits.mplot3d import Axes3D
 import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
 from task import *
 from run import Run
+from network import get_perf
 
 mpl.rcParams['xtick.direction'] = 'out'
 mpl.rcParams['ytick.direction'] = 'out'
 
 
 save_addon = 'tf_latest_500'
-rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
+#rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
+rules = [CHOICEATTEND_MOD1]
 
 def f_sub_mean(x):
     # subtract mean activity across batch conditions
@@ -48,10 +50,12 @@ with Run(save_addon) as R:
     tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
     tar_str_range = 0.2
-    tar1_mod1_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar_mod1/(n_tar-1)
-    tar2_mod1_strengths = 2 - tar1_mod1_strengths
-    tar1_mod2_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar_mod2/(n_tar-1)
-    tar2_mod2_strengths = 2 - tar1_mod2_strengths
+    tar1_mod1_cohs = -tar_str_range/2+tar_str_range*ind_tar_mod1/(n_tar-1)
+    tar1_mod2_cohs = -tar_str_range/2+tar_str_range*ind_tar_mod2/(n_tar-1)
+    tar1_mod1_strengths = 1 + tar1_mod1_cohs
+    tar2_mod1_strengths = 1 - tar1_mod1_cohs
+    tar1_mod2_strengths = 1 + tar1_mod2_cohs
+    tar2_mod2_strengths = 1 - tar1_mod2_cohs
 
     params = {'tar1_locs' : tar1_locs,
               'tar2_locs' : tar2_locs,
@@ -61,15 +65,33 @@ with Run(save_addon) as R:
               'tar2_mod2_strengths' : tar2_mod2_strengths,
               'tar_time'    : 800}
 
-    h_samples = dict()
-    for rule in rules:
+    X = np.zeros((len(rules)*batch_size, 3+3)) # regressors
+
+    H = np.array([])
+    for i, rule in enumerate(rules):
         task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
         # Only study target epoch
         epoch = task.epochs['tar1']
-        h_sample = R.f_h(task.x)[epoch[0]:epoch[1],...][::20,...]
-        if sub_mean:
-            h_sample = f_sub_mean(h_sample)
-        h_samples[rule] = h_sample
+        h_sample = R.f_h(task.x)
+        y_sample = R.f_y(h_sample)
+        y_sample_loc = R.f_y_loc(y_sample)
+
+        perfs = get_perf(y_sample, task.y_loc)
+        # y_choice is 1 for choosing tar1_loc, otherwise -1
+        y_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
+
+        h_sample = h_sample[epoch[0]:epoch[1],...][::20,...]
+        if i == 0:
+            H = h_sample
+        else:
+            H = np.concatenate((H, h_sample), axis=1)
+
+        X[i*batch_size:(i+1)*batch_size, :3] = np.array([y_choice, tar1_mod1_cohs, tar1_mod2_cohs]).T
+        X[i*batch_size:(i+1)*batch_size, 3+i] = 1
+
+    if sub_mean:
+        H = f_sub_mean(H)
+
 
 
 def show3D(h_tran, separate_by, pcs=(0,1,2), **kwargs):
@@ -156,16 +178,28 @@ def test_PCA_ring():
 
 
 # Regression
-rule = CHOICEATTEND_MOD1
-h = h_samples[rule]
 
 from sklearn import linear_model
 # Create linear regression object
 regr = linear_model.LinearRegression()
 # Train the model using the training sets
-X = np.array([tar1_mod1_strengths, tar1_mod2_strengths]).T
-regr.fit(X, h[-1,:,0])
-h1 = regr.predict(X)
+Y = np.swapaxes(H, 0, 1)
+Y = Y.reshape((Y.shape[0], -1))
+# Y = np.dot(X, np.random.rand(2,1000))
 
-plt.plot(h1[:], h[-1,:,0], 'o')
+X2 = np.zeros((X.shape[0], 6+6))
+X2[:,:6] = X
+for i in [0,1]:
+    for j in [0,1,2]:
+        X2[:,6+(i+1)*j] = X[:,i+1]*X[:,3+j]
+regr.fit(X2, Y)
+regr.score(X2, Y)
+
+regr.fit(X, Y)
+regr.score(X, Y)
+
+
+y1 = regr.predict(X2)
+plt.plot(Y.flatten(), y1.flatten(), '.', alpha=0.01)
+plt.plot([-5,5],[-5,5])
 plt.show()
