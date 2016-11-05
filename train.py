@@ -124,7 +124,7 @@ def train(HDIM):
                         y_hat_test = sess.run(y_hat, feed_dict={x: task.x})
                         y_hat_test = y_hat_test.reshape((-1,batch_size_test,n_output))
                         c_test = np.mean(((y_hat_test-task.y)*task.c_mask)**2)
-                        perf_test = get_perf(y_hat_test, task.y_loc)
+                        perf_test = np.mean(get_perf(y_hat_test, task.y_loc))
                         cost_tests[rule].append(c_test)
                         perf_tests[rule].append(perf_test)
                         print('{:15s}'.format(rule_name[rule]) +
