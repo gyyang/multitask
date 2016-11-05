@@ -26,7 +26,6 @@ mpl.rcParams['ytick.direction'] = 'out'
 save_addon = 'tf_latest_500'
 rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
 
-sub_mean = True # Not clear if legit yet
 def f_sub_mean(x):
     # subtract mean activity across batch conditions
     assert(len(x.shape)==3)
@@ -35,6 +34,7 @@ def f_sub_mean(x):
         x[:,i,:] -= x_mean
     return x
 
+sub_mean=True
 print('Starting standard analysis of the CHOICEATTEND task...')
 with Run(save_addon) as R:
 
@@ -71,83 +71,17 @@ with Run(save_addon) as R:
             h_sample = f_sub_mean(h_sample)
         h_samples[rule] = h_sample
 
-nt, nb, nh = h_samples[CHOICEATTEND_MOD1].shape
-from sklearn.decomposition import PCA
-pca = PCA()
-pca.fit(h_samples[CHOICEATTEND_MOD1].reshape((-1, nh)))
 
-h_trans = dict()
-for rule in rules:
-    h_trans[rule] = pca.transform(h_samples[rule].reshape((-1, nh)))
-ev = pca.explained_variance_
-evr = pca.explained_variance_ratio_
-# plt.figure()
-# plt.plot(h_trans[:,0], h_trans[:,1], '.')
-# plt.show()
+def show3D(h_tran, separate_by, pcs=(0,1,2), **kwargs):
+    if separate_by == 'tar1_mod1_strengths':
+        separate_bys = tar1_mod1_strengths
+        colors = sns.color_palette("RdBu_r", len(np.unique(separate_bys)))
+    elif separate_by == 'tar1_mod2_strengths':
+        separate_bys = tar1_mod2_strengths
+        colors = sns.color_palette("BrBG", len(np.unique(separate_bys)))
+    else:
+        raise ValueError
 
-# Plot multiple rules:
-# colors = sns.color_palette('dark', len(rules))
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# for i, rule in enumerate(rules):
-#     h_plot = h_trans[rule]
-#     h_plot = h_plot.reshape((nt, nb, nh))
-#     #h_plot = h_plot[:,tar1_locs==np.unique(tar1_locs)[1],:]
-#     h_plot = h_plot.reshape((-1,nh))
-#     ax.plot(h_plot[:,0], h_plot[:,1], h_plot[:,2], '.', markersize=2, color=colors[i])
-#     ax.plot([h_plot[0,0]], [h_plot[0,1]], [h_plot[0,2]], 'd', markersize=5, color=colors[i])
-# plt.show()
-
-# Plot multiple conditions
-rule = CHOICEATTEND_MOD1
-task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
-y_locs = task.y_loc[-1]
-
-#separate_bys = tar1_locs
-
-separate_bys = tar1_mod1_strengths
-#separate_bys = tar1_mod2_strengths
-
-#separate_bys = y_locs
-#separate_bys = np.arange(nb)
-
-#colors = sns.color_palette('dark', len(np.unique(separate_bys)))
-#colors = sns.color_palette("husl", len(np.unique(separate_bys)))
-colors = sns.color_palette("RdBu_r", len(np.unique(separate_bys)))
-h_tran = h_trans[rule].reshape((nt, nb, -1))
-
-
-#==============================================================================
-# pcs = [0,1]
-# fig = plt.figure(figsize=(4,4))
-# ax = fig.add_axes([.2,.2,.7,.7])    
-# for i, s in enumerate(np.unique(separate_bys)):
-#     h_plot = h_tran[:,separate_bys==s,:]
-#     for j in range(h_plot.shape[1]):
-#         ax.plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]], '.-', markersize=2, color=colors[i])
-#         ax.plot([h_plot[0,j,pcs[0]]], [h_plot[0,j,pcs[1]]], 'd', markersize=5, color=colors[i])
-# plt.savefig('figure/temp.pdf')
-# plt.show()
-# 
-# 
-# 
-# colors = sns.color_palette("husl", nb)
-# pcs = [0,1]
-# fig = plt.figure(figsize=(4,4))
-# ax = fig.add_axes([.2,.2,.7,.7])
-# for i in range(nb):
-#     h_plot = h_tran[:,i,:]
-#     ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]], '.-', markersize=2, color=colors[i])
-#     ax.plot([h_plot[0,pcs[0]]], [h_plot[0,pcs[1]]], 'd', markersize=5, color=colors[i])
-#     plt.text(h_plot[-1,pcs[0]], h_plot[-1,pcs[1]],
-#              '{:0.1f},{:0.1f},{:0.1f},{:0.1f}'.format(tar1_locs[i], y_locs[i], tar1_mod1_strengths[i], tar1_mod2_strengths[i]),
-#              fontsize=7)
-# plt.savefig('figure/temp.pdf')
-# plt.show()
-#==============================================================================
-
-def show3D():
-    pcs = [0,1,2]
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     for i, s in enumerate(np.unique(separate_bys)):
@@ -155,10 +89,12 @@ def show3D():
         for j in range(h_plot.shape[1]):
             ax.plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]], h_plot[:,j,pcs[2]],
                     '.-', markersize=2, color=colors[i])
-    ax.azim = -62
+    if 'azim' in kwargs:
+        ax.azim = kwargs['azim']
+    if 'elev' in kwargs:
+        ax.elev = kwargs['elev']
     ax.elev = 62
     plt.show()
-
 
 def test_PCA_ring():
     # Test PCA with simple ring representation
@@ -199,3 +135,37 @@ def test_PCA_ring():
     plt.show()
 
 
+# nt, nb, nh = h_samples[CHOICEATTEND_MOD1].shape
+# from sklearn.decomposition import PCA
+# pca = PCA()
+# #pca.fit(h_samples[CHOICEATTEND_MOD1].reshape((-1, nh)))
+# pca.fit(np.concatenate((h_samples[CHOICEATTEND_MOD1].reshape((-1, nh)),h_samples[CHOICEATTEND_MOD2].reshape((-1, nh))), axis=0))
+#
+# h_trans = dict()
+# for rule in rules:
+#     h_trans[rule] = pca.transform(h_samples[rule].reshape((-1, nh)))
+
+#h_tran = h_trans[CHOICEATTEND_MOD1].reshape((nt, nb, -1))
+#show3D(h_tran, 'tar1_mod1_strengths', azim=-62, elev=62)
+#show3D(h_tran, 'tar1_mod2_strengths', azim=-62, elev=62)
+
+#h_tran = h_trans[CHOICEATTEND_MOD2].reshape((nt, nb, -1))
+#show3D(h_tran, 'tar1_mod1_strengths', azim=-62, elev=62)
+#show3D(h_tran, 'tar1_mod2_strengths', azim=-62, elev=62)
+
+
+
+# Regression
+rule = CHOICEATTEND_MOD1
+h = h_samples[rule]
+
+from sklearn import linear_model
+# Create linear regression object
+regr = linear_model.LinearRegression()
+# Train the model using the training sets
+X = np.array([tar1_mod1_strengths, tar1_mod2_strengths]).T
+regr.fit(X, h[-1,:,0])
+h1 = regr.predict(X)
+
+plt.plot(h1[:], h[-1,:,0], 'o')
+plt.show()
