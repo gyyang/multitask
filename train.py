@@ -29,7 +29,7 @@ def train(HDIM):
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : 'tf_latest_'+str(HDIM)}
+              'save_addon'  : 'tf_temp_'+str(HDIM)}
 
     # Rules
     rules = [FIXATION, GO, INHGO, DELAYGO,\
@@ -149,4 +149,4 @@ def train(HDIM):
 
 
 if __name__ == '__main__':
-    train(HDIM=300)
+    train(HDIM=20)

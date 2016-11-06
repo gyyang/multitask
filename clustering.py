@@ -15,7 +15,7 @@ from task import *
 from run import Run
 
 ########################## Running the network ################################
-save_addon = 'tf_debug_400'
+save_addon = 'tf_latest_200'
 data_type = 'epoch'
 
 rules = [GO, INHGO, DELAYGO,\
@@ -28,7 +28,6 @@ n_rules = len(rules)
 
 h_all_byrule  = OrderedDict()
 h_all_byepoch = OrderedDict()
-# with GeneralAnalysis(save_addon) as R:
 with Run(save_addon) as R:
     config = R.config
     for rule in rules:
