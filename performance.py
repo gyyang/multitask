@@ -20,6 +20,9 @@ from run import Run
 
 mpl.rcParams['xtick.direction'] = 'out'
 mpl.rcParams['ytick.direction'] = 'out'
+mpl.rcParams['font-family'] = 'sans-serif'
+mpl.rcParams['font']='Helvetica Neue'
+
 
 color_rules = np.array([
             [240,163,255],[0,117,220],[153,63,0],[76,0,92],[25,25,25],[0,92,49],

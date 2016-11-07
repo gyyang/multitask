@@ -8,6 +8,7 @@ import os
 import numpy as np
 import pickle
 from collections import OrderedDict
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn.apionly as sns
 
@@ -15,8 +16,8 @@ from task import *
 from run import Run
 
 ########################## Running the network ################################
-save_addon = 'tf_latest_200'
-data_type = 'epoch'
+save_addon = 'tf_latest_500'
+data_type = 'rule'
 
 rules = [GO, INHGO, DELAYGO,\
     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
@@ -119,7 +120,7 @@ elif data_type == 'epoch':
 else:
     raise ValueError
 
-vmin, vmax = 0, 0.5
+vmin, vmax = 0, 1
 fig = plt.figure(figsize=figsize)
 ax = fig.add_axes([0.25, 0.2, 0.6, 0.7])
 im = ax.imshow(h_normvar_all.T, cmap='hot',
