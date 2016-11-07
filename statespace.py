@@ -38,7 +38,7 @@ def f_sub_mean(x):
         x[:,i,:] -= x_mean
     return x
 
-sub_mean=True
+subtract_t_mean=True
 print('Starting standard analysis of the CHOICEATTEND task...')
 with Run(save_addon) as R:
 
@@ -91,9 +91,20 @@ with Run(save_addon) as R:
         X[i*batch_size:(i+1)*batch_size, :3] = np.array([y_choice, tar1_mod1_cohs, tar1_mod2_cohs]).T
         X[i*batch_size:(i+1)*batch_size, 3+i] = 1
         trial_rules[i*batch_size:(i+1)*batch_size] = rule
-    if sub_mean:
+    if subtract_t_mean:
         H = f_sub_mean(H)
 
+# Include only active units
+nt, nb, nh = H.shape
+h = H.reshape((-1, nh))
+ind_active = np.where(h.var(axis=0) > 1e-4)[0]
+ind_orig   = np.arange(nh)[ind_active]
+h = h[:, ind_active]
+
+# Z-score response
+h = h - h.mean(axis=0)
+h = h/h.std(axis=0)
+h = h.reshape((nt, nb, h.shape[-1]))
 
 
 def show3D(h_tran, separate_by, pcs=(0,1,2), **kwargs):
@@ -185,21 +196,21 @@ from sklearn import linear_model
 # Create linear regression object
 
 # Train the model using the training sets
-Y = np.swapaxes(H, 0, 1)
+Y = np.swapaxes(h, 0, 1)
 Y = Y.reshape((Y.shape[0], -1))
 regr = linear_model.LinearRegression()
 regr.fit(X, Y)
 coef = regr.coef_
-coef = coef.reshape((H.shape[0],H.shape[2],X.shape[1])) # Time, Units, Coefs
+coef = coef.reshape((h.shape[0],h.shape[2],X.shape[1])) # Time, Units, Coefs
 # Get coeff at time when norm is maximum
-coef_maxt = np.zeros((H.shape[2],X.shape[1])) # Units, Coefs
-for i in range(H.shape[2]):
+coef_maxt = np.zeros((h.shape[2],X.shape[1])) # Units, Coefs
+for i in range(h.shape[2]):
     ind = np.argmax(np.sum(coef[:,i,:]**2,axis=1))
     coef_maxt[i, :] = coef[ind,i,:]
 # Orthogonalize
 q, r = np.linalg.qr(coef_maxt)
 
-H_tran = np.dot(H, q) # Transform
+h_tran = np.dot(h, q) # Transform
 
 
 # Show 2-D
@@ -219,11 +230,6 @@ for i_row, rule in enumerate(rules):
             pcs = [0,2] # Choice, Mod1
             separate_by = 'tar1_mod2_strengths'
 
-
-
-        ind = trial_rules==rule
-        h_tran = H_tran[:,ind,:]
-
         if separate_by == 'tar1_mod1_strengths':
             separate_bys = tar1_mod1_strengths
             colors = sns.color_palette("RdBu_r", len(np.unique(separate_bys)))
@@ -233,8 +239,9 @@ for i_row, rule in enumerate(rules):
         else:
             raise ValueError
 
+        ind = trial_rules==rule
         for i, s in enumerate(np.unique(separate_bys)):
-            h_plot = h_tran[:,separate_bys==s,:]
+            h_plot = h_tran[:,ind,:][:,separate_bys==s,:]
             if plot_eachcurve:
                 for j in range(h_plot.shape[1]):
                     axarr[i_row,i_col].plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
