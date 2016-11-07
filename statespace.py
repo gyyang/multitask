@@ -26,7 +26,7 @@ from network import get_perf
 # 
 #==============================================================================
 
-save_addon = 'tf_latest_500'
+save_addon = 'tf_latest_400'
 rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
 #rules = [CHOICEATTEND_MOD1]
 
@@ -38,14 +38,21 @@ def f_sub_mean(x):
         x[:,i,:] -= x_mean
     return x
 
+# Regressors
+Choice, Mod1, Mod2, Rule_mod1, Rule_mod2, Rule_int = range(6)
+regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule attend 1', 'Rule attend 2', 'Rule int']
+
 subtract_t_mean=True
+z_score = True
+
 print('Starting standard analysis of the CHOICEATTEND task...')
 with Run(save_addon) as R:
 
     n_tar = 6
-    batch_size = n_tar**2
-    batch_shape = (n_tar,n_tar)
-    ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
+    n_rep = 30
+    batch_size = n_rep * n_tar**2
+    batch_shape = (n_rep, n_tar, n_tar)
+    ind_rep, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
 
     tar1_loc  = 0
     tar1_locs = np.ones(batch_size)*tar1_loc
@@ -65,7 +72,8 @@ with Run(save_addon) as R:
               'tar2_mod1_strengths' : tar2_mod1_strengths,
               'tar1_mod2_strengths' : tar1_mod2_strengths,
               'tar2_mod2_strengths' : tar2_mod2_strengths,
-              'tar_time'    : 800}
+              'tar_time'    : 1600}
+              # If tar_time is long (~1600), we can reproduce the curving trajectories
 
     X = np.zeros((len(rules)*batch_size, 3+3)) # regressors
     trial_rules = np.zeros(len(rules)*batch_size)
@@ -82,7 +90,7 @@ with Run(save_addon) as R:
         # y_choice is 1 for choosing tar1_loc, otherwise -1
         y_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
 
-        h_sample = h_sample[epoch[0]:epoch[1],...][::20,...]
+        h_sample = h_sample[epoch[0]:epoch[1],...][::50,...] # every 50 ms
         if i == 0:
             H = h_sample
         else:
@@ -102,10 +110,11 @@ ind_orig   = np.arange(nh)[ind_active]
 h = h[:, ind_active]
 
 # Z-score response (will have a strong impact on results)
-h = h - h.mean(axis=0)
-h = h/h.std(axis=0)
-h = h.reshape((nt, nb, h.shape[-1]))
+if z_score:
+    h = h - h.mean(axis=0)
+    h = h/h.std(axis=0)
 
+h = h.reshape((nt, nb, h.shape[-1]))
 
 def show3D(h_tran, separate_by, pcs=(0,1,2), **kwargs):
     if separate_by == 'tar1_mod1_strengths':
@@ -212,58 +221,67 @@ q, r = np.linalg.qr(coef_maxt)
 
 h_tran = np.dot(h, q) # Transform
 
-
 # Show 2-D
 plot_eachcurve = False
-fig, axarr = plt.subplots(3, 3, sharex='col', sharey='row')
+fig, axarr = plt.subplots(3, 3, sharex='col', sharey='row', figsize=(3,3))
 for i_row, rule in enumerate(rules):
     for i_col in range(3):
-
+        ax = axarr[i_row,i_col]
+        ch_list = [-1,1]
         if i_col == 0:
             pcs = [0,1] # Choice, Mod1
             separate_by = 'tar1_mod1_strengths'
         elif i_col == 1:
-            pcs = [0,1] # Choice, Mod1
-            separate_by = 'tar1_mod2_strengths'
-            axarr[i_row,i_col].set_title(rule_name[rule])
+            if i_row == 0:
+                pcs = [0,2]
+                separate_by = 'tar1_mod1_strengths'
+            else:
+                pcs = [0,1] # Choice, Mod1
+                separate_by = 'tar1_mod2_strengths'
+            ax.set_title(rule_name[rule], fontsize=7, y=0.9)
         else:
             pcs = [0,2] # Choice, Mod1
             separate_by = 'tar1_mod2_strengths'
 
         if separate_by == 'tar1_mod1_strengths':
-            separate_bys = tar1_mod1_strengths
-            colors = sns.color_palette("RdBu_r", len(np.unique(separate_bys)))
+            sep_by = Mod1
+            colors = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=len(np.unique(X[:,sep_by])))
         elif separate_by == 'tar1_mod2_strengths':
-            separate_bys = tar1_mod2_strengths
-            colors = sns.color_palette("BrBG", len(np.unique(separate_bys)))
+            sep_by = Mod2
+            colors = sns.diverging_palette(145, 280, sep=1, s=99, l=30, n=len(np.unique(X[:,sep_by])))
         else:
             raise ValueError
 
-        ind = trial_rules==rule
-        for i, s in enumerate(np.unique(separate_bys)):
-            h_plot = h_tran[:,ind,:][:,separate_bys==s,:]
-            if plot_eachcurve:
-                for j in range(h_plot.shape[1]):
-                    axarr[i_row,i_col].plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
-                            '.-', markersize=2, color=colors[i])
-            else: #TODO: This is incorrect now
-                h_plot = h_plot.mean(axis=1)
-                axarr[i_row,i_col].plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
-                        '.-', markersize=2, color=colors[i])
-        plt.locator_params(nbins=2)
+        ax.locator_params(nbins=2)
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+        ax.set_xlabel(regr_names[pcs[0]], fontsize=7)
+        ax.set_ylabel(regr_names[pcs[1]], fontsize=7)
+        ax.tick_params(axis='both', which='major', labelsize=7)
 
+
+        for i, s in enumerate(np.unique(X[:,sep_by])):
+            for ch in ch_list: # Choice
+                if ch == -1:
+                    kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+                    #mfc=colors[i]
+                else:
+                    kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
+                    #mfc = 'white'
+                ind = (X[:,sep_by]==s)*(trial_rules==rule)*(X[:,0]==ch)
+                if np.any(ind):
+                    h_plot = h_tran[:,ind,:]
+                    if plot_eachcurve:
+                        for j in range(h_plot.shape[1]):
+                            axarr[i_row,i_col].plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
+                                    '.-', markersize=2, color=colors[i])
+                    else:
+                        h_plot = h_plot.mean(axis=1)
+                        axarr[i_row,i_col].plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
+                                '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
+plt.tight_layout(pad=1.0)
+plt.savefig('figure/choicetasks_statespace.pdf', transparent=True)
 plt.show()
-
-
-
-
-# X2 = np.zeros((X.shape[0], 6+6))
-# X2[:,:6] = X
-# for i in [0,1]:
-#     for j in [0,1,2]:
-#         X2[:,6+(i+1)*j] = X[:,i+1]*X[:,3+j]
-# regr = linear_model.LinearRegression()
-# regr.fit(X2, Y)
-# print(regr.score(X2, Y))
-
 

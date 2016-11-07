@@ -88,15 +88,12 @@ class Run(Session):
 
         self.test_ran = False
 
-def sample_plot():
+def sample_plot(save_addon, rule):
     save = False
-    save_addon = 'tf_debug_400'
-
-    rule = DMCNOGO
 
     with Run(save_addon) as R:
         config = R.config
-        task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=1000)
+        task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=2000)
         x_sample = task.x
         h_sample = R.f_h(x_sample)
         y_sample = R.f_y(h_sample)
@@ -285,5 +282,6 @@ def schematic_plot():
     plt.show()
 
 if __name__ == "__main__":
+    sample_plot(save_addon='tf_latest_400', rule=CHOICEATTEND_MOD1)
     pass
 
