@@ -109,6 +109,11 @@ labels = labels[ind_sort]
 h_normvar_all = h_normvar_all[ind_sort, :]
 ind_orig = ind_orig[ind_sort]
 
+# Save results
+result = {'labels' : labels, 'h_normvar_all' : h_normvar_all, 'ind_orig' : ind_orig}
+with open('data/clustering'+save_addon+'.pkl','wb') as f:
+    pickle.dump(result, f)
+
 ######################### Plotting Variance ###################################
 # Plot Normalized Variance
 if data_type == 'rule':
