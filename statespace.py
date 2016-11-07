@@ -101,7 +101,7 @@ ind_active = np.where(h.var(axis=0) > 1e-4)[0]
 ind_orig   = np.arange(nh)[ind_active]
 h = h[:, ind_active]
 
-# Z-score response
+# Z-score response (will have a strong impact on results)
 h = h - h.mean(axis=0)
 h = h/h.std(axis=0)
 h = h.reshape((nt, nb, h.shape[-1]))

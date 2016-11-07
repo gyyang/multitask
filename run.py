@@ -88,9 +88,7 @@ class Run(Session):
 
         self.test_ran = False
 
-
-if __name__ == "__main__":
-
+def sample_plot():
     save = False
     save_addon = 'tf_debug_400'
 
@@ -102,7 +100,7 @@ if __name__ == "__main__":
         x_sample = task.x
         h_sample = R.f_h(x_sample)
         y_sample = R.f_y(h_sample)
-        
+
         params = R.params
         w_rec = R.w_rec
         w_in  = R.w_in
@@ -165,3 +163,127 @@ if __name__ == "__main__":
 
     _ = plt.plot(h_sample[:,0,:20])
     plt.show()
+
+def schematic_plot():
+    save_addon = 'tf_latest_500'
+    fontsize = 5
+
+    rule = CHOICE_MOD1
+
+    with Run(save_addon) as R:
+        config = R.config
+        task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=1000)
+        x_sample = task.x
+        h_sample = R.f_h(x_sample)
+        y_sample = R.f_y(h_sample)
+
+
+    N_RING = config['N_RING']
+
+    # Plot Stimulus
+    fig = plt.figure(figsize=(1.0,1.2))
+    heights = np.array([0.06,0.25,0.25])
+    for i in range(3):
+        ax = fig.add_axes([0.2,sum(heights[i+1:]+0.1)+0.05,0.7,heights[i]])
+        cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+        plt.xticks([])
+        ax.tick_params(axis='both', which='major', labelsize=fontsize)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+
+        if i == 0:
+            plt.plot(x_sample[:,0,0], color=sns.xkcd_palette(['blue'])[0])
+            plt.yticks([0,1],['',''],rotation='vertical')
+            plt.ylim([-0.1,1.5])
+            plt.title('Fixation input', fontsize=fontsize, y=0.9)
+        elif i == 1:
+            plt.imshow(x_sample[:,0,1:1+N_RING].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
+            plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$','',r'360$\degree$'],rotation='vertical')
+            plt.title('Stimulus Mod 1', fontsize=fontsize, y=0.9)
+        elif i == 2:
+            plt.imshow(x_sample[:,0,1+N_RING:1+2*N_RING].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
+            plt.yticks([0,(N_RING-1)/2,N_RING-1],['','',''],rotation='vertical')
+            plt.title('Stimulus Mod 2', fontsize=fontsize, y=0.9)
+        ax.get_yaxis().set_label_coords(-0.12,0.5)
+    plt.savefig('figure/schematic_input.pdf',transparent=True)
+    plt.show()
+
+    # Plot Rule Inputs
+    fig = plt.figure(figsize=(1.0, 0.4))
+    ax = fig.add_axes([0.2,0.1,0.7,0.65])
+    cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+    plt.xticks([])
+    ax.tick_params(axis='both', which='major', labelsize=fontsize)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+
+    X = x_sample[:,0,1+2*N_RING:]
+    plt.imshow(X.T, aspect='auto', vmin=0, vmax=1, cmap=cmap, interpolation='none',origin='lower')
+    plt.yticks([0,X.shape[-1]-1],['1',str(X.shape[-1])],rotation='vertical')
+    plt.title('Rule inputs', fontsize=fontsize, y=0.9)
+    ax.get_yaxis().set_label_coords(-0.12,0.5)
+    plt.savefig('figure/schematic_rule.pdf',transparent=True)
+    plt.show()
+
+
+    # Plot Units
+    fig = plt.figure(figsize=(1.0, 0.8))
+    ax = fig.add_axes([0.2,0.1,0.7,0.65])
+    cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+    plt.xticks([])
+    ax.tick_params(axis='both', which='major', labelsize=fontsize)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+
+    plt.imshow(h_sample[:,0,:].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
+    plt.yticks([0,config['HDIM']-1],['1',str(config['HDIM'])],rotation='vertical')
+    plt.title('Recurrent units', fontsize=fontsize, y=0.9)
+    ax.get_yaxis().set_label_coords(-0.12,0.5)
+    plt.savefig('figure/schematic_units.pdf',transparent=True)
+    plt.show()
+
+
+    # Plot Outputs
+    fig = plt.figure(figsize=(1.0,0.8))
+    heights = np.array([0.1,0.45])+0.01
+    for i in range(2):
+        ax = fig.add_axes([0.2,sum(heights[i+1:]+0.15)+0.1,0.7,heights[i]])
+        cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+        plt.xticks([])
+        ax.tick_params(axis='both', which='major', labelsize=fontsize)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+
+        if i == 0:
+            plt.plot(task.y[:,0,0],color=sns.xkcd_palette(['green'])[0])
+            plt.plot(y_sample[:,0,0],color=sns.xkcd_palette(['blue'])[0])
+            plt.yticks([0.05,0.8],['',''],rotation='vertical')
+            plt.ylim([-0.1,1.1])
+            plt.title('Fixation output', fontsize=fontsize, y=0.9)
+
+        elif i == 1:
+            plt.imshow(y_sample[:,0,1:].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
+            plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$','',r'360$\degree$'],rotation='vertical')
+            plt.xticks([])
+            plt.title('Output', fontsize=fontsize, y=0.9)
+
+        ax.get_yaxis().set_label_coords(-0.12,0.5)
+
+    plt.savefig('figure/schematic_outputs.pdf',transparent=True)
+    plt.show()
+
+if __name__ == "__main__":
+    pass
+
