@@ -20,13 +20,15 @@ from task import *
 from run import Run
 from network import get_perf
 
-mpl.rcParams['xtick.direction'] = 'out'
-mpl.rcParams['ytick.direction'] = 'out'
-
+#==============================================================================
+# mpl.rcParams['xtick.direction'] = 'out'
+# mpl.rcParams['ytick.direction'] = 'out'
+# 
+#==============================================================================
 
 save_addon = 'tf_latest_500'
-#rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
-rules = [CHOICEATTEND_MOD1]
+rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
+#rules = [CHOICEATTEND_MOD1]
 
 def f_sub_mean(x):
     # subtract mean activity across batch conditions
@@ -66,7 +68,7 @@ with Run(save_addon) as R:
               'tar_time'    : 800}
 
     X = np.zeros((len(rules)*batch_size, 3+3)) # regressors
-
+    trial_rules = np.zeros(len(rules)*batch_size)
     H = np.array([])
     for i, rule in enumerate(rules):
         task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
@@ -88,7 +90,7 @@ with Run(save_addon) as R:
 
         X[i*batch_size:(i+1)*batch_size, :3] = np.array([y_choice, tar1_mod1_cohs, tar1_mod2_cohs]).T
         X[i*batch_size:(i+1)*batch_size, 3+i] = 1
-
+        trial_rules[i*batch_size:(i+1)*batch_size] = rule
     if sub_mean:
         H = f_sub_mean(H)
 
@@ -181,25 +183,80 @@ def test_PCA_ring():
 
 from sklearn import linear_model
 # Create linear regression object
-regr = linear_model.LinearRegression()
+
 # Train the model using the training sets
 Y = np.swapaxes(H, 0, 1)
 Y = Y.reshape((Y.shape[0], -1))
-# Y = np.dot(X, np.random.rand(2,1000))
-
-X2 = np.zeros((X.shape[0], 6+6))
-X2[:,:6] = X
-for i in [0,1]:
-    for j in [0,1,2]:
-        X2[:,6+(i+1)*j] = X[:,i+1]*X[:,3+j]
-regr.fit(X2, Y)
-regr.score(X2, Y)
-
+regr = linear_model.LinearRegression()
 regr.fit(X, Y)
-regr.score(X, Y)
+coef = regr.coef_
+coef = coef.reshape((H.shape[0],H.shape[2],X.shape[1])) # Time, Units, Coefs
+# Get coeff at time when norm is maximum
+coef_maxt = np.zeros((H.shape[2],X.shape[1])) # Units, Coefs
+for i in range(H.shape[2]):
+    ind = np.argmax(np.sum(coef[:,i,:]**2,axis=1))
+    coef_maxt[i, :] = coef[ind,i,:]
+# Orthogonalize
+q, r = np.linalg.qr(coef_maxt)
+
+H_tran = np.dot(H, q) # Transform
 
 
-y1 = regr.predict(X2)
-plt.plot(Y.flatten(), y1.flatten(), '.', alpha=0.01)
-plt.plot([-5,5],[-5,5])
+# Show 2-D
+plot_eachcurve = False
+fig, axarr = plt.subplots(3, 3, sharex='col', sharey='row')
+for i_row, rule in enumerate(rules):
+    for i_col in range(3):
+
+        if i_col == 0:
+            pcs = [0,1] # Choice, Mod1
+            separate_by = 'tar1_mod1_strengths'
+        elif i_col == 1:
+            pcs = [0,1] # Choice, Mod1
+            separate_by = 'tar1_mod2_strengths'
+            axarr[i_row,i_col].set_title(rule_name[rule])
+        else:
+            pcs = [0,2] # Choice, Mod1
+            separate_by = 'tar1_mod2_strengths'
+
+
+
+        ind = trial_rules==rule
+        h_tran = H_tran[:,ind,:]
+
+        if separate_by == 'tar1_mod1_strengths':
+            separate_bys = tar1_mod1_strengths
+            colors = sns.color_palette("RdBu_r", len(np.unique(separate_bys)))
+        elif separate_by == 'tar1_mod2_strengths':
+            separate_bys = tar1_mod2_strengths
+            colors = sns.color_palette("BrBG", len(np.unique(separate_bys)))
+        else:
+            raise ValueError
+
+        for i, s in enumerate(np.unique(separate_bys)):
+            h_plot = h_tran[:,separate_bys==s,:]
+            if plot_eachcurve:
+                for j in range(h_plot.shape[1]):
+                    axarr[i_row,i_col].plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
+                            '.-', markersize=2, color=colors[i])
+            else: #TODO: This is incorrect now
+                h_plot = h_plot.mean(axis=1)
+                axarr[i_row,i_col].plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
+                        '.-', markersize=2, color=colors[i])
+        plt.locator_params(nbins=2)
+
 plt.show()
+
+
+
+
+# X2 = np.zeros((X.shape[0], 6+6))
+# X2[:,:6] = X
+# for i in [0,1]:
+#     for j in [0,1,2]:
+#         X2[:,6+(i+1)*j] = X[:,i+1]*X[:,3+j]
+# regr = linear_model.LinearRegression()
+# regr.fit(X2, Y)
+# print(regr.score(X2, Y))
+
+
