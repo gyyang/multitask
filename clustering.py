@@ -95,8 +95,9 @@ ac.fit(h_var_all) # n_samples, n_features = n_units, n_rules/n_epochs
 labels = ac.labels_ # cluster labels
 
 # Sort clusters by its task preference (important for consistency across nets)
-label_prefs = [(np.argmax(h_normvar_all[labels==l].sum(axis=0))) for l in set(labels)]
+label_prefs = [rules[np.argmax(h_normvar_all[labels==l].sum(axis=0))] for l in set(labels)]
 ind_label_sort = np.argsort(label_prefs)
+label_prefs = np.array(label_prefs)[ind_label_sort]
 # Relabel
 labels2 = np.zeros_like(labels)
 for i, ind in enumerate(ind_label_sort):
@@ -104,13 +105,16 @@ for i, ind in enumerate(ind_label_sort):
 labels = labels2
 
 # Sort data by labels
-ind_sort = np.argsort(labels)
-labels = labels[ind_sort]
-h_normvar_all = h_normvar_all[ind_sort, :]
-ind_orig = ind_orig[ind_sort]
+ind_sort        = np.argsort(labels)
+labels          = labels[ind_sort]
+h_normvar_all   = h_normvar_all[ind_sort, :]
+ind_orig        = ind_orig[ind_sort]
 
 # Save results
-result = {'labels' : labels, 'h_normvar_all' : h_normvar_all, 'ind_orig' : ind_orig}
+result = {'labels'          : labels,
+          'label_prefs'     : label_prefs,
+          'h_normvar_all'   : h_normvar_all,
+          'ind_orig'        : ind_orig}
 with open('data/clustering'+save_addon+'.pkl','wb') as f:
     pickle.dump(result, f)
 
@@ -125,10 +129,12 @@ elif data_type == 'epoch':
 else:
     raise ValueError
 
+h_plot  = h_normvar_all.T
+# h_plot /= h_normvar_all.max(axis=1)
 vmin, vmax = 0, 1
 fig = plt.figure(figsize=figsize)
 ax = fig.add_axes([0.25, 0.2, 0.6, 0.7])
-im = ax.imshow(h_normvar_all.T, cmap='hot',
+im = ax.imshow(h_plot, cmap='hot',
                aspect='auto', interpolation='none', vmin=vmin, vmax=vmax)
 
 plt.yticks(range(len(tick_names)), tick_names,
