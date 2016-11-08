@@ -281,6 +281,44 @@ def schematic_plot():
     plt.savefig('figure/schematic_outputs.pdf',transparent=True)
     plt.show()
 
+def plot_singleneuron_intime(save_addon, neuron, rule, epoch=None, save=False):
+    with Run(save_addon) as R:
+        config = R.config
+        task = generate_onebatch(rule=rule, config=config, mode='test')
+        h_test = R.f_h(task.x) # (Time, Batch, Units)
+    h_max = h_test[:,:,neuron].max()
+    print(h_max)
+
+    fig = plt.figure(figsize=(1.5,1))
+    ax = fig.add_axes([0.3,0.25,0.6,0.6])
+    ax.set_color_cycle(sns.color_palette("husl", h_test.shape[1]))
+    _ = ax.plot(h_test[:,:,neuron])
+
+    if epoch is not None:
+        e0, e1 = task.epochs[epoch]
+        e0 = e0 if e0 is not None else 0
+        e1 = e1 if e1 is not None else h_test.shape[0]
+        ax.plot([e0, e1], [h_max*1.15]*2,
+                color='black',linewidth=1.5)
+        save_name = 'figure/trace_'+rule_name[rule]+epoch+save_addon+'.pdf'
+    else:
+        save_name = 'figure/trace_unit'+str(neuron)+rule_name[rule]+save_addon+'.pdf'
+
+    plt.xticks([0,2000])
+    plt.xlabel('Time (ms)', fontsize=7, labelpad=-5)
+    plt.ylabel('activitity (a.u.)', fontsize=7)
+    plt.title('Unit {:d} '.format(neuron) + rule_name[rule], fontsize=7)
+    plt.ylim(np.array([-0.1, 1.2])*h_max)
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    plt.locator_params(axis='y', nbins=4)
+    if save:
+        plt.savefig(save_name, transparent=True)
+    plt.show()
+
 if __name__ == "__main__":
     sample_plot(save_addon='tf_latest_400', rule=CHOICEATTEND_MOD1)
     pass

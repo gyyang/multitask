@@ -59,7 +59,11 @@ else:
 
 h_var_all = np.zeros((nh, len(h_all.keys())))
 for i, val in enumerate(h_all.values()):
-    h_var_all[:, i] = val[t_start:].reshape((-1, nh)).var(axis=0)
+    # val is Time, Batch, Units
+    # Variance across time and stimulus
+    # h_var_all[:, i] = val[t_start:].reshape((-1, nh)).var(axis=0)
+    # Variance acros stimulus, then averaged across time
+    h_var_all[:, i] = val[t_start:].var(axis=1).mean(axis=0)
 
 # Plot total variance distribution
 fig = plt.figure(figsize=(1.5,1.2))
@@ -114,7 +118,10 @@ ind_orig        = ind_orig[ind_sort]
 result = {'labels'          : labels,
           'label_prefs'     : label_prefs,
           'h_normvar_all'   : h_normvar_all,
-          'ind_orig'        : ind_orig}
+          'ind_orig'        : ind_orig,
+          'rules'           : rules,
+          'data_type'       : data_type}
+
 with open('data/clustering'+save_addon+'.pkl','wb') as f:
     pickle.dump(result, f)
 
