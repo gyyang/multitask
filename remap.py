@@ -115,7 +115,6 @@ if True:
     ax.spines["top"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-#    ax.set_xlim([-0.5, 1.5])
     plt.savefig('figure/connweightrule_remap_unit'+str(neuron)+save_addon+'.pdf', transparent=True)
     plt.show()
 

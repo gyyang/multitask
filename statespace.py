@@ -28,7 +28,6 @@ from network import get_perf
 
 save_addon = 'tf_latest_400'
 rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
-#rules = [CHOICEATTEND_MOD1]
 
 def f_sub_mean(x):
     # subtract mean activity across batch conditions
@@ -78,6 +77,7 @@ with Run(save_addon) as R:
     X = np.zeros((len(rules)*batch_size, 3+3)) # regressors
     trial_rules = np.zeros(len(rules)*batch_size)
     H = np.array([])
+    Perfs = np.array([])
     for i, rule in enumerate(rules):
         task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
         # Only study target epoch
@@ -93,12 +93,15 @@ with Run(save_addon) as R:
         h_sample = h_sample[epoch[0]:epoch[1],...][::50,...] # every 50 ms
         if i == 0:
             H = h_sample
+            Perfs = perfs
         else:
             H = np.concatenate((H, h_sample), axis=1)
+            Perfs = np.concatenate((Perfs, perfs))
 
         X[i*batch_size:(i+1)*batch_size, :3] = np.array([y_choice, tar1_mod1_cohs, tar1_mod2_cohs]).T
         X[i*batch_size:(i+1)*batch_size, 3+i] = 1
         trial_rules[i*batch_size:(i+1)*batch_size] = rule
+
     if subtract_t_mean:
         H = f_sub_mean(H)
 
@@ -118,7 +121,6 @@ h = h.reshape((nt, nb, h.shape[-1]))
 
 
 # Regression
-
 from sklearn import linear_model
 # Create linear regression object
 
@@ -139,27 +141,27 @@ q, r = np.linalg.qr(coef_maxt)
 
 h_tran = np.dot(h, q) # Transform
 
-# Show 2-D
+
+# Pretty Plotting of State-space Results
 plot_eachcurve = False
-fig, axarr = plt.subplots(3, 3, sharex='col', sharey='row', figsize=(3,3))
-for i_row, rule in enumerate(rules):
-    for i_col in range(3):
-        ax = axarr[i_row,i_col]
+plot_onlycorrect = True # Only plotting correct trials
+fs = 6
+
+Perfs = Perfs.astype(bool)
+fig, axarr = plt.subplots(2, 3, sharex=True, sharey='row', figsize=(3,2))
+for i_col, rule in enumerate(rules):
+    for i_row in range(2):
+        ax = axarr[i_row, i_col]
         ch_list = [-1,1]
-        if i_col == 0:
-            pcs = [0,1] # Choice, Mod1
+        if i_row == 0:
+            pcs = [Choice, Mod1] # Choice, Mod1
             separate_by = 'tar1_mod1_strengths'
-        elif i_col == 1:
-            if i_row == 0:
-                pcs = [0,2]
-                separate_by = 'tar1_mod1_strengths'
-            else:
-                pcs = [0,1] # Choice, Mod1
-                separate_by = 'tar1_mod2_strengths'
-            ax.set_title(rule_name[rule], fontsize=7, y=0.9)
+            ax.set_title(rule_name[rule], fontsize=fs, y=0.8)
         else:
-            pcs = [0,2] # Choice, Mod1
+            pcs = [Choice, Mod2] # Choice, Mod1
             separate_by = 'tar1_mod2_strengths'
+        ax.set_ylim([h_tran[:,:,pcs[1]].min(),h_tran[:,:,pcs[1]].max()])
+        ax.set_xlim([h_tran[:,:,pcs[0]].min(),h_tran[:,:,pcs[0]].max()])
 
         if separate_by == 'tar1_mod1_strengths':
             sep_by = Mod1
@@ -170,25 +172,24 @@ for i_row, rule in enumerate(rules):
         else:
             raise ValueError
 
-        ax.locator_params(nbins=2)
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
-        ax.set_xlabel(regr_names[pcs[0]], fontsize=7)
-        ax.set_ylabel(regr_names[pcs[1]], fontsize=7)
-        ax.tick_params(axis='both', which='major', labelsize=7)
-
+        ax.axis('off')
+        if i_col == 0:
+            anc = [h_tran[:,:,pcs[0]].min()+1, h_tran[:,:,pcs[1]].max()-5] # anchor point
+            ax.plot([anc[0], anc[0]], [anc[1]-5, anc[1]-1], color='black', lw=1.0)
+            ax.plot([anc[0]+1, anc[0]+5], [anc[1], anc[1]], color='black', lw=1.0)
+            ax.text(anc[0], anc[1], regr_names[pcs[0]], fontsize=fs, va='bottom')
+            ax.text(anc[0], anc[1], regr_names[pcs[1]], fontsize=fs, rotation=90, ha='right', va='top')
 
         for i, s in enumerate(np.unique(X[:,sep_by])):
             for ch in ch_list: # Choice
                 if ch == -1:
                     kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
-                    #mfc=colors[i]
                 else:
                     kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
-                    #mfc = 'white'
                 ind = (X[:,sep_by]==s)*(trial_rules==rule)*(X[:,0]==ch)
+                if plot_onlycorrect:
+                    ind *= Perfs
+
                 if np.any(ind):
                     h_plot = h_tran[:,ind,:]
                     if plot_eachcurve:
@@ -199,7 +200,29 @@ for i_row, rule in enumerate(rules):
                         h_plot = h_plot.mean(axis=1)
                         axarr[i_row,i_col].plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
                                 '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
-plt.tight_layout(pad=1.0)
-plt.savefig('figure/choicetasks_statespace.pdf', transparent=True)
+
+for i_row in range(2):
+    if i_row == 0:
+        ax = fig.add_axes([0.25,0.45,0.2,0.1])
+        colors = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
+    else:
+        ax = fig.add_axes([0.25,0.05,0.2,0.1])
+        colors = sns.diverging_palette(145, 280, sep=1, s=99, l=30, n=6)
+
+    for i in range(6):
+        kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+        ax.plot([i], [0], '.-', color=colors[i], markersize=4, markeredgewidth=0.5, **kwargs)
+    ax.axis('off')
+    ax.text(2.5, 1, 'Strong Weak Strong', fontsize=5, va='bottom', ha='center')
+    ax.text(2.5, -1, 'To choice 1    To choice 2', fontsize=5, va='top', ha='center')
+    ax.set_xlim([-1,6])
+    ax.set_ylim([-3,3])
+
+plt.tight_layout(pad=0.0)
+plt.savefig('figure/choicetasks_statespace'+save_addon+'.pdf', transparent=True)
 plt.show()
+
+
+
+
 
