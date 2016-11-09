@@ -121,42 +121,51 @@ if False:
 
 
 # ########### Plot Causal Manipulation Results  #############################
-perfs = list()
-with Run(save_addon, lesion_units=ind_remap_orig) as R:
-    config = R.config
-    for rule in rules:
-        task = generate_onebatch(rule=rule, config=config, mode='test')
-        y_hat = R.f_y_from_x(task.x)
-        perf = get_perf(y_hat, task.y_loc)
-        perfs.append(perf.mean())
+perfs, perfs_lesion_remap = list(), list()
+for lesion_units, perfs_store in zip([None, ind_remap_orig],
+                                     [perfs, perfs_lesion_remap]):
+    with Run(save_addon, lesion_units=lesion_units) as R:
+        config = R.config
+        for rule in rules:
+            task = generate_onebatch(rule=rule, config=config, mode='test')
+            y_hat = R.f_y_from_x(task.x)
+            perf = get_perf(y_hat, task.y_loc)
+            perfs_store.append(perf.mean())
 
-#
-# perfs = ga.get_performances()
-#
-# # inh_id = ind
-# inh_id = inds_remap
-# ga_inh = GeneralAnalysis(save_addon=save_addon, inh_id=inh_id, inh_output=True)
-# perfs_inh = ga_inh.get_performances()
-#
-# fig = plt.figure(figsize=(2.5,2))
-# ax = fig.add_axes([0.2,0.5,0.75,0.4])
-# ax.plot(perfs, 'o-', markersize=3, label='intact', color=sns.xkcd_palette(['black'])[0])
-# ax.plot(perfs_inh, 'o-', markersize=3, label='Inh. unit \n'+str(inh_id), color=sns.xkcd_palette(['red'])[0])
-# plt.xticks(range(len(ga.rules)), [rule_name[rule] for rule in ga.rules], rotation=90)
-# plt.ylabel('performance', fontsize=7)
-# plt.ylim(bottom=0.0, top=1.05)
-# plt.xlim([-0.5, len(perfs)-0.5])
-# ax.tick_params(axis='both', which='major', labelsize=7)
-# leg = plt.legend(fontsize=6,frameon=False, loc=2, numpoints=1,
-#                  bbox_to_anchor=(0,0.5), labelspacing=0.3)
-# ax.spines["right"].set_visible(False)
-# ax.spines["top"].set_visible(False)
-# ax.xaxis.set_ticks_position('bottom')
-# ax.yaxis.set_ticks_position('left')
-# plt.locator_params(axis='y', nbins=4)
-# plt.savefig('figure/performance_inh'+str(inh_id)+A.config['save_addon']+'.pdf', transparent=True)
-# plt.show()
-#
+perf_diff = np.array(perfs_lesion_remap) - np.array(perfs)
+perf_diff_remaprules    = perf_diff[ind_rules_remap].mean()
+perf_diff_nonremaprules = perf_diff[ind_rules_nonremap].mean()
+
+perfs, perfs_lesion_remap = np.array(perfs), np.array(perfs_lesion_remap)
+perf_plots = [np.mean(perfs[ind_rules_nonremap]), np.mean(perfs[ind_rules_remap]),
+              np.mean(perfs_lesion_remap[ind_rules_nonremap]), np.mean(perfs_lesion_remap[ind_rules_remap])]
+
+fs = 6
+width = 0.3
+fig = plt.figure(figsize=(1.5,1.2))
+ax = fig.add_axes([0.3,0.3,0.6,0.4])
+b0 = ax.bar(np.arange(2)-width, [np.mean(perfs[ind_rules_nonremap]), np.mean(perfs[ind_rules_remap])],
+       width=width, color=sns.xkcd_palette(['orange'])[0], edgecolor='none')
+b1 = ax.bar(np.arange(2), [np.mean(perfs_lesion_remap[ind_rules_nonremap]), np.mean(perfs_lesion_remap[ind_rules_remap])],
+       width=width, color=sns.xkcd_palette(['green'])[0], edgecolor='none')
+ax.set_xticks(np.arange(2))
+ax.set_xticklabels(['Non-remap', 'Remap'])
+ax.set_xlabel('Rules', fontsize=fs, labelpad=3)
+ax.set_ylabel('performance', fontsize=fs)
+lg = ax.legend((b0, b1), ('Control', 'Remap units lesioned'),
+               fontsize=fs, ncol=1, bbox_to_anchor=(1,1.7),
+               labelspacing=0.2, loc=1, frameon=False)
+plt.setp(lg.get_title(),fontsize=fs)
+ax.tick_params(axis='both', which='major', labelsize=fs)
+plt.locator_params(axis='y',nbins=2)
+ax.spines["right"].set_visible(False)
+ax.spines["top"].set_visible(False)
+ax.xaxis.set_ticks_position('bottom')
+ax.yaxis.set_ticks_position('left')
+#    ax.set_xlim([-0.5, 1.5])
+plt.savefig('figure/perflesion_remap_units'+save_addon+'.pdf', transparent=True)
+plt.show()
+
 
 # # A.plot_unit_connection(inds)
 # ga = GeneralAnalysis(save_addon=A.save_addon_original)
@@ -175,35 +184,6 @@ with Run(save_addon, lesion_units=ind_remap_orig) as R:
 #     raise ValueError('Did not success to find a typical remap unit in this network')
 #
 #
-# ########### Plot Causal Manipulation Results  #############################
-#
-# perfs = ga.get_performances()
-#
-# # inh_id = ind
-# inh_id = inds_remap
-# ga_inh = GeneralAnalysis(save_addon=save_addon, inh_id=inh_id, inh_output=True)
-# perfs_inh = ga_inh.get_performances()
-#
-# fig = plt.figure(figsize=(2.5,2))
-# ax = fig.add_axes([0.2,0.5,0.75,0.4])
-# ax.plot(perfs, 'o-', markersize=3, label='intact', color=sns.xkcd_palette(['black'])[0])
-# ax.plot(perfs_inh, 'o-', markersize=3, label='Inh. unit \n'+str(inh_id), color=sns.xkcd_palette(['red'])[0])
-# plt.xticks(range(len(ga.rules)), [rule_name[rule] for rule in ga.rules], rotation=90)
-# plt.ylabel('performance', fontsize=7)
-# plt.ylim(bottom=0.0, top=1.05)
-# plt.xlim([-0.5, len(perfs)-0.5])
-# ax.tick_params(axis='both', which='major', labelsize=7)
-# leg = plt.legend(fontsize=6,frameon=False, loc=2, numpoints=1,
-#                  bbox_to_anchor=(0,0.5), labelspacing=0.3)
-# ax.spines["right"].set_visible(False)
-# ax.spines["top"].set_visible(False)
-# ax.xaxis.set_ticks_position('bottom')
-# ax.yaxis.set_ticks_position('left')
-# plt.locator_params(axis='y', nbins=4)
-# plt.savefig('figure/performance_inh'+str(inh_id)+A.config['save_addon']+'.pdf', transparent=True)
-# plt.show()
-#
-
 
 # ########### Plot histogram of correlation coefficient #####################
 # slopes = list()
