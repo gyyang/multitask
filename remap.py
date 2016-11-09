@@ -55,12 +55,48 @@ ind_remap_orig = ind_orig[ind_remap] # Indices of remap units in the original ma
 # ind_remap      = np.where(labels==label_remap)[0]
 # ind_remap_orig = ind_orig[ind_remap] # Indices of remap units in the original matrix
 
-plot_singleneuron_intime(save_addon, ind_remap_orig[-2], [INHREMAP, INHGO], save=True, ylabel_firstonly = True)
+########################## Analyze Remap Units ################################
+
+# plot_singleneuron_intime(save_addon, ind_remap_orig[-2], [INHREMAP, INHGO], save=True, ylabel_firstonly = True)
 
 
+###################### Plot single unit connection ##########################
+plot_single_unit_connection = False
+if plot_single_unit_connection:
+    neuron = ind_remap_orig[-2]
 
+    with Run(save_addon) as R:
+        w_out, b_out, w_rec, w_in, b_rec = R.w_out, R.b_out, R.w_rec, R.w_in, R.b_rec
+        config = R.config
+    N_RING = config['N_RING']
 
+    # Connection with ring input and output
+    w_in0 = w_in[neuron, 1:1+N_RING]
+    w_out0 = w_out[:,neuron][1:]
 
+    fs = 6
+    fig = plt.figure(figsize=(1.5,0.8))
+    ax = fig.add_axes([0.3,0.25,0.6,0.55])
+    ax.plot(w_in0, color=sns.xkcd_palette(['green'])[0], label='from input')
+    ax.plot(w_out0, color=sns.xkcd_palette(['blue'])[0], label='to output')
+    plt.ylabel('conn. weight', fontsize=fs, labelpad=1)
+    plt.xlabel('degree', fontsize=fs, labelpad=-6)
+    plt.xticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$','',r'360$\degree$'])
+    plt.title('Unit {:d} '.format(neuron), fontsize=fs)
+
+    wmax = max((w_in0.max(),w_out0.max()))
+    wmin = min((w_in0.min(),w_out0.min()))
+    plt.ylim([wmin-0.1*(wmax-wmin),wmax+0.7*(wmax-wmin)])
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    plt.locator_params(axis='y',nbins=5)
+    lg = plt.legend(ncol=1,bbox_to_anchor=(1.0,1.15),frameon=False,
+                    fontsize=fs,labelspacing=0.3,loc=1)
+    plt.savefig('figure/connweight_remap_unit'+str(neuron)+save_addon+'.pdf', transparent=True)
+    plt.show()
 
 
 
@@ -109,34 +145,8 @@ plot_singleneuron_intime(save_addon, ind_remap_orig[-2], [INHREMAP, INHGO], save
 # plt.savefig('figure/performance_inh'+str(inh_id)+A.config['save_addon']+'.pdf', transparent=True)
 # plt.show()
 #
-# ###################### Plot single unit connection ##########################
-# # Connection with ring input and output
-# w_in = ga.Win[ind,1:1+N_RING]
-# w_out = ga.Wout[:,ind][1:]
-# fig = plt.figure(figsize=(1.5,1.5))
-# ax = fig.add_axes([0.3,0.3,0.6,0.5])
-# ax.plot(w_in, color=sns.xkcd_palette(['green'])[0], label='from input')
-# ax.plot(w_out, color=sns.xkcd_palette(['blue'])[0], label='to output')
-# plt.ylabel('conn. weight', fontsize=7, labelpad=1)
-# plt.xlabel('ring', fontsize=7)
-# plt.xticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'])
-# plt.title('Unit {:d} '.format(ind), fontsize=7)
-#
-# wmax = max((w_in.max(),w_out.max()))
-# wmin = min((w_in.min(),w_out.min()))
-# plt.ylim([wmin-0.1*(wmax-wmin),wmax+0.7*(wmax-wmin)])
-# ax.tick_params(axis='both', which='major', labelsize=7)
-# ax.spines["right"].set_visible(False)
-# ax.spines["top"].set_visible(False)
-# ax.xaxis.set_ticks_position('bottom')
-# ax.yaxis.set_ticks_position('left')
-# plt.locator_params(axis='y',nbins=5)
-# lg = plt.legend(ncol=1,bbox_to_anchor=(1,1.1),frameon=False,
-#                 fontsize=7,labelspacing=0.3,loc=1)
-# plt.savefig('figure/sample_remap_unit_connectivity.pdf', transparent=True)
-# plt.show()
-#
-#
+
+
 # ########### Plot histogram of correlation coefficient #####################
 # slopes = list()
 # rvalues = list()
