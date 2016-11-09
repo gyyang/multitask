@@ -66,9 +66,9 @@ with Run(save_addon) as R:
     config = R.config
 N_RING = config['N_RING']
 
-if False:
-    neuron = ind_remap_orig[-2]
+neuron = ind_remap_orig[-2] # Example unit
 
+if False:
     # Connection with ring input and output
     w_in0 = w_in[neuron, 1:1+N_RING]
     w_out0 = w_out[:,neuron][1:]
@@ -76,10 +76,10 @@ if False:
     fs = 6
     fig = plt.figure(figsize=(1.5,0.8))
     ax = fig.add_axes([0.3,0.25,0.6,0.55])
-    ax.plot(w_in0, color=sns.xkcd_palette(['green'])[0], label='from input')
-    ax.plot(w_out0, color=sns.xkcd_palette(['blue'])[0], label='to output')
-    plt.ylabel('conn. weight', fontsize=fs, labelpad=1)
-    plt.xlabel('degree', fontsize=fs, labelpad=-6)
+    ax.plot(w_in0, color=sns.xkcd_palette(['green'])[0], label='From input')
+    ax.plot(w_out0, color=sns.xkcd_palette(['blue'])[0], label='To output')
+    plt.ylabel('Conn. weight', fontsize=fs, labelpad=1)
+    plt.xlabel('Degree', fontsize=fs, labelpad=-6)
     plt.xticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$','',r'360$\degree$'])
     plt.title('Unit {:d} '.format(neuron), fontsize=fs)
 
@@ -98,17 +98,17 @@ if False:
     plt.show()
 
 
-if False:
+if True:
     remaprule_to_remap = w_in[:, 2*N_RING+rules_remap][ind_remap_orig, :].flatten()
     nonremaprule_to_remap = w_in[:, 2*N_RING+rules_nonremap][ind_remap_orig, :].flatten()
 
     fs = 6
-    fig = plt.figure(figsize=(1.5,0.8))
-    ax = fig.add_axes([0.3,0.4,0.6,0.55])
-    ax.boxplot([remaprule_to_remap, nonremaprule_to_remap], showfliers=False)
-    ax.set_xticklabels(['remap', 'non-remap'])
+    fig = plt.figure(figsize=(1.5,1.2))
+    ax = fig.add_axes([0.3,0.3,0.6,0.4])
+    ax.boxplot([nonremaprule_to_remap, remaprule_to_remap], showfliers=False)
+    ax.set_xticklabels(['Non-remap', 'Remap'])
     ax.set_xlabel('Input from rule units', fontsize=fs, labelpad=3)
-    ax.set_ylabel('conn. weight', fontsize=fs)
+    ax.set_ylabel('Conn. weight', fontsize=fs)
     ax.tick_params(axis='both', which='major', labelsize=fs)
     plt.locator_params(axis='y',nbins=2)
     ax.spines["right"].set_visible(False)
@@ -121,50 +121,51 @@ if False:
 
 
 # ########### Plot Causal Manipulation Results  #############################
-perfs, perfs_lesion_remap = list(), list()
-for lesion_units, perfs_store in zip([None, ind_remap_orig],
-                                     [perfs, perfs_lesion_remap]):
-    with Run(save_addon, lesion_units=lesion_units) as R:
-        config = R.config
-        for rule in rules:
-            task = generate_onebatch(rule=rule, config=config, mode='test')
-            y_hat = R.f_y_from_x(task.x)
-            perf = get_perf(y_hat, task.y_loc)
-            perfs_store.append(perf.mean())
+if False:
+    perfs, perfs_lesion_remap = list(), list()
+    for lesion_units, perfs_store in zip([None, ind_remap_orig],
+                                         [perfs, perfs_lesion_remap]):
+        with Run(save_addon, lesion_units=lesion_units) as R:
+            config = R.config
+            for rule in rules:
+                task = generate_onebatch(rule=rule, config=config, mode='test')
+                y_hat = R.f_y_from_x(task.x)
+                perf = get_perf(y_hat, task.y_loc)
+                perfs_store.append(perf.mean())
 
-perf_diff = np.array(perfs_lesion_remap) - np.array(perfs)
-perf_diff_remaprules    = perf_diff[ind_rules_remap].mean()
-perf_diff_nonremaprules = perf_diff[ind_rules_nonremap].mean()
+    perf_diff = np.array(perfs_lesion_remap) - np.array(perfs)
+    perf_diff_remaprules    = perf_diff[ind_rules_remap].mean()
+    perf_diff_nonremaprules = perf_diff[ind_rules_nonremap].mean()
 
-perfs, perfs_lesion_remap = np.array(perfs), np.array(perfs_lesion_remap)
-perf_plots = [np.mean(perfs[ind_rules_nonremap]), np.mean(perfs[ind_rules_remap]),
-              np.mean(perfs_lesion_remap[ind_rules_nonremap]), np.mean(perfs_lesion_remap[ind_rules_remap])]
+    perfs, perfs_lesion_remap = np.array(perfs), np.array(perfs_lesion_remap)
+    perf_plots = [np.mean(perfs[ind_rules_nonremap]), np.mean(perfs[ind_rules_remap]),
+                  np.mean(perfs_lesion_remap[ind_rules_nonremap]), np.mean(perfs_lesion_remap[ind_rules_remap])]
 
-fs = 6
-width = 0.3
-fig = plt.figure(figsize=(1.5,1.2))
-ax = fig.add_axes([0.3,0.3,0.6,0.4])
-b0 = ax.bar(np.arange(2)-width, [np.mean(perfs[ind_rules_nonremap]), np.mean(perfs[ind_rules_remap])],
-       width=width, color=sns.xkcd_palette(['orange'])[0], edgecolor='none')
-b1 = ax.bar(np.arange(2), [np.mean(perfs_lesion_remap[ind_rules_nonremap]), np.mean(perfs_lesion_remap[ind_rules_remap])],
-       width=width, color=sns.xkcd_palette(['green'])[0], edgecolor='none')
-ax.set_xticks(np.arange(2))
-ax.set_xticklabels(['Non-remap', 'Remap'])
-ax.set_xlabel('Rules', fontsize=fs, labelpad=3)
-ax.set_ylabel('performance', fontsize=fs)
-lg = ax.legend((b0, b1), ('Control', 'Remap units lesioned'),
-               fontsize=fs, ncol=1, bbox_to_anchor=(1,1.7),
-               labelspacing=0.2, loc=1, frameon=False)
-plt.setp(lg.get_title(),fontsize=fs)
-ax.tick_params(axis='both', which='major', labelsize=fs)
-plt.locator_params(axis='y',nbins=2)
-ax.spines["right"].set_visible(False)
-ax.spines["top"].set_visible(False)
-ax.xaxis.set_ticks_position('bottom')
-ax.yaxis.set_ticks_position('left')
-#    ax.set_xlim([-0.5, 1.5])
-plt.savefig('figure/perflesion_remap_units'+save_addon+'.pdf', transparent=True)
-plt.show()
+    fs = 6
+    width = 0.3
+    fig = plt.figure(figsize=(1.5,1.2))
+    ax = fig.add_axes([0.3,0.3,0.6,0.4])
+    b0 = ax.bar(np.arange(2)-width, [np.mean(perfs[ind_rules_nonremap]), np.mean(perfs[ind_rules_remap])],
+           width=width, color=sns.xkcd_palette(['orange'])[0], edgecolor='none')
+    b1 = ax.bar(np.arange(2), [np.mean(perfs_lesion_remap[ind_rules_nonremap]), np.mean(perfs_lesion_remap[ind_rules_remap])],
+           width=width, color=sns.xkcd_palette(['green'])[0], edgecolor='none')
+    ax.set_xticks(np.arange(2))
+    ax.set_xticklabels(['Non-remap', 'Remap'])
+    ax.set_xlabel('Rules', fontsize=fs, labelpad=3)
+    ax.set_ylabel('performance', fontsize=fs)
+    lg = ax.legend((b0, b1), ('Control', 'Remap units lesioned'),
+                   fontsize=fs, ncol=1, bbox_to_anchor=(1,1.7),
+                   labelspacing=0.2, loc=1, frameon=False)
+    plt.setp(lg.get_title(),fontsize=fs)
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+    plt.locator_params(axis='y',nbins=2)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    #    ax.set_xlim([-0.5, 1.5])
+    plt.savefig('figure/perflesion_remap_units'+save_addon+'.pdf', transparent=True)
+    plt.show()
 
 
 # # A.plot_unit_connection(inds)
