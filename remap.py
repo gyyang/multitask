@@ -21,7 +21,6 @@ from run import Run, plot_singleneuron_intime
 from network import get_perf
 
 
-###################### Plot single unit activity ##########################
 save_addon = 'tf_latest_500'
 with open('data/clustering'+save_addon+'.pkl','rb') as f:
     result = pickle.load(f)
@@ -31,8 +30,9 @@ h_normvar_all   = result['h_normvar_all']
 ind_orig        = result['ind_orig']
 rules           = result['rules']
 
-# Get remap units
-# Directly search (ignore clustering results)
+########################## Get Remap Units ####################################
+# Directly search
+# This will be a stricter subset of the remap modules found in clustering results
 rules_remap = [REMAP, INHREMAP, DELAYREMAP]
 rules_nonremap = [r for r in rules if r not in rules_remap]
 ind_rules_remap = [rules.index(r) for r in rules_remap]
@@ -47,7 +47,6 @@ plt.show()
 
 ind_remap = np.where(h_normvar_all_remap>0.9)[0]
 ind_remap_orig = ind_orig[ind_remap] # Indices of remap units in the original matrix
-
 
 # Use clustering results (tend to be loose)
 # label_remap    = np.where(label_prefs==INHREMAP)[0][0]
