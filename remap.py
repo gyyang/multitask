@@ -33,8 +33,8 @@ rules           = result['rules']
 ########################## Get Remap Units ####################################
 # Directly search
 # This will be a stricter subset of the remap modules found in clustering results
-rules_remap = [REMAP, INHREMAP, DELAYREMAP]
-rules_nonremap = [r for r in rules if r not in rules_remap]
+rules_remap = np.array([REMAP, INHREMAP, DELAYREMAP])
+rules_nonremap = np.array([r for r in rules if r not in rules_remap])
 ind_rules_remap = [rules.index(r) for r in rules_remap]
 ind_rules_nonremap = [rules.index(r) for r in rules_nonremap]
 h_normvar_all_remap = h_normvar_all[:, ind_rules_remap].sum(axis=1)
@@ -61,14 +61,13 @@ ind_remap_orig = ind_orig[ind_remap] # Indices of remap units in the original ma
 
 
 ###################### Plot single unit connection ##########################
-plot_single_unit_connection = False
-if plot_single_unit_connection:
-    neuron = ind_remap_orig[-2]
+with Run(save_addon) as R:
+    w_out, b_out, w_rec, w_in, b_rec = R.w_out, R.b_out, R.w_rec, R.w_in, R.b_rec
+    config = R.config
+N_RING = config['N_RING']
 
-    with Run(save_addon) as R:
-        w_out, b_out, w_rec, w_in, b_rec = R.w_out, R.b_out, R.w_rec, R.w_in, R.b_rec
-        config = R.config
-    N_RING = config['N_RING']
+if False:
+    neuron = ind_remap_orig[-2]
 
     # Connection with ring input and output
     w_in0 = w_in[neuron, 1:1+N_RING]
@@ -99,6 +98,66 @@ if plot_single_unit_connection:
     plt.show()
 
 
+if False:
+    remaprule_to_remap = w_in[:, 2*N_RING+rules_remap][ind_remap_orig, :].flatten()
+    nonremaprule_to_remap = w_in[:, 2*N_RING+rules_nonremap][ind_remap_orig, :].flatten()
+
+    fs = 6
+    fig = plt.figure(figsize=(1.5,0.8))
+    ax = fig.add_axes([0.3,0.4,0.6,0.55])
+    ax.boxplot([remaprule_to_remap, nonremaprule_to_remap], showfliers=False)
+    ax.set_xticklabels(['remap', 'non-remap'])
+    ax.set_xlabel('Input from rule units', fontsize=fs, labelpad=3)
+    ax.set_ylabel('conn. weight', fontsize=fs)
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+    plt.locator_params(axis='y',nbins=2)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+#    ax.set_xlim([-0.5, 1.5])
+    plt.savefig('figure/connweightrule_remap_unit'+str(neuron)+save_addon+'.pdf', transparent=True)
+    plt.show()
+
+
+# ########### Plot Causal Manipulation Results  #############################
+rules = [INHGO, INHREMAP]
+perfs = list()
+with Run(save_addon) as R:
+    config = R.config
+    for rule in rules:
+        task = generate_onebatch(rule=rule, config=config, mode='test')
+        y_hat = R.f_y_from_x(task.x)
+        perf = get_perf(y_hat, task.y_loc)
+        perfs.append(perf.mean())
+
+#
+# perfs = ga.get_performances()
+#
+# # inh_id = ind
+# inh_id = inds_remap
+# ga_inh = GeneralAnalysis(save_addon=save_addon, inh_id=inh_id, inh_output=True)
+# perfs_inh = ga_inh.get_performances()
+#
+# fig = plt.figure(figsize=(2.5,2))
+# ax = fig.add_axes([0.2,0.5,0.75,0.4])
+# ax.plot(perfs, 'o-', markersize=3, label='intact', color=sns.xkcd_palette(['black'])[0])
+# ax.plot(perfs_inh, 'o-', markersize=3, label='Inh. unit \n'+str(inh_id), color=sns.xkcd_palette(['red'])[0])
+# plt.xticks(range(len(ga.rules)), [rule_name[rule] for rule in ga.rules], rotation=90)
+# plt.ylabel('performance', fontsize=7)
+# plt.ylim(bottom=0.0, top=1.05)
+# plt.xlim([-0.5, len(perfs)-0.5])
+# ax.tick_params(axis='both', which='major', labelsize=7)
+# leg = plt.legend(fontsize=6,frameon=False, loc=2, numpoints=1,
+#                  bbox_to_anchor=(0,0.5), labelspacing=0.3)
+# ax.spines["right"].set_visible(False)
+# ax.spines["top"].set_visible(False)
+# ax.xaxis.set_ticks_position('bottom')
+# ax.yaxis.set_ticks_position('left')
+# plt.locator_params(axis='y', nbins=4)
+# plt.savefig('figure/performance_inh'+str(inh_id)+A.config['save_addon']+'.pdf', transparent=True)
+# plt.show()
+#
 
 # # A.plot_unit_connection(inds)
 # ga = GeneralAnalysis(save_addon=A.save_addon_original)

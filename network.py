@@ -111,8 +111,13 @@ def popvec(y):
     loc = np.arctan2(temp_sin, temp_cos)
     return np.mod(loc, 2*np.pi)
 
-# performance
 def get_perf(y_hat, y_loc):
+    '''
+    Get performance
+    :param y_hat: Actual output. Time, Batch, Unit
+    :param y_loc: Target output location (-1 for fixation). Time, Batch
+    :return:
+    '''
     # Only look at last time points
     y_loc = y_loc[-1]
     y_hat = y_hat[-1]
