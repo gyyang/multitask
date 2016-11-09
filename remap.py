@@ -40,10 +40,12 @@ ind_rules_nonremap = [rules.index(r) for r in rules_nonremap]
 h_normvar_all_remap = h_normvar_all[:, ind_rules_remap].sum(axis=1)
 h_normvar_all_nonremap = h_normvar_all[:, ind_rules_nonremap].sum(axis=1)
 
-plt.figure()
-_ = plt.hist(h_normvar_all_remap, bins=50)
-plt.xlabel('Proportion of variance in remap tasks')
-plt.show()
+#==============================================================================
+# plt.figure()
+# _ = plt.hist(h_normvar_all_remap, bins=50)
+# plt.xlabel('Proportion of variance in remap tasks')
+# plt.show()
+#==============================================================================
 
 ind_remap = np.where(h_normvar_all_remap>0.9)[0]
 ind_remap_orig = ind_orig[ind_remap] # Indices of remap units in the original matrix
@@ -53,13 +55,7 @@ ind_remap_orig = ind_orig[ind_remap] # Indices of remap units in the original ma
 # ind_remap      = np.where(labels==label_remap)[0]
 # ind_remap_orig = ind_orig[ind_remap] # Indices of remap units in the original matrix
 
-plot_singleneuron_intime(save_addon, ind_remap_orig[0], REMAP)
-
-plt.figure()
-_ = plt.plot(h_normvar_all[ind_remap,:].T, 'o', color='black', alpha=0.2)
-plt.xticks(range(len(rules)), [rule_name[r] for r in rules], rotation=90)
-plt.show()
-
+plot_singleneuron_intime(save_addon, ind_remap_orig[-2], [INHREMAP, INHGO], save=True, ylabel_firstonly = True)
 
 
 

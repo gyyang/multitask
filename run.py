@@ -281,7 +281,29 @@ def schematic_plot():
     plt.savefig('figure/schematic_outputs.pdf',transparent=True)
     plt.show()
 
-def plot_singleneuron_intime(save_addon, neuron, rules, epoch=None, save=False):
+def plot_singleneuron_intime(save_addon, neurons, rules,
+                             epoch=None, save=False, ylabel_firstonly=True):
+    '''
+
+    :param save_addon:
+    :param neurons: indices of neurons to plot
+    :param rules: rules to plot
+    :param epoch: epoch to plot
+    :param save: save figure?
+    :param ylabel_firstonly: if True, only plot ylabel for the first rule in rules
+    :return:
+    '''
+    try:
+        _ = iter(rules)
+    except TypeError:
+        rules = [rules]
+
+    try:
+        _ = iter(neurons)
+    except TypeError:
+        neurons = [neurons]
+
+    t_start = 500
     h_tests = dict()
     with Run(save_addon) as R:
         config = R.config
@@ -289,39 +311,44 @@ def plot_singleneuron_intime(save_addon, neuron, rules, epoch=None, save=False):
             task = generate_onebatch(rule=rule, config=config, mode='test')
             h_tests[rule] = R.f_h(task.x) # (Time, Batch, Units)
 
-    h_max = np.max([h_tests[r][:,:,neuron].max() for r in rules])
-    print(h_max)
+    for neuron in neurons:
+        h_max = np.max([h_tests[r][t_start:,:,neuron].max() for r in rules])
+        for j, rule in enumerate(rules):
+            fs = 6
+            fig = plt.figure(figsize=(1.0,0.8))
+            ax = fig.add_axes([0.35,0.25,0.55,0.55])
+            ax.set_color_cycle(sns.color_palette("husl", h_tests[rule].shape[1]))
+            _ = ax.plot(np.arange(h_tests[rule][t_start:].shape[0])/1000.,
+                        h_tests[rule][t_start:,:,neuron])
 
-    for rule in rules:
-        fig = plt.figure(figsize=(1.5,1))
-        ax = fig.add_axes([0.3,0.25,0.6,0.6])
-        ax.set_color_cycle(sns.color_palette("husl", h_tests[rule].shape[1]))
-        _ = ax.plot(h_tests[rule][:,:,neuron])
+            if epoch is not None:
+                e0, e1 = task.epochs[epoch]
+                e0 = e0 if e0 is not None else 0
+                e1 = e1 if e1 is not None else h_tests[rule].shape[0]
+                ax.plot([e0, e1], [h_max*1.15]*2,
+                        color='black',linewidth=1.5)
+                save_name = 'figure/trace_'+rule_name[rule]+epoch+save_addon+'.pdf'
+            else:
+                save_name = 'figure/trace_unit'+str(neuron)+rule_name[rule]+save_addon+'.pdf'
 
-        if epoch is not None:
-            e0, e1 = task.epochs[epoch]
-            e0 = e0 if e0 is not None else 0
-            e1 = e1 if e1 is not None else h_tests[rule].shape[0]
-            ax.plot([e0, e1], [h_max*1.15]*2,
-                    color='black',linewidth=1.5)
-            save_name = 'figure/trace_'+rule_name[rule]+epoch+save_addon+'.pdf'
-        else:
-            save_name = 'figure/trace_unit'+str(neuron)+rule_name[rule]+save_addon+'.pdf'
+            plt.ylim(np.array([-0.1, 1.2])*h_max)
+            plt.xticks([0,2])
+            plt.xlabel('Time (s)', fontsize=fs, labelpad=-5)
+            plt.locator_params(axis='y', nbins=4)
+            if j>0 and ylabel_firstonly:
+                ax.set_yticklabels([])
+            else:
+                plt.ylabel('activitity (a.u.)', fontsize=fs)
+            plt.title('Unit {:d} '.format(neuron) + rule_name[rule], fontsize=fs)
+            ax.tick_params(axis='both', which='major', labelsize=fs)
+            ax.spines["right"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+            if save:
+                plt.savefig(save_name, transparent=True)
+            plt.show()
 
-        plt.xticks([0,2000])
-        plt.xlabel('Time (ms)', fontsize=7, labelpad=-5)
-        plt.ylabel('activitity (a.u.)', fontsize=7)
-        plt.title('Unit {:d} '.format(neuron) + rule_name[rule], fontsize=7)
-        plt.ylim(np.array([-0.1, 1.2])*h_max)
-        ax.tick_params(axis='both', which='major', labelsize=7)
-        ax.spines["right"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
-        plt.locator_params(axis='y', nbins=4)
-        if save:
-            plt.savefig(save_name, transparent=True)
-        plt.show()
 
 if __name__ == "__main__":
     sample_plot(save_addon='tf_latest_400', rule=CHOICEATTEND_MOD1)
