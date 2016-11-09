@@ -121,9 +121,8 @@ if False:
 
 
 # ########### Plot Causal Manipulation Results  #############################
-rules = [INHGO, INHREMAP]
 perfs = list()
-with Run(save_addon) as R:
+with Run(save_addon, lesion_units=ind_remap_orig) as R:
     config = R.config
     for rule in rules:
         task = generate_onebatch(rule=rule, config=config, mode='test')

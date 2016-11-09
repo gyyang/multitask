@@ -18,7 +18,7 @@ from task import *
 from network import LeakyRNNCell, popvec
 
 class Run(Session):
-    def __init__(self, save_addon):
+    def __init__(self, save_addon, lesion_units=None):
         '''
         save_addon: add on for loading and saving
         inh_id    : Ids of units to inhibit inputs or outputs
@@ -65,8 +65,27 @@ class Run(Session):
         saver = tf.train.Saver()
         saver.restore(self, os.path.join('data', config['save_addon']+'.ckpt'))
 
-        # assign_op = tf.trainable_variables()[2].assign(np.ones((n_input+n_hidden, n_hidden)))
-        # self.run(assign_op)
+        if lesion_units is not None:
+            try:
+                _ = iter(lesion_units)
+                lesion_units = np.array(lesion_units)
+            except TypeError:
+                lesion_units = np.array([lesion_units])
+            print('Lesioning Units:')
+            print(lesion_units)
+
+            # Temporary solution before better ways to get recurrent connections
+            w_rec = self.run(tf.trainable_variables()[3])
+            assert w_rec.shape==(n_input+n_hidden, n_hidden) # has to be the recurrent connection
+            w_rec[n_input+lesion_units, :] = 0 # Set output projections from these units to zero
+            lesion_w_rec = tf.trainable_variables()[3].assign(w_rec)
+            self.run(lesion_w_rec)
+
+            w_out = self.run(tf.trainable_variables()[0])
+            assert w_out.shape==(n_hidden, n_output) # has to be the recurrent connection
+            w_out[lesion_units, :] = 0 # Set output projections from these units to zero
+            lesion_w_out = tf.trainable_variables()[0].assign(w_out)
+            self.run(lesion_w_out)
 
         self.f_h = lambda x0 : self.run(h, feed_dict={x : x0})
         self.f_y = lambda h0 : self.run(y_hat, feed_dict={h : h0}).reshape(
