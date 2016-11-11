@@ -99,8 +99,8 @@ if False:
 
 
 if True:
-    remaprule_to_remap = w_in[:, 2*N_RING+rules_remap][ind_remap_orig, :].flatten()
-    nonremaprule_to_remap = w_in[:, 2*N_RING+rules_nonremap][ind_remap_orig, :].flatten()
+    remaprule_to_remap = w_in[:, 2*N_RING+1+rules_remap][ind_remap_orig, :].flatten()
+    nonremaprule_to_remap = w_in[:, 2*N_RING+1+rules_nonremap][ind_remap_orig, :].flatten()
 
     fs = 6
     fig = plt.figure(figsize=(1.5,1.2))
