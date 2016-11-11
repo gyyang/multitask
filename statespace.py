@@ -20,12 +20,6 @@ from task import *
 from run import Run
 from network import get_perf
 
-#==============================================================================
-# mpl.rcParams['xtick.direction'] = 'out'
-# mpl.rcParams['ytick.direction'] = 'out'
-# 
-#==============================================================================
-
 save_addon = 'tf_latest_400'
 rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
 
@@ -44,7 +38,7 @@ regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule attend 1', 'Rule attend 2', 'Rul
 subtract_t_mean=True
 z_score = True
 
-print('Starting standard analysis of the CHOICEATTEND task...')
+
 with Run(save_addon) as R:
 
     n_tar = 6
@@ -79,6 +73,7 @@ with Run(save_addon) as R:
     H = np.array([])
     Perfs = np.array([])
     for i, rule in enumerate(rules):
+        print('Starting standard analysis of the '+rule_name[rule]+' task...')
         task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
         # Only study target epoch
         epoch = task.epochs['tar1']
