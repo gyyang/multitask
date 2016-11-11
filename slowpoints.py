@@ -1,5 +1,6 @@
 """
 Find fixed points of a RNN
+Directly using numpy. Numpy is faster in this case.
 """
 
 from __future__ import division
@@ -16,6 +17,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
+import tensorflow as tf
+
 from task import *
 from run import Run
 from network import get_perf
@@ -38,6 +41,21 @@ f = lambda x : np.log(1+np.exp(x)) # nonlinearity
 dxdt = lambda x : -x + f(np.dot(w_rec,x)+b_rec) # dx/dt
 g = lambda x : np.mean(dxdt(x)**2)
 
-x = np.zeros(nh)
+start = time.time()
+for i in range(500):
+    x = np.random.rand(nh)*2
+    g0 = g(x)
+    # print(g0)
+print(time.time()-start)
 
-print(g(x))
+
+x = tf.placeholder("float", [nh, 1])
+dxdt = -x + tf.nn.softplus(tf.matmul(w_rec, x) + b_rec)
+g = tf.reduce_mean(tf.square(dxdt))
+
+with tf.Session() as sess:
+    start = time.time()
+    for i in range(500):
+        g0 = sess.run(g, feed_dict={x: np.random.rand(nh,1)*2})
+    # print(g0)
+    print(time.time()-start)
