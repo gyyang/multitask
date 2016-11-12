@@ -11,18 +11,27 @@ import tensorflow as tf
 from task import *
 from run import Run
 
-def find_slowpoints(save_addon, rule, x0):
+def find_slowpoints(save_addon, rule, x0_list):
+    print('Findings slow points...')
+    # Generate coherence 0 inputs
+    # This has to be different from Mante et al. 2013,
+    # because our inputs are always positive, and can appear at different locations
+    params = {'tar1_locs' : [0],
+              'tar2_locs' : [np.pi],
+              'tar1_mod1_strengths' : [1],
+              'tar2_mod1_strengths' : [1],
+              'tar1_mod2_strengths' : [1],
+              'tar2_mod2_strengths' : [1],
+              'tar_time'    : 1600}
 
     with Run(save_addon) as R:
         w_rec = R.w_rec
         w_in  = R.w_in
         b_rec = R.b_rec
-        config = R.config
+        task  = generate_onebatch(rule, R.config, 'psychometric', noise_on=False, params=params)
 
-    N_RING = config['N_RING']
-    _, nh, _ = config['shape']
-    # Add the constant rule input to the baseline
-    b_rec = b_rec + w_in[:, 2*N_RING+1+rule]
+    # Add constant input to baseline
+    b_rec = b_rec + np.dot(w_in, task.x[1000,0,:])
 
     def dgdx(x):
         expy = np.exp(np.dot(w_rec, x) + b_rec)
@@ -38,14 +47,17 @@ def find_slowpoints(save_addon, rule, x0):
     # It's 10% faster to provide ejac and fun separately
     # Default seeting Newton-CG is 100% slower but more accurate than L-BFGS-B
     # But much much better than SLSQP
-    res = minimize(g, x0, method='Newton-CG', jac=dgdx)
-    return res
+    res_list = list()
+    for x0 in x0_list:
+        res = minimize(g, x0, method='Newton-CG', jac=dgdx)
+        res_list.append(res)
+    return res_list
 
 
 if __name__ == '__main__':
     save_addon = 'tf_latest_300'
     rule = CHOICEATTEND_MOD1
-    find_slowpoints(save_addon, rule, x0 = np.zeros(300))
+    find_slowpoints(save_addon, rule, x0_list = [np.zeros(300)])
 
 # Test
 # start = time.time()

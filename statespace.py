@@ -19,6 +19,8 @@ import seaborn.apionly as sns # If you don't have this, then some colormaps won'
 from task import *
 from run import Run
 from network import get_perf
+from slowpoints import find_slowpoints
+
 
 save_addon = 'tf_latest_400'
 rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
@@ -189,12 +191,33 @@ for i_col, rule in enumerate(rules):
                     h_plot = h_tran[:,ind,:]
                     if plot_eachcurve:
                         for j in range(h_plot.shape[1]):
-                            axarr[i_row,i_col].plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
+                            ax.plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
                                     '.-', markersize=2, color=colors[i])
                     else:
                         h_plot = h_plot.mean(axis=1)
-                        axarr[i_row,i_col].plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
+                        ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
                                 '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
+
+
+        if i_col == 0: # Plot points
+            # Find slow points
+            x0_list = list()
+            for k in range(10):
+                x0 = np.zeros(nh)
+                x0[ind_active] = q[:,0] * k
+                x0_list.append(x0)
+            res_list = find_slowpoints(save_addon, CHOICEATTEND_MOD1, x0_list)
+            pnt_trans = list()
+            for res in res_list:
+                if res.success:
+                    pnt = res.x[ind_active]
+                    pnt_tran = np.dot(pnt, q) # Transform
+                    pnt_trans.append(pnt_tran)
+            pnt_trans = np.array(pnt_trans)
+            ax.plot(pnt_trans[:,pcs[0]], pnt_trans[:,pcs[1]], '*', color='red')
+
+
+plt.tight_layout(pad=0.0)
 
 for i_row in range(2):
     if i_row == 0:
@@ -213,10 +236,8 @@ for i_row in range(2):
     ax.set_xlim([-1,6])
     ax.set_ylim([-3,3])
 
-plt.tight_layout(pad=0.0)
-plt.savefig('figure/choicetasks_statespace'+save_addon+'.pdf', transparent=True)
+plt.savefig('figure/temp_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
 plt.show()
-
 
 
 

@@ -1632,7 +1632,7 @@ rule_name    = {FIXATION                : 'Fixation',
 #                 DELAYMATCHNOGO      : [Mod1, Mod2, Inh, Match, Delay],
 #                 INTREPRO            : [Mod1, Mod2, Inh, Timed, Delay]}
 
-def generate_onebatch(rule, config, mode, **kwargs):
+def generate_onebatch(rule, config, mode, noise_on=True, **kwargs):
     '''
     Generate one batch of data
     :param rule: the rule for this batch
@@ -1644,7 +1644,7 @@ def generate_onebatch(rule, config, mode, **kwargs):
     '''
     dt = config['dt']
     task = rule_mapping[rule](config, mode, **kwargs)
-    if mode in ['random', 'sample', 'psychometric']:
+    if mode in ['random', 'sample', 'psychometric'] and noise_on:
         task.add_x_noise(dt)
 
     # Add rule input to every task
