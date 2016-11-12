@@ -9,7 +9,6 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import seaborn.apionly as sns
-
 import tensorflow as tf
 from tensorflow.python.ops import rnn
 from tensorflow.python.client.session import Session

@@ -49,7 +49,9 @@ def find_slowpoints(save_addon, rule, x0_list):
     # But much much better than SLSQP
     res_list = list()
     for x0 in x0_list:
-        res = minimize(g, x0, method='Newton-CG', jac=dgdx)
+        # res = minimize(g, x0, method='Newton-CG', jac=dgdx)
+        res = minimize(g, x0, method='L-BFGS-B', jac=dgdx, options={'ftol':1e-3}) # ftol may be important for how slow points are
+        print('hello')
         res_list.append(res)
     return res_list
 

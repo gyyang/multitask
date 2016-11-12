@@ -19,7 +19,7 @@ import seaborn.apionly as sns # If you don't have this, then some colormaps won'
 from task import *
 from run import Run
 from network import get_perf
-from slowpoints import find_slowpoints
+# from slowpoints import find_slowpoints
 
 
 save_addon = 'tf_latest_400'
@@ -117,7 +117,7 @@ if z_score:
 h = h.reshape((nt, nb, h.shape[-1]))
 
 
-# Regression
+################################### Regression ################################
 from sklearn import linear_model
 # Create linear regression object
 
@@ -139,12 +139,65 @@ q, r = np.linalg.qr(coef_maxt)
 h_tran = np.dot(h, q) # Transform
 
 
-# Pretty Plotting of State-space Results
+############################### Find slow points ##############################
+def find_slowpoints(save_addon, rule, x0_list):
+    print('Findings slow points...')
+    # Generate coherence 0 inputs
+    # This has to be different from Mante et al. 2013,
+    # because our inputs are always positive, and can appear at different locations
+    params = {'tar1_locs' : [0],
+              'tar2_locs' : [np.pi],
+              'tar1_mod1_strengths' : [1.2],
+              'tar2_mod1_strengths' : [0.8],
+              'tar1_mod2_strengths' : [0.8],
+              'tar2_mod2_strengths' : [1.2],
+              'tar_time'    : 1600}
+
+    with Run(save_addon) as R:
+        w_rec = R.w_rec
+        w_in  = R.w_in
+        b_rec = R.b_rec
+        task  = generate_onebatch(rule, R.config, 'psychometric', noise_on=False, params=params)
+
+    nh = len(b_rec)
+    # Add constant input to baseline
+    b_rec = b_rec + np.dot(w_in, task.x[1000,0,:])
+
+    def dgdx(x):
+        expy = np.exp(np.dot(w_rec, x) + b_rec)
+        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
+        dfdx = 1/(1+1/expy)
+        return (-F + np.dot(w_rec.T, F*dfdx))/nh
+
+    def g(x):
+        expy = np.exp(np.dot(w_rec, x) + b_rec)
+        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
+        return np.mean(F**2)/2
+
+    # It's 10% faster to provide ejac and fun separately
+    # Default seeting Newton-CG is 100% slower but more accurate than L-BFGS-B
+    # But much much better than SLSQP
+    res_list = list()
+    for x0 in x0_list:
+        # res = minimize(g, x0, method='Newton-CG', jac=dgdx)
+        res = minimize(g, x0, method='L-BFGS-B', jac=dgdx,
+                       bounds=[(0,100)]*nh, options={'ftol':1e-20, 'gtol': 1e-7})
+        # ftol may be important for how slow points are
+        # If I pick gtol=1e-7, ftol=1e-20. Then regardless of starting points
+        # I find only one fixed point, which depends on the input to the network
+        #
+        res_list.append(res)
+    return res_list
+
+
+
+################ Pretty Plotting of State-space Results #######################
 plot_eachcurve = False
 plot_onlycorrect = True # Only plotting correct trials
 fs = 6
 
 Perfs = Perfs.astype(bool)
+
 fig, axarr = plt.subplots(2, 3, sharex=True, sharey='row', figsize=(3,2))
 for i_col, rule in enumerate(rules):
     for i_row in range(2):
@@ -198,23 +251,41 @@ for i_col, rule in enumerate(rules):
                         ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
                                 '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
 
+                    # Compute and plot slow points
+                    if i_row == 0:
+                        if i_col == 0:
+                            # Choosing starting points
+                            # x0_list = list()
+                            # for k in range(10):
+                            #     x0 = np.zeros(nh)
+                            #     x0[ind_active] = q[:,0] * k
+                            #     x0_list.append(x0)
 
-        if i_col == 0: # Plot points
-            # Find slow points
-            x0_list = list()
-            for k in range(10):
-                x0 = np.zeros(nh)
-                x0[ind_active] = q[:,0] * k
-                x0_list.append(x0)
-            res_list = find_slowpoints(save_addon, CHOICEATTEND_MOD1, x0_list)
-            pnt_trans = list()
-            for res in res_list:
-                if res.success:
-                    pnt = res.x[ind_active]
-                    pnt_tran = np.dot(pnt, q) # Transform
-                    pnt_trans.append(pnt_tran)
-            pnt_trans = np.array(pnt_trans)
-            ax.plot(pnt_trans[:,pcs[0]], pnt_trans[:,pcs[1]], '*', color='red')
+                            tmp = h[:, ind, :].mean(axis=1)
+                            tmp = tmp[::3,:]
+                            x0_list = np.zeros((tmp.shape[0], nh))
+                            x0_list[:, ind_active] = tmp
+
+                            x0_list = np.random.rand(10, nh)*4
+
+                            # Find slow points
+                            res_list = find_slowpoints(save_addon, rule, x0_list)
+                            pnt_trans = list()
+                            for res, x0 in zip(res_list, x0_list):
+                                print(res.fun)
+                                x0_tran = np.dot(x0[ind_active], q)
+                                pnt_tran = np.dot(res.x[ind_active], q) # Transform
+                                # axarr[0, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
+                                #                      [x0_tran[Mod1],pnt_tran[Mod1]],
+                                #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
+                                # axarr[1, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
+                                #                      [x0_tran[Mod2],pnt_tran[Mod2]],
+                                #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
+                                pnt_trans.append(pnt_tran)
+
+                            pnt_trans = np.array(pnt_trans)
+                            axarr[0, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
+                            axarr[1, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
 
 
 plt.tight_layout(pad=0.0)
