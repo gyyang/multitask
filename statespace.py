@@ -106,8 +106,10 @@ h = h[:, ind_active]
 
 # Z-score response (will have a strong impact on results)
 if z_score:
-    h = h - h.mean(axis=0)
-    h = h/h.std(axis=0)
+    meanh = h.mean(axis=0)
+    stdh = h.std(axis=0)
+    h = h - meanh
+    h = h/stdh
 
 h = h.reshape((nt, nb, h.shape[-1]))
 
@@ -143,6 +145,16 @@ Perfs = Perfs.astype(bool)
 
 colors1 = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
 colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
+
+params = {'tar1_locs' : [0],
+          'tar2_locs' : [np.pi],
+          'tar1_mod1_strengths' : [1],
+          'tar2_mod1_strengths' : [1],
+          'tar1_mod2_strengths' : [1],
+          'tar2_mod2_strengths' : [1],
+          'tar_time'    : 1600}
+task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
+x = task.x[1000,0,:]
 
 fig, axarr = plt.subplots(2, 3, sharex=True, sharey='row', figsize=(3,2))
 for i_col, rule in enumerate(rules):
@@ -198,40 +210,51 @@ for i_col, rule in enumerate(rules):
                                 '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
 
                     # Compute and plot slow points
-                    # if i_row == 0:
-                    #     if i_col == 0:
-                    #         # Choosing starting points
-                    #         # x0_list = list()
-                    #         # for k in range(10):
-                    #         #     x0 = np.zeros(nh)
-                    #         #     x0[ind_active] = q[:,0] * k
-                    #         #     x0_list.append(x0)
-                    #
-                    #         tmp = h[:, ind, :].mean(axis=1)
-                    #         tmp = tmp[::3,:]
-                    #         x0_list = np.zeros((tmp.shape[0], nh))
-                    #         x0_list[:, ind_active] = tmp
-                    #
-                    #         x0_list = np.random.rand(10, nh)*4
-                    #
-                    #         # Find slow points
-                    #         res_list = find_slowpoints(save_addon, rule, x0_list)
-                    #         pnt_trans = list()
-                    #         for res, x0 in zip(res_list, x0_list):
-                    #             print(res.fun)
-                    #             x0_tran = np.dot(x0[ind_active], q)
-                    #             pnt_tran = np.dot(res.x[ind_active], q) # Transform
-                    #             # axarr[0, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
-                    #             #                      [x0_tran[Mod1],pnt_tran[Mod1]],
-                    #             #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
-                    #             # axarr[1, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
-                    #             #                      [x0_tran[Mod2],pnt_tran[Mod2]],
-                    #             #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
-                    #             pnt_trans.append(pnt_tran)
-                    #
-                    #         pnt_trans = np.array(pnt_trans)
-                    #         axarr[0, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
-                    #         axarr[1, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
+                    if i_row == 0:
+                        if i_col == 0:
+                            # Choosing starting points
+                            # x0_list = list()
+                            # for k in range(10):
+                            #     x0 = np.zeros(nh)
+                            #     x0[ind_active] = q[:,0] * k
+                            #     x0_list.append(x0)
+
+                            tmp = h[:, ind, :].mean(axis=1)
+                            tmp = tmp[::3,:]
+                            if z_score:
+                                tmp = tmp * stdh
+                                tmp = tmp + meanh
+                            x0_list = np.zeros((tmp.shape[0], nh))
+                            x0_list[:, ind_active] = tmp
+
+                            # x0_list = np.random.rand(10, nh)*4
+
+                            # Find slow points
+                            res_list = [find_slowpoints(save_addon, x, x0=x0) for x0 in x0_list]
+                            pnt_trans = list()
+                            for res, x0 in zip(res_list, x0_list):
+                                print(res.fun)
+                                x0_ = x0[ind_active]
+                                h0_ = res.x[ind_active]
+                                if z_score:
+                                    x0_ = x0_ - meanh
+                                    x0_ = x0_/stdh
+                                    h0_ = h0_ - meanh
+                                    h0_ = h0_/stdh
+                                x0_tran = np.dot(x0_, q)
+                                pnt_tran = np.dot(h0_, q) # Transform
+                                # pnt_tran = np.dot(x0_, q) # Transform
+                                # axarr[0, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
+                                #                      [x0_tran[Mod1],pnt_tran[Mod1]],
+                                #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
+                                # axarr[1, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
+                                #                      [x0_tran[Mod2],pnt_tran[Mod2]],
+                                #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
+                                pnt_trans.append(pnt_tran)
+
+                            pnt_trans = np.array(pnt_trans)
+                            axarr[0, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
+                            axarr[1, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
 
 ############################### Find slow points ##############################
 
@@ -258,9 +281,6 @@ for i_col, rule in enumerate(rules):
 #                                  mfc=colors1[ind_tar_mod1[i]], mec=colors2[ind_tar_mod2[i]],
 #                                  mew=0.5)
 #
-#
-#
-#
 # pnt_trans = np.array(pnt_trans)
 # axarr[0, 0].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
 # axarr[1, 0].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
@@ -285,7 +305,7 @@ for i_row in range(2):
     ax.set_xlim([-1,6])
     ax.set_ylim([-3,3])
 
-#plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
+plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
 plt.show()
 
 

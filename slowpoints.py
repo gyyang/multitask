@@ -26,18 +26,18 @@ def find_slowpoints(save_addon, input, x0=None):
         expy = np.exp(np.dot(w_rec, x) + b_rec)
         F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
         dfdx = 1/(1+1/expy)
-        return (-F + np.dot(w_rec.T, F*dfdx))/nh
+        return (-F + np.dot(w_rec.T, F*dfdx))
 
     def g(x):
         expy = np.exp(np.dot(w_rec, x) + b_rec)
         F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
-        return np.mean(F**2)/2
+        return np.sum(F**2)/2
 
     if x0 is None:
         x0 = np.ones(nh)
-    # res = minimize(g, x0, method='Newton-CG', jac=dgdx)
+    # res = minimize(g, x0, method='Newton-CG', jac=dgdx, options={'xtol': 1e-7})
     res = minimize(g, x0, method='L-BFGS-B', jac=dgdx,
-                   bounds=[(0,100)]*nh, options={'ftol':1e-20, 'gtol': 1e-7})
+                   bounds=[(0,100)]*nh, options={'ftol':1e-20, 'gtol': 1e-9})
     # ftol may be important for how slow points are
     # If I pick gtol=1e-7, ftol=1e-20. Then regardless of starting points
     # I find only one fixed point, which depends on the input to the network

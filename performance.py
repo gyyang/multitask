@@ -495,7 +495,7 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     if 'savename_append' in kwargs:
         savename += kwargs['savename_append']
 
-    plt.savefig(savename+'.pdf', transparent=True)
+    #plt.savefig(savename+'.pdf', transparent=True)
     plt.show()
     return fits
 
@@ -503,7 +503,7 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 # plot_trainingprogress('tf_latest_400')
 # plot_finalperformance('tf_latest')
 
-# psychometric_choice('tf_latest_500')
+psychometric_choice('tf_choiceonly_100')
 # psychometric_choiceattend('tf_latest_400')
 # psychometric_choiceattend_varytime('tf_latest_400')
 # psychometric_choiceint('tf_latest_400')
