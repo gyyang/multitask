@@ -25,19 +25,11 @@ from slowpoints import find_slowpoints
 save_addon = 'tf_latest_400'
 rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
 
-def f_sub_mean(x):
-    # subtract mean activity across batch conditions
-    assert(len(x.shape)==3)
-    x_mean = x.mean(axis=1)
-    for i in range(x.shape[1]):
-        x[:,i,:] -= x_mean
-    return x
-
 # Regressors
 Choice, Mod1, Mod2, Rule_mod1, Rule_mod2, Rule_int = range(6)
 regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule attend 1', 'Rule attend 2', 'Rule int']
 
-subtract_t_mean=True
+subtract_t_mean=False
 z_score = True
 
 
@@ -104,9 +96,6 @@ with Run(save_addon) as R:
         X[i*batch_size:(i+1)*batch_size, :3] = np.array([y_choice, tar1_mod1_cohs, tar1_mod2_cohs]).T
         X[i*batch_size:(i+1)*batch_size, 3+i] = 1
         trial_rules[i*batch_size:(i+1)*batch_size] = rule
-
-    if subtract_t_mean:
-        H = f_sub_mean(H)
 
 # Include only active units
 nt, nb, nh = H.shape
@@ -246,33 +235,33 @@ for i_col, rule in enumerate(rules):
 
 ############################### Find slow points ##############################
 
-for i_col, rule in enumerate(rules):
-    # Choosing starting points
-    params, batch_size = gen_taskparams(n_tar=6, n_rep=1, tar_str_range=0.2)
-    # Find slow points
-    # Generate coherence 0 inputs
-    # This has to be different from Mante et al. 2013,
-    # because our inputs are always positive, and can appear at different locations
-    pnt_trans = list()
-    task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
-    ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),(6,6))
-    for i in range(batch_size):
-        res = find_slowpoints(save_addon, input=task.x[1000,i,:])
-        print(res.success, res.fun)
-        pnt_tran = np.dot(res.x[ind_active], q) # Transform
-        pnt_trans.append(pnt_tran)
-
-    for i in range(batch_size):
-        pnt_tran = pnt_trans[i]
-        for i_row, pc1 in zip([0, 1], [Mod1, Mod2]):
-            axarr[i_row, i_col].plot(pnt_tran[Choice], pnt_tran[pc1], 'o', markersize=1.5,
-                                 mfc=colors1[ind_tar_mod1[i]], mec=colors2[ind_tar_mod2[i]],
-                                 mew=0.5)
-
-
-
-
-pnt_trans = np.array(pnt_trans)
+# for i_col, rule in enumerate(rules):
+#     # Choosing starting points
+#     params, batch_size = gen_taskparams(n_tar=6, n_rep=1, tar_str_range=0.2)
+#     # Find slow points
+#     # Generate coherence 0 inputs
+#     # This has to be different from Mante et al. 2013,
+#     # because our inputs are always positive, and can appear at different locations
+#     pnt_trans = list()
+#     task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
+#     ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),(6,6))
+#     for i in range(batch_size):
+#         res = find_slowpoints(save_addon, input=task.x[1000,i,:])
+#         print(res.success, res.fun)
+#         pnt_tran = np.dot(res.x[ind_active], q) # Transform
+#         pnt_trans.append(pnt_tran)
+#
+#     for i in range(batch_size):
+#         pnt_tran = pnt_trans[i]
+#         for i_row, pc1 in zip([0, 1], [Mod1, Mod2]):
+#             axarr[i_row, i_col].plot(pnt_tran[Choice], pnt_tran[pc1], 'o', markersize=1.5,
+#                                  mfc=colors1[ind_tar_mod1[i]], mec=colors2[ind_tar_mod2[i]],
+#                                  mew=0.5)
+#
+#
+#
+#
+# pnt_trans = np.array(pnt_trans)
 # axarr[0, 0].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
 # axarr[1, 0].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
 
