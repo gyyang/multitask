@@ -18,12 +18,6 @@ import seaborn.apionly as sns # If you don't have this, then some colormaps won'
 from task import *
 from run import Run
 
-mpl.rcParams['xtick.direction'] = 'out'
-mpl.rcParams['ytick.direction'] = 'out'
-mpl.rcParams['font-family'] = 'sans-serif'
-mpl.rcParams['font']='Helvetica Neue'
-
-
 color_rules = np.array([
             [240,163,255],[0,117,220],[153,63,0],[76,0,92],[25,25,25],[0,92,49],
             [43,206,72],[255,204,153],[128,128,128],[148,255,181],[143,124,0],
@@ -299,6 +293,59 @@ def psychometric_choiceattend(save_addon, **kwargs):
                                   colors=sns.color_palette("Set2",2),
                                   legtitle='Modality',rule=CHOICEATTEND_MOD1, **kwargs)
 
+def psychometric_choiceattend_varytime(save_addon, **kwargs):
+    print('Starting second analysis of the CHOICEATTEND task...')
+    with Run(save_addon) as R:
+
+        from task import get_dist
+
+        n_tar_loc = 12 # increase repeat by increasing this
+        n_tar = 7
+        batch_size = n_tar_loc * n_tar**2
+        batch_shape = (n_tar_loc,n_tar,n_tar)
+        ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
+
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
+
+        tar_str_range = 0.25
+        tar1_mod1_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar_mod1/(n_tar-1)
+        tar2_mod1_strengths = 2 - tar1_mod1_strengths
+        tar1_mod2_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar_mod2/(n_tar-1)
+        tar2_mod2_strengths = 2 - tar1_mod2_strengths
+
+        xdatas = list()
+        ydatas = list()
+        tar_times = [200, 400, 800, 1200]
+        for tar_time in tar_times:
+            params = {'tar1_locs' : tar1_locs,
+                      'tar2_locs' : tar2_locs,
+                      'tar1_mod1_strengths' : tar1_mod1_strengths,
+                      'tar2_mod1_strengths' : tar2_mod1_strengths,
+                      'tar1_mod2_strengths' : tar1_mod2_strengths,
+                      'tar2_mod2_strengths' : tar2_mod2_strengths,
+                      'tar_time'    : tar_time}
+
+            task  = generate_onebatch(CHOICEATTEND_MOD1, R.config, 'psychometric', params=params)
+            y_loc_sample = R.f_y_loc_from_x(task.x)
+            y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
+
+            tar1_locs_ = np.reshape(tar1_locs, batch_shape)
+            tar2_locs_ = np.reshape(tar2_locs, batch_shape)
+
+            choose1 = (get_dist(y_loc_sample - tar1_locs_) < 0.3*np.pi).sum(axis=0)
+            choose2 = (get_dist(y_loc_sample - tar2_locs_) < 0.3*np.pi).sum(axis=0)
+            prop1s = choose1/(choose1 + choose2)
+
+            xdatas.extend([tar_str_range*(-1+2*np.arange(n_tar)/(n_tar-1))])
+            ydatas.extend([prop1s.mean(axis=k) for k in [1]])
+
+        plot_psychometric_choice(xdatas, ydatas,
+                                 labels=[str(t) for t in tar_times],
+                                 colors=sns.dark_palette("light blue", len(tar_times), input="xkcd"),
+                                 legtitle='Stim. time (ms)',rule=CHOICEATTEND_MOD1,
+                                 savename_append='2', **kwargs)
+
 def psychometric_choiceint(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICEINT task...')
     with Run(save_addon) as R:
@@ -444,16 +491,26 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     ax.spines["top"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-    plt.savefig('figure/analyze_'+rule_name[kwargs['rule']].replace(' ','')+'_performance.pdf', transparent=True)
+    savename = 'figure/analyze_'+rule_name[kwargs['rule']].replace(' ','') + '_performance'
+    if 'savename_append' in kwargs:
+        savename += kwargs['savename_append']
+
+    plt.savefig(savename+'.pdf', transparent=True)
     plt.show()
     return fits
+
+
+
 
 
 
 # plot_trainingprogress('tf_latest_400')
 # plot_finalperformance('tf_latest')
 
-psychometric_choice('tf_latest_500')
-# psychometric_choiceattend('tf_latest_400')
+# psychometric_choice('tf_latest_500')
+psychometric_choiceattend('tf_latest_400')
 # psychometric_choiceint('tf_latest_400')
 # psychometric_delaychoice('tf_500')
+
+
+# psychometric_choiceattend_varytime('tf_latest_400')
