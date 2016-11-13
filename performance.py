@@ -500,17 +500,13 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     return fits
 
 
-
-
-
-
 # plot_trainingprogress('tf_latest_400')
 # plot_finalperformance('tf_latest')
 
 # psychometric_choice('tf_latest_500')
-psychometric_choiceattend('tf_latest_400')
+# psychometric_choiceattend('tf_latest_400')
+# psychometric_choiceattend_varytime('tf_latest_400')
 # psychometric_choiceint('tf_latest_400')
 # psychometric_delaychoice('tf_500')
 
 
-# psychometric_choiceattend_varytime('tf_latest_400')

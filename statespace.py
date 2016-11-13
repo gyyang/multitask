@@ -19,7 +19,7 @@ import seaborn.apionly as sns # If you don't have this, then some colormaps won'
 from task import *
 from run import Run
 from network import get_perf
-# from slowpoints import find_slowpoints
+from slowpoints import find_slowpoints
 
 
 save_addon = 'tf_latest_400'
@@ -41,19 +41,16 @@ subtract_t_mean=True
 z_score = True
 
 
-with Run(save_addon) as R:
+tar1_loc  = 0
 
-    n_tar = 6
-    n_rep = 10
+def gen_taskparams(n_tar, n_rep, tar_str_range):
     batch_size = n_rep * n_tar**2
     batch_shape = (n_rep, n_tar, n_tar)
     ind_rep, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
 
-    tar1_loc  = 0
     tar1_locs = np.ones(batch_size)*tar1_loc
     tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-    tar_str_range = 0.2
     tar1_mod1_cohs = -tar_str_range/2+tar_str_range*ind_tar_mod1/(n_tar-1)
     tar1_mod2_cohs = -tar_str_range/2+tar_str_range*ind_tar_mod2/(n_tar-1)
     tar1_mod1_strengths = 1 + tar1_mod1_cohs
@@ -69,6 +66,13 @@ with Run(save_addon) as R:
               'tar2_mod2_strengths' : tar2_mod2_strengths,
               'tar_time'    : 1600}
               # If tar_time is long (~1600), we can reproduce the curving trajectories
+    return params, batch_size
+
+
+with Run(save_addon) as R:
+    config = R.config
+
+    params, batch_size = gen_taskparams(n_tar=6, n_rep=10, tar_str_range=0.2)
 
     X = np.zeros((len(rules)*batch_size, 3+3)) # regressors
     trial_rules = np.zeros(len(rules)*batch_size)
@@ -95,6 +99,8 @@ with Run(save_addon) as R:
             H = np.concatenate((H, h_sample), axis=1)
             Perfs = np.concatenate((Perfs, perfs))
 
+        tar1_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
+        tar1_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
         X[i*batch_size:(i+1)*batch_size, :3] = np.array([y_choice, tar1_mod1_cohs, tar1_mod2_cohs]).T
         X[i*batch_size:(i+1)*batch_size, 3+i] = 1
         trial_rules[i*batch_size:(i+1)*batch_size] = rule
@@ -139,64 +145,15 @@ q, r = np.linalg.qr(coef_maxt)
 h_tran = np.dot(h, q) # Transform
 
 
-############################### Find slow points ##############################
-def find_slowpoints(save_addon, rule, x0_list):
-    print('Findings slow points...')
-    # Generate coherence 0 inputs
-    # This has to be different from Mante et al. 2013,
-    # because our inputs are always positive, and can appear at different locations
-    params = {'tar1_locs' : [0],
-              'tar2_locs' : [np.pi],
-              'tar1_mod1_strengths' : [1.2],
-              'tar2_mod1_strengths' : [0.8],
-              'tar1_mod2_strengths' : [0.8],
-              'tar2_mod2_strengths' : [1.2],
-              'tar_time'    : 1600}
-
-    with Run(save_addon) as R:
-        w_rec = R.w_rec
-        w_in  = R.w_in
-        b_rec = R.b_rec
-        task  = generate_onebatch(rule, R.config, 'psychometric', noise_on=False, params=params)
-
-    nh = len(b_rec)
-    # Add constant input to baseline
-    b_rec = b_rec + np.dot(w_in, task.x[1000,0,:])
-
-    def dgdx(x):
-        expy = np.exp(np.dot(w_rec, x) + b_rec)
-        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
-        dfdx = 1/(1+1/expy)
-        return (-F + np.dot(w_rec.T, F*dfdx))/nh
-
-    def g(x):
-        expy = np.exp(np.dot(w_rec, x) + b_rec)
-        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
-        return np.mean(F**2)/2
-
-    # It's 10% faster to provide ejac and fun separately
-    # Default seeting Newton-CG is 100% slower but more accurate than L-BFGS-B
-    # But much much better than SLSQP
-    res_list = list()
-    for x0 in x0_list:
-        # res = minimize(g, x0, method='Newton-CG', jac=dgdx)
-        res = minimize(g, x0, method='L-BFGS-B', jac=dgdx,
-                       bounds=[(0,100)]*nh, options={'ftol':1e-20, 'gtol': 1e-7})
-        # ftol may be important for how slow points are
-        # If I pick gtol=1e-7, ftol=1e-20. Then regardless of starting points
-        # I find only one fixed point, which depends on the input to the network
-        #
-        res_list.append(res)
-    return res_list
-
-
-
 ################ Pretty Plotting of State-space Results #######################
 plot_eachcurve = False
 plot_onlycorrect = True # Only plotting correct trials
 fs = 6
 
 Perfs = Perfs.astype(bool)
+
+colors1 = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
+colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
 
 fig, axarr = plt.subplots(2, 3, sharex=True, sharey='row', figsize=(3,2))
 for i_col, rule in enumerate(rules):
@@ -215,10 +172,10 @@ for i_col, rule in enumerate(rules):
 
         if separate_by == 'tar1_mod1_strengths':
             sep_by = Mod1
-            colors = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=len(np.unique(X[:,sep_by])))
+            colors = colors1
         elif separate_by == 'tar1_mod2_strengths':
             sep_by = Mod2
-            colors = sns.diverging_palette(145, 280, sep=1, s=99, l=30, n=len(np.unique(X[:,sep_by])))
+            colors = colors2
         else:
             raise ValueError
 
@@ -252,40 +209,72 @@ for i_col, rule in enumerate(rules):
                                 '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
 
                     # Compute and plot slow points
-                    if i_row == 0:
-                        if i_col == 0:
-                            # Choosing starting points
-                            # x0_list = list()
-                            # for k in range(10):
-                            #     x0 = np.zeros(nh)
-                            #     x0[ind_active] = q[:,0] * k
-                            #     x0_list.append(x0)
+                    # if i_row == 0:
+                    #     if i_col == 0:
+                    #         # Choosing starting points
+                    #         # x0_list = list()
+                    #         # for k in range(10):
+                    #         #     x0 = np.zeros(nh)
+                    #         #     x0[ind_active] = q[:,0] * k
+                    #         #     x0_list.append(x0)
+                    #
+                    #         tmp = h[:, ind, :].mean(axis=1)
+                    #         tmp = tmp[::3,:]
+                    #         x0_list = np.zeros((tmp.shape[0], nh))
+                    #         x0_list[:, ind_active] = tmp
+                    #
+                    #         x0_list = np.random.rand(10, nh)*4
+                    #
+                    #         # Find slow points
+                    #         res_list = find_slowpoints(save_addon, rule, x0_list)
+                    #         pnt_trans = list()
+                    #         for res, x0 in zip(res_list, x0_list):
+                    #             print(res.fun)
+                    #             x0_tran = np.dot(x0[ind_active], q)
+                    #             pnt_tran = np.dot(res.x[ind_active], q) # Transform
+                    #             # axarr[0, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
+                    #             #                      [x0_tran[Mod1],pnt_tran[Mod1]],
+                    #             #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
+                    #             # axarr[1, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
+                    #             #                      [x0_tran[Mod2],pnt_tran[Mod2]],
+                    #             #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
+                    #             pnt_trans.append(pnt_tran)
+                    #
+                    #         pnt_trans = np.array(pnt_trans)
+                    #         axarr[0, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
+                    #         axarr[1, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
 
-                            tmp = h[:, ind, :].mean(axis=1)
-                            tmp = tmp[::3,:]
-                            x0_list = np.zeros((tmp.shape[0], nh))
-                            x0_list[:, ind_active] = tmp
+############################### Find slow points ##############################
 
-                            x0_list = np.random.rand(10, nh)*4
+for i_col, rule in enumerate(rules):
+    # Choosing starting points
+    params, batch_size = gen_taskparams(n_tar=6, n_rep=1, tar_str_range=0.2)
+    # Find slow points
+    # Generate coherence 0 inputs
+    # This has to be different from Mante et al. 2013,
+    # because our inputs are always positive, and can appear at different locations
+    pnt_trans = list()
+    task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
+    ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),(6,6))
+    for i in range(batch_size):
+        res = find_slowpoints(save_addon, input=task.x[1000,i,:])
+        print(res.success, res.fun)
+        pnt_tran = np.dot(res.x[ind_active], q) # Transform
+        pnt_trans.append(pnt_tran)
 
-                            # Find slow points
-                            res_list = find_slowpoints(save_addon, rule, x0_list)
-                            pnt_trans = list()
-                            for res, x0 in zip(res_list, x0_list):
-                                print(res.fun)
-                                x0_tran = np.dot(x0[ind_active], q)
-                                pnt_tran = np.dot(res.x[ind_active], q) # Transform
-                                # axarr[0, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
-                                #                      [x0_tran[Mod1],pnt_tran[Mod1]],
-                                #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
-                                # axarr[1, i_col].plot([x0_tran[Choice],pnt_tran[Choice]],
-                                #                      [x0_tran[Mod2],pnt_tran[Mod2]],
-                                #                      '+-', markersize=1, mew=0.2, lw=0.25, color='red')
-                                pnt_trans.append(pnt_tran)
+    for i in range(batch_size):
+        pnt_tran = pnt_trans[i]
+        for i_row, pc1 in zip([0, 1], [Mod1, Mod2]):
+            axarr[i_row, i_col].plot(pnt_tran[Choice], pnt_tran[pc1], 'o', markersize=1.5,
+                                 mfc=colors1[ind_tar_mod1[i]], mec=colors2[ind_tar_mod2[i]],
+                                 mew=0.5)
 
-                            pnt_trans = np.array(pnt_trans)
-                            axarr[0, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
-                            axarr[1, i_col].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
+
+
+
+pnt_trans = np.array(pnt_trans)
+# axarr[0, 0].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
+# axarr[1, 0].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
 
 
 plt.tight_layout(pad=0.0)
@@ -307,7 +296,7 @@ for i_row in range(2):
     ax.set_xlim([-1,6])
     ax.set_ylim([-3,3])
 
-plt.savefig('figure/temp_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
+#plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
 plt.show()
 
 
