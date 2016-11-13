@@ -22,27 +22,24 @@ from network import get_perf
 from slowpoints import find_slowpoints
 
 
-save_addon = 'tf_latest_400'
+save_addon = 'tf_choiceonly_100'
 rule = CHOICE_MOD1
+z_score = True
 
-def f_sub_mean(x):
-    # subtract mean activity across batch conditions
-    assert(len(x.shape)==3)
-    x_mean = x.mean(axis=1)
-    for i in range(x.shape[1]):
-        x[:,i,:] -= x_mean
-    return x
 
 # Regressors
 Choice, Mod1 = range(2)
 regr_names = ['Choice', 'Mod 1']
 
-subtract_t_mean=False
-z_score = False
 
 tar1_loc  = 0
 
-def gen_taskparams(n_tar, n_rep, tar_str_range):
+tar_str_range = 0.2
+n_tar = 6
+with Run(save_addon) as R:
+    config = R.config
+
+    n_rep = 1
     batch_size = n_rep * n_tar
     batch_shape = (n_rep, n_tar)
     ind_rep, ind_tar = np.unravel_index(range(batch_size),batch_shape)
@@ -58,14 +55,6 @@ def gen_taskparams(n_tar, n_rep, tar_str_range):
               'tar1_strengths' : tar1_strengths,
               'tar2_strengths' : tar2_strengths,
               'tar_time'    : 10000}
-
-    return params, batch_size
-
-
-with Run(save_addon) as R:
-    config = R.config
-
-    params, batch_size = gen_taskparams(n_tar=6, n_rep=1, tar_str_range=0.4)
 
     X = np.zeros((batch_size, 2)) # regressors
 
@@ -88,9 +77,6 @@ with Run(save_addon) as R:
     tar_cohs = params['tar1_strengths'] - params['tar2_strengths']
     X = np.array([y_choice, tar_cohs]).T
 
-    if subtract_t_mean:
-        H = f_sub_mean(H)
-
 # Include only active units
 nt, nb, nh = H.shape
 h = H.reshape((-1, nh))
@@ -100,8 +86,10 @@ h = h[:, ind_active]
 
 # Z-score response (will have a strong impact on results)
 if z_score:
-    h = h - h.mean(axis=0)
-    h = h/h.std(axis=0)
+    meanh = h.mean(axis=0)
+    stdh = h.std(axis=0)
+    h = h - meanh
+    h = h/stdh
 
 h = h.reshape((nt, nb, h.shape[-1]))
 
@@ -154,22 +142,40 @@ for i, s in enumerate(np.unique(X[:,sep_by])):
                     '.-', markersize=2, color=colors[i], markeredgewidth=0.2)
 ############################### Find slow points ##############################
 
-# Choosing starting points
-params, batch_size = gen_taskparams(n_tar=6, n_rep=1, tar_str_range=0.2)
-# Find slow points
+params = {'tar1_locs' : [0],
+          'tar2_locs' : [np.pi],
+          'tar1_strengths' : [1],
+          'tar2_strengths' : [1],
+          'tar_time'    : 2000}
+          # Find slow points
+
 # Generate coherence 0 inputs
 # This has to be different from Mante et al. 2013,
 # because our inputs are always positive, and can appear at different locations
 pnt_trans = list()
 task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
-ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),(6,6))
-for i in range(batch_size):
-    res = find_slowpoints(save_addon, input=task.x[1000,i,:])
-    print(res.success, res.fun)
-    pnt_tran = np.dot(res.x[ind_active], q) # Transform
+x = task.x[1000,0,:]
+for i in [-1]+range(n_tar):
+    x0 = np.zeros(nh)
+    if i > -1:
+        if z_score:
+            h0 = h[-1,i,:]
+            h0 = h0 * stdh
+            h0 = h0 + meanh
+        x0[ind_active] = h0
+    res = find_slowpoints(save_addon, input=x, x0=x0)
+    print(res.message, res.success, res.fun)
+
+    h0 = res.x[ind_active]
+    if z_score:
+        h0 = h0 - meanh
+        h0 = h0/stdh
+    pnt_tran = np.dot(h0, q) # Transform
     pnt_trans.append(pnt_tran)
+
 pnt_trans = np.array(pnt_trans)
 ax.plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], 'o', markersize=2, color='red')
+
 
 plt.savefig('figure/fixpoint_simplechoice_statespace'+save_addon+'.pdf', transparent=True)
 plt.show()
