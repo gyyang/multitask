@@ -11,7 +11,7 @@ import tensorflow as tf
 from task import *
 from run import Run
 
-def find_slowpoints(save_addon, input, x0=None):
+def find_slowpoints(save_addon, input, start_points=None):
     print('Findings slow points...')
     with Run(save_addon) as R:
         w_rec = R.w_rec
@@ -33,15 +33,19 @@ def find_slowpoints(save_addon, input, x0=None):
         F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
         return np.sum(F**2)/2
 
-    if x0 is None:
-        x0 = np.ones(nh)
-    # res = minimize(g, x0, method='Newton-CG', jac=dgdx, options={'xtol': 1e-7})
-    res = minimize(g, x0, method='L-BFGS-B', jac=dgdx,
-                   bounds=[(0,100)]*nh, options={'ftol':1e-20, 'gtol': 1e-9})
-    # ftol may be important for how slow points are
-    # If I pick gtol=1e-7, ftol=1e-20. Then regardless of starting points
-    # I find only one fixed point, which depends on the input to the network
-    return res
+    if start_points is None:
+        start_points = [np.ones(nh)]
+
+    res_list = list()
+    for start_point in start_points:
+        # res = minimize(g, x0, method='Newton-CG', jac=dgdx, options={'xtol': 1e-7})
+        res = minimize(g, start_point, method='L-BFGS-B', jac=dgdx,
+                       bounds=[(0,100)]*nh, options={'ftol':1e-20, 'gtol': 1e-9})
+        # ftol may be important for how slow points are
+        # If I pick gtol=1e-7, ftol=1e-20. Then regardless of starting points
+        # I find only one fixed point, which depends on the input to the network
+        res_list.append(res)
+    return res_list
 
 if __name__ == '__main__':
     save_addon = 'tf_latest_300'
