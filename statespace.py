@@ -19,17 +19,16 @@ import seaborn.apionly as sns # If you don't have this, then some colormaps won'
 from task import *
 from run import Run
 from network import get_perf
-from slowpoints import find_slowpoints
+# from slowpoints import find_slowpoints
 
 
-save_addon = 'tf_latest_400'
+save_addon = 'tf_latest_500'
 rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
 
 # Regressors
 Choice, Mod1, Mod2, Rule_mod1, Rule_mod2, Rule_int = range(6)
 regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule attend 1', 'Rule attend 2', 'Rule int']
 
-subtract_t_mean=False
 z_score = True
 
 
@@ -136,37 +135,132 @@ q, r = np.linalg.qr(coef_maxt)
 h_tran = np.dot(h, q) # Transform
 
 
-############################### Find Slow Points ##############################
+####################### Find Fixed & Slow Points ##############################
+def find_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True, dtype='float64'):
+    if find_fixedpoints:
+        # Finding fixed points require less tolerange
+        print('Findings fixed points...')
+        options = {'ftol':1e-10, 'gtol': 1e-10} # for L-BFGS-B
+        # options = {'ftol':1e-7, 'gtol': 1e-7} # for L-BFGS-B
+        # options = {'xtol': 1e-10}
+    else:
+        # Finding slow points allow more tolerange
+        print('Findings slow points...')
+        options = {'ftol':1e-4, 'gtol': 1e-4} # for L-BFGS-B
+        # options = {'xtol': 1e-5}
+    with Run(save_addon) as R:
+        w_rec = R.w_rec.astype(dtype)
+        w_in  = R.w_in.astype(dtype)
+        b_rec = R.b_rec.astype(dtype)
+
+    nh = len(b_rec)
+    # Add constant input to baseline
+    input = input.astype(dtype)
+    b_rec = b_rec + np.dot(w_in, input)
+
+    def dgdx(x):
+        expy = np.exp(np.dot(w_rec, x) + b_rec)
+        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
+        dfdx = 1/(1+1/expy)
+        return (-F + np.dot(w_rec.T, F*dfdx))
+
+    def g(x):
+        expy = np.exp(np.dot(w_rec, x) + b_rec)
+        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
+        return np.sum(F**2)/2
+
+    if start_points is None:
+        start_points = [np.ones(nh)]
+
+    res_list = list()
+    for start_point in start_points:
+        start_point = start_point.astype(dtype)
+        # res = minimize(g, start_point, method='Newton-CG', jac=dgdx, options=options)
+        res = minimize(g, start_point, method='L-BFGS-B', jac=dgdx,
+                       bounds=[(0,100)]*nh, options=options)
+        # ftol may be important for how slow points are
+        # If I pick gtol=1e-7, ftol=1e-20. Then regardless of starting points
+        # I find only one fixed point, which depends on the input to the network
+        res_list.append(res)
+    return res_list
+
+# Find Fixed points
 # Choosing starting points
-params = {'tar1_locs' : [0],
-          'tar2_locs' : [np.pi],
-          'tar1_mod1_strengths' : [1],
-          'tar2_mod1_strengths' : [1],
-          'tar1_mod2_strengths' : [1],
-          'tar2_mod2_strengths' : [1],
-          'tar_time'    : 1600}
-task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
+fixed_points_trans_all = dict()
+slow_points_trans_all  = dict()
+for rule in rules:
+    params = {'tar1_locs' : [0],
+              'tar2_locs' : [np.pi],
+              'tar1_mod1_strengths' : [1],
+              'tar2_mod1_strengths' : [1],
+              'tar1_mod2_strengths' : [1],
+              'tar2_mod2_strengths' : [1],
+              'tar_time'    : 1600}
+    print(rule_name[rule])
+    task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
 
-tmp = np.array([h[-1, X[:,0]==ch, :].mean(axis=0) for ch in [1, -1]])
-if z_score:
-    tmp *= stdh
-    tmp += meanh
-start_points = np.zeros((tmp.shape[0], nh))
-start_points[:, ind_active] = tmp
+    #tmp = np.array([h[-1, X[:,0]==ch, :].mean(axis=0) for ch in [1, -1]])
+    tmp = list()
+    for ch in [-1, 1]:
+        h_tmp = h[-1, X[:,0]==ch, :]
+        ind = np.argmax(np.sum(h_tmp**2, 1))
+        tmp.append(h_tmp[ind, :])
+    tmp = np.array(tmp)
 
-# Find fixed points
-res_list = find_slowpoints(save_addon, task.x[1000,0,:], start_points=start_points)
-fixed_points_trans = list()
-for res in res_list:
-    print(res.fun)
-    fixed_points = res.x[ind_active]
     if z_score:
-        fixed_points -= meanh
-        fixed_points /= stdh
-    fixed_points_tran = np.dot(fixed_points, q)
-    fixed_points_trans.append(fixed_points_tran)
+        tmp *= stdh
+        tmp += meanh
+    start_points = np.zeros((tmp.shape[0], nh))
+    start_points[:, ind_active] = tmp
 
-fixed_points_trans = np.array(fixed_points_trans)
+    # Find fixed points
+    res_list = find_slowpoints(save_addon, task.x[1000,0,:],
+                               start_points=start_points, find_fixedpoints=True)
+    fixed_points_raws  = list()
+    fixed_points_trans = list()
+    for i, res in enumerate(res_list):
+        print(res.success, res.message, res.fun)
+        fixed_points_raws.append(res.x)
+        # fixed_points = start_points[i,ind_active]
+        fixed_points = res.x[ind_active]
+        if z_score:
+            fixed_points -= meanh
+            fixed_points /= stdh
+        fixed_points_tran = np.dot(fixed_points, q)
+        fixed_points_trans.append(fixed_points_tran)
+
+    fixed_points_raws  = np.array(fixed_points_raws)
+    fixed_points_trans = np.array(fixed_points_trans)
+    fixed_points_trans_all[rule] = fixed_points_trans
+
+    # Find slow points
+    # The starting conditions will be equally sampled points in between two fixed points
+    n_slow_points = 100 # actual points will be this minus 1
+    mix_weight = np.array([np.arange(1,n_slow_points), n_slow_points-np.arange(1,n_slow_points)], dtype='float').T/n_slow_points
+
+    # start_points = np.dot(mix_weight, fixed_points_raws)
+    start_points = np.dot(mix_weight, start_points)
+
+    # start_points+= np.random.randn(*start_points.shape) # Randomly perturb starting points
+    # start_points *= np.random.uniform(0, 2, size=start_points.shape) # Randomly perturb starting points
+
+    # start_points = np.random.rand(100, nh)*3
+
+    res_list = find_slowpoints(save_addon, task.x[1000,0,:],
+                               start_points=start_points, find_fixedpoints=False)
+
+    slow_points_trans = list()
+    for i, res in enumerate(res_list):
+        # print(res.fun)
+        # slow_points = start_points[i,ind_active]
+        slow_points = res.x[ind_active]
+        if z_score:
+            slow_points -= meanh
+            slow_points /= stdh
+        slow_points_tran = np.dot(slow_points, q)
+        slow_points_trans.append(slow_points_tran)
+    slow_points_trans = np.array(slow_points_trans)
+    slow_points_trans_all[rule] = slow_points_trans
 
 ################ Pretty Plotting of State-space Results #######################
 plot_eachcurve = False
@@ -234,39 +328,14 @@ for i_col, rule in enumerate(rules):
                             '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
 
                 # Compute and plot slow points
-                if i_col == 0:
-                    axarr[i_row, i_col].plot(fixed_points_trans[:,pcs[0]],
-                                             fixed_points_trans[:,pcs[1]],
-                                             '+', markersize=1, mew=0.2, color='red')
+                ax.plot(slow_points_trans_all[rule][:,pcs[0]],
+                        slow_points_trans_all[rule][:,pcs[1]],
+                        '+', markersize=1, mew=0.2, color=sns.xkcd_palette(['magenta'])[0])
 
-############################### Find slow points ##############################
+                ax.plot(fixed_points_trans_all[rule][:,pcs[0]],
+                        fixed_points_trans_all[rule][:,pcs[1]],
+                        'x', markersize=2, mew=0.5, color=sns.xkcd_palette(['red'])[0])
 
-# for i_col, rule in enumerate(rules):
-#     # Choosing starting points
-#     params, batch_size = gen_taskparams(n_tar=6, n_rep=1, tar_str_range=0.2)
-#     # Find slow points
-#     # Generate coherence 0 inputs
-#     # This has to be different from Mante et al. 2013,
-#     # because our inputs are always positive, and can appear at different locations
-#     pnt_trans = list()
-#     task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
-#     ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),(6,6))
-#     for i in range(batch_size):
-#         res = find_slowpoints(save_addon, input=task.x[1000,i,:])
-#         print(res.success, res.fun)
-#         pnt_tran = np.dot(res.x[ind_active], q) # Transform
-#         pnt_trans.append(pnt_tran)
-#
-#     for i in range(batch_size):
-#         pnt_tran = pnt_trans[i]
-#         for i_row, pc1 in zip([0, 1], [Mod1, Mod2]):
-#             axarr[i_row, i_col].plot(pnt_tran[Choice], pnt_tran[pc1], 'o', markersize=1.5,
-#                                  mfc=colors1[ind_tar_mod1[i]], mec=colors2[ind_tar_mod2[i]],
-#                                  mew=0.5)
-#
-# pnt_trans = np.array(pnt_trans)
-# axarr[0, 0].plot(pnt_trans[:,Choice], pnt_trans[:,Mod1], '+', markersize=1, mew=0.2, color='red')
-# axarr[1, 0].plot(pnt_trans[:,Choice], pnt_trans[:,Mod2], '+', markersize=1, mew=0.2, color='red')
 
 
 plt.tight_layout(pad=0.0)

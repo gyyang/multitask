@@ -11,15 +11,23 @@ import tensorflow as tf
 from task import *
 from run import Run
 
-def find_slowpoints(save_addon, input, start_points=None):
-    print('Findings slow points...')
+def find_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True):
+    if find_fixedpoints:
+        # Finding fixed points require less tolerange
+        print('Findings fixed points...')
+        options = {'ftol':1e-20, 'gtol': 1e-9}
+    else:
+        # Finding slow points allow more tolerange
+        print('Findings slow points...')
+        options = {'ftol':1e-3, 'gtol': 1e-3}
     with Run(save_addon) as R:
-        w_rec = R.w_rec
-        w_in  = R.w_in
-        b_rec = R.b_rec
+        w_rec = R.w_rec.astype('float64')
+        w_in  = R.w_in.astype('float64')
+        b_rec = R.b_rec.astype('float64')
 
     nh = len(b_rec)
     # Add constant input to baseline
+    input = input.astype('float64')
     b_rec = b_rec + np.dot(w_in, input)
 
     def dgdx(x):
@@ -38,9 +46,10 @@ def find_slowpoints(save_addon, input, start_points=None):
 
     res_list = list()
     for start_point in start_points:
+        start_point = start_point.astype('float64')
         # res = minimize(g, x0, method='Newton-CG', jac=dgdx, options={'xtol': 1e-7})
         res = minimize(g, start_point, method='L-BFGS-B', jac=dgdx,
-                       bounds=[(0,100)]*nh, options={'ftol':1e-20, 'gtol': 1e-9})
+                       bounds=[(0,100)]*nh, options=options)
         # ftol may be important for how slow points are
         # If I pick gtol=1e-7, ftol=1e-20. Then regardless of starting points
         # I find only one fixed point, which depends on the input to the network
@@ -50,7 +59,32 @@ def find_slowpoints(save_addon, input, start_points=None):
 if __name__ == '__main__':
     save_addon = 'tf_latest_300'
     rule = CHOICEATTEND_MOD1
-    find_slowpoints(save_addon, rule, x0_list = [np.zeros(300)])
+    # find_slowpoints(save_addon, rule, x0_list = [np.zeros(300)])
+
+    with Run(save_addon) as R:
+        w_rec = R.w_rec.astype('float64')
+        w_in  = R.w_in.astype('float64')
+        b_rec = R.b_rec.astype('float64')
+
+    nh = len(b_rec)
+
+    def dgdx(x):
+        expy = np.exp(np.dot(w_rec, x) + b_rec)
+        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
+        dfdx = 1/(1+1/expy)
+        return (-F + np.dot(w_rec.T, F*dfdx))
+
+    def g(x):
+        expy = np.exp(np.dot(w_rec, x) + b_rec)
+        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
+        return np.sum(F**2)/2.
+
+    x0 = np.ones(nh)
+    dx = np.ones(nh)*0.0000001
+    x1 = x0 + dx
+
+    print(g(x1) - g(x0))
+    print(np.sum(dgdx(x0)*dx))
 
 # Test
 # start = time.time()
