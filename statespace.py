@@ -22,7 +22,7 @@ from network import get_perf
 # from slowpoints import find_slowpoints
 
 
-save_addon = 'tf_latest_500'
+save_addon = 'tf_latest_400'
 rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
 
 # Regressors
@@ -184,183 +184,207 @@ def find_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True,
         res_list.append(res)
     return res_list
 
-# Find Fixed points
-# Choosing starting points
-fixed_points_trans_all = dict()
-slow_points_trans_all  = dict()
-for rule in rules:
-    params = {'tar1_locs' : [0],
-              'tar2_locs' : [np.pi],
-              'tar1_mod1_strengths' : [1],
-              'tar2_mod1_strengths' : [1],
-              'tar1_mod2_strengths' : [1],
-              'tar2_mod2_strengths' : [1],
-              'tar_time'    : 1600}
-    print(rule_name[rule])
-    task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
+if False:
+    # Find Fixed points
+    # Choosing starting points
+    fixed_points_trans_all = dict()
+    slow_points_trans_all  = dict()
+    for rule in rules:
+        params = {'tar1_locs' : [0],
+                  'tar2_locs' : [np.pi],
+                  'tar1_mod1_strengths' : [1],
+                  'tar2_mod1_strengths' : [1],
+                  'tar1_mod2_strengths' : [1],
+                  'tar2_mod2_strengths' : [1],
+                  'tar_time'    : 1600}
+        print(rule_name[rule])
+        task  = generate_onebatch(rule, config, 'psychometric', noise_on=False, params=params)
 
-    #tmp = np.array([h[-1, X[:,0]==ch, :].mean(axis=0) for ch in [1, -1]])
-    tmp = list()
-    for ch in [-1, 1]:
-        h_tmp = h[-1, X[:,0]==ch, :]
-        ind = np.argmax(np.sum(h_tmp**2, 1))
-        tmp.append(h_tmp[ind, :])
-    tmp = np.array(tmp)
+        #tmp = np.array([h[-1, X[:,0]==ch, :].mean(axis=0) for ch in [1, -1]])
+        tmp = list()
+        for ch in [-1, 1]:
+            h_tmp = h[-1, X[:,0]==ch, :]
+            ind = np.argmax(np.sum(h_tmp**2, 1))
+            tmp.append(h_tmp[ind, :])
+        tmp = np.array(tmp)
 
-    if z_score:
-        tmp *= stdh
-        tmp += meanh
-    start_points = np.zeros((tmp.shape[0], nh))
-    start_points[:, ind_active] = tmp
-
-    # Find fixed points
-    res_list = find_slowpoints(save_addon, task.x[1000,0,:],
-                               start_points=start_points, find_fixedpoints=True)
-    fixed_points_raws  = list()
-    fixed_points_trans = list()
-    for i, res in enumerate(res_list):
-        print(res.success, res.message, res.fun)
-        fixed_points_raws.append(res.x)
-        # fixed_points = start_points[i,ind_active]
-        fixed_points = res.x[ind_active]
         if z_score:
-            fixed_points -= meanh
-            fixed_points /= stdh
-        fixed_points_tran = np.dot(fixed_points, q)
-        fixed_points_trans.append(fixed_points_tran)
+            tmp *= stdh
+            tmp += meanh
+        start_points = np.zeros((tmp.shape[0], nh))
+        start_points[:, ind_active] = tmp
 
-    fixed_points_raws  = np.array(fixed_points_raws)
-    fixed_points_trans = np.array(fixed_points_trans)
-    fixed_points_trans_all[rule] = fixed_points_trans
+        # Find fixed points
+        res_list = find_slowpoints(save_addon, task.x[1000,0,:],
+                                   start_points=start_points, find_fixedpoints=True)
+        fixed_points_raws  = list()
+        fixed_points_trans = list()
+        for i, res in enumerate(res_list):
+            print(res.success, res.message, res.fun)
+            fixed_points_raws.append(res.x)
+            # fixed_points = start_points[i,ind_active]
+            fixed_points = res.x[ind_active]
+            if z_score:
+                fixed_points -= meanh
+                fixed_points /= stdh
+            fixed_points_tran = np.dot(fixed_points, q)
+            fixed_points_trans.append(fixed_points_tran)
 
-    # Find slow points
-    # The starting conditions will be equally sampled points in between two fixed points
-    n_slow_points = 100 # actual points will be this minus 1
-    mix_weight = np.array([np.arange(1,n_slow_points), n_slow_points-np.arange(1,n_slow_points)], dtype='float').T/n_slow_points
+        fixed_points_raws  = np.array(fixed_points_raws)
+        fixed_points_trans = np.array(fixed_points_trans)
+        fixed_points_trans_all[rule] = fixed_points_trans
 
-    # start_points = np.dot(mix_weight, fixed_points_raws)
-    start_points = np.dot(mix_weight, start_points)
+        # Find slow points
+        # The starting conditions will be equally sampled points in between two fixed points
+        n_slow_points = 100 # actual points will be this minus 1
+        mix_weight = np.array([np.arange(1,n_slow_points), n_slow_points-np.arange(1,n_slow_points)], dtype='float').T/n_slow_points
 
-    # start_points+= np.random.randn(*start_points.shape) # Randomly perturb starting points
-    # start_points *= np.random.uniform(0, 2, size=start_points.shape) # Randomly perturb starting points
+        # start_points = np.dot(mix_weight, fixed_points_raws)
+        start_points = np.dot(mix_weight, start_points)
 
-    # start_points = np.random.rand(100, nh)*3
+        # start_points+= np.random.randn(*start_points.shape) # Randomly perturb starting points
+        # start_points *= np.random.uniform(0, 2, size=start_points.shape) # Randomly perturb starting points
 
-    res_list = find_slowpoints(save_addon, task.x[1000,0,:],
-                               start_points=start_points, find_fixedpoints=False)
+        # start_points = np.random.rand(100, nh)*3
 
-    slow_points_trans = list()
-    for i, res in enumerate(res_list):
-        # print(res.fun)
-        # slow_points = start_points[i,ind_active]
-        slow_points = res.x[ind_active]
-        if z_score:
-            slow_points -= meanh
-            slow_points /= stdh
-        slow_points_tran = np.dot(slow_points, q)
-        slow_points_trans.append(slow_points_tran)
-    slow_points_trans = np.array(slow_points_trans)
-    slow_points_trans_all[rule] = slow_points_trans
+        res_list = find_slowpoints(save_addon, task.x[1000,0,:],
+                                   start_points=start_points, find_fixedpoints=False)
 
-################ Pretty Plotting of State-space Results #######################
-plot_eachcurve = False
-plot_onlycorrect = True # Only plotting correct trials
-fs = 6
+        slow_points_trans = list()
+        for i, res in enumerate(res_list):
+            # print(res.fun)
+            # slow_points = start_points[i,ind_active]
+            slow_points = res.x[ind_active]
+            if z_score:
+                slow_points -= meanh
+                slow_points /= stdh
+            slow_points_tran = np.dot(slow_points, q)
+            slow_points_trans.append(slow_points_tran)
+        slow_points_trans = np.array(slow_points_trans)
+        slow_points_trans_all[rule] = slow_points_trans
 
-Perfs = Perfs.astype(bool)
+    ################ Pretty Plotting of State-space Results #######################
+    plot_eachcurve = False
+    plot_onlycorrect = True # Only plotting correct trials
+    fs = 6
 
-colors1 = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
-colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
+    Perfs = Perfs.astype(bool)
 
-fig, axarr = plt.subplots(2, 3, sharex=True, sharey='row', figsize=(3,2))
-for i_col, rule in enumerate(rules):
+    colors1 = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
+    colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
+
+    fig, axarr = plt.subplots(2, 3, sharex=True, sharey='row', figsize=(3,2))
+    for i_col, rule in enumerate(rules):
+        for i_row in range(2):
+            ax = axarr[i_row, i_col]
+            ch_list = [-1,1]
+            if i_row == 0:
+                pcs = [Choice, Mod1] # Choice, Mod1
+                separate_by = 'tar1_mod1_strengths'
+                ax.set_title(rule_name[rule], fontsize=fs, y=0.8)
+            else:
+                pcs = [Choice, Mod2] # Choice, Mod1
+                separate_by = 'tar1_mod2_strengths'
+            ax.set_ylim([h_tran[:,:,pcs[1]].min(),h_tran[:,:,pcs[1]].max()])
+            ax.set_xlim([h_tran[:,:,pcs[0]].min(),h_tran[:,:,pcs[0]].max()])
+
+            if separate_by == 'tar1_mod1_strengths':
+                sep_by = Mod1
+                colors = colors1
+            elif separate_by == 'tar1_mod2_strengths':
+                sep_by = Mod2
+                colors = colors2
+            else:
+                raise ValueError
+
+            ax.axis('off')
+            if i_col == 0:
+                anc = [h_tran[:,:,pcs[0]].min()+1, h_tran[:,:,pcs[1]].max()-5] # anchor point
+                ax.plot([anc[0], anc[0]], [anc[1]-5, anc[1]-1], color='black', lw=1.0)
+                ax.plot([anc[0]+1, anc[0]+5], [anc[1], anc[1]], color='black', lw=1.0)
+                ax.text(anc[0], anc[1], regr_names[pcs[0]], fontsize=fs, va='bottom')
+                ax.text(anc[0], anc[1], regr_names[pcs[1]], fontsize=fs, rotation=90, ha='right', va='top')
+
+            for i, s in enumerate(np.unique(X[:,sep_by])):
+                for ch in ch_list: # Choice
+                    if ch == -1:
+                        kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+                    else:
+                        kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
+                    ind = (X[:,sep_by]==s)*(trial_rules==rule)*(X[:,0]==ch)
+                    if plot_onlycorrect:
+                        ind *= Perfs
+
+                    if not np.any(ind):
+                        continue
+
+                    h_plot = h_tran[:,ind,:]
+                    if plot_eachcurve:
+                        for j in range(h_plot.shape[1]):
+                            ax.plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
+                                    '.-', markersize=2, color=colors[i])
+                    else:
+                        h_plot = h_plot.mean(axis=1)
+                        ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
+                                '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
+
+                    # Compute and plot slow points
+                    ax.plot(slow_points_trans_all[rule][:,pcs[0]],
+                            slow_points_trans_all[rule][:,pcs[1]],
+                            '+', markersize=1, mew=0.2, color=sns.xkcd_palette(['magenta'])[0])
+
+                    ax.plot(fixed_points_trans_all[rule][:,pcs[0]],
+                            fixed_points_trans_all[rule][:,pcs[1]],
+                            'x', markersize=2, mew=0.5, color=sns.xkcd_palette(['red'])[0])
+
+
+
+    plt.tight_layout(pad=0.0)
+
+    # Plot labels
     for i_row in range(2):
-        ax = axarr[i_row, i_col]
-        ch_list = [-1,1]
         if i_row == 0:
-            pcs = [Choice, Mod1] # Choice, Mod1
-            separate_by = 'tar1_mod1_strengths'
-            ax.set_title(rule_name[rule], fontsize=fs, y=0.8)
+            ax = fig.add_axes([0.25,0.45,0.2,0.1])
+            colors = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
         else:
-            pcs = [Choice, Mod2] # Choice, Mod1
-            separate_by = 'tar1_mod2_strengths'
-        ax.set_ylim([h_tran[:,:,pcs[1]].min(),h_tran[:,:,pcs[1]].max()])
-        ax.set_xlim([h_tran[:,:,pcs[0]].min(),h_tran[:,:,pcs[0]].max()])
+            ax = fig.add_axes([0.25,0.05,0.2,0.1])
+            colors = sns.diverging_palette(145, 280, sep=1, s=99, l=30, n=6)
 
-        if separate_by == 'tar1_mod1_strengths':
-            sep_by = Mod1
-            colors = colors1
-        elif separate_by == 'tar1_mod2_strengths':
-            sep_by = Mod2
-            colors = colors2
-        else:
-            raise ValueError
-
+        for i in range(6):
+            kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+            ax.plot([i], [0], '.-', color=colors[i], markersize=4, markeredgewidth=0.5, **kwargs)
         ax.axis('off')
-        if i_col == 0:
-            anc = [h_tran[:,:,pcs[0]].min()+1, h_tran[:,:,pcs[1]].max()-5] # anchor point
-            ax.plot([anc[0], anc[0]], [anc[1]-5, anc[1]-1], color='black', lw=1.0)
-            ax.plot([anc[0]+1, anc[0]+5], [anc[1], anc[1]], color='black', lw=1.0)
-            ax.text(anc[0], anc[1], regr_names[pcs[0]], fontsize=fs, va='bottom')
-            ax.text(anc[0], anc[1], regr_names[pcs[1]], fontsize=fs, rotation=90, ha='right', va='top')
+        ax.text(2.5, 1, 'Strong Weak Strong', fontsize=5, va='bottom', ha='center')
+        ax.text(2.5, -1, 'To choice 1    To choice 2', fontsize=5, va='top', ha='center')
+        ax.set_xlim([-1,6])
+        ax.set_ylim([-3,3])
 
-        for i, s in enumerate(np.unique(X[:,sep_by])):
-            for ch in ch_list: # Choice
-                if ch == -1:
-                    kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
-                else:
-                    kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
-                ind = (X[:,sep_by]==s)*(trial_rules==rule)*(X[:,0]==ch)
-                if plot_onlycorrect:
-                    ind *= Perfs
-
-                if not np.any(ind):
-                    continue
-
-                h_plot = h_tran[:,ind,:]
-                if plot_eachcurve:
-                    for j in range(h_plot.shape[1]):
-                        ax.plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
-                                '.-', markersize=2, color=colors[i])
-                else:
-                    h_plot = h_plot.mean(axis=1)
-                    ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
-                            '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
-
-                # Compute and plot slow points
-                ax.plot(slow_points_trans_all[rule][:,pcs[0]],
-                        slow_points_trans_all[rule][:,pcs[1]],
-                        '+', markersize=1, mew=0.2, color=sns.xkcd_palette(['magenta'])[0])
-
-                ax.plot(fixed_points_trans_all[rule][:,pcs[0]],
-                        fixed_points_trans_all[rule][:,pcs[1]],
-                        'x', markersize=2, mew=0.5, color=sns.xkcd_palette(['red'])[0])
+    plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
+    plt.show()
 
 
 
-plt.tight_layout(pad=0.0)
-
-# Plot labels
-for i_row in range(2):
-    if i_row == 0:
-        ax = fig.add_axes([0.25,0.45,0.2,0.1])
-        colors = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
-    else:
-        ax = fig.add_axes([0.25,0.05,0.2,0.1])
-        colors = sns.diverging_palette(145, 280, sep=1, s=99, l=30, n=6)
-
-    for i in range(6):
-        kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
-        ax.plot([i], [0], '.-', color=colors[i], markersize=4, markeredgewidth=0.5, **kwargs)
-    ax.axis('off')
-    ax.text(2.5, 1, 'Strong Weak Strong', fontsize=5, va='bottom', ha='center')
-    ax.text(2.5, -1, 'To choice 1    To choice 2', fontsize=5, va='top', ha='center')
-    ax.set_xlim([-1,6])
-    ax.set_ylim([-3,3])
-
-plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
+############################## Plot beta weights ##############################
+# coef_ = coef.reshape((-1, 6))
+coef_ = coef_maxt
+fs = 6
+fig, axarr = plt.subplots(6, 6, sharex='col', sharey='row', figsize=(4,4))
+for i in range(6):
+    for j in range(6):
+        ax = axarr[i, j]
+        ax.plot(coef_[:,j], coef_[:, i], 'o', ms=1, mec='white', mew=0.25)
+        ax.axis('off')
+        if i == 5:
+            med_x = np.median(coef_[:,j])
+            ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
+            bot_y = np.min(coef_[:,i])
+            ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
+            ax.text(med_x, bot_y, regr_names[j], fontsize=fs, va='top', ha='center')
+        if j == 0:
+            med_y = np.median(coef_[:,i])
+            ran_y = (np.max(coef_[:,i]) - np.min(coef_[:,i]))/5
+            left_x = np.min(coef_[:,j])
+            ax.plot([left_x, left_x], [med_y-ran_y, med_y+ran_y], color='black', lw=1.0)
+            ax.text(left_x, med_y, regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
+plt.savefig('figure/temp.pdf', transparent=True)
 plt.show()
-
-
-
-
