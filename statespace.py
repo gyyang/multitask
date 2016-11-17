@@ -365,14 +365,36 @@ if False:
 
 
 ############################## Plot beta weights ##############################
+# Load clustering results
+with open('data/clustering'+save_addon+'.pkl','rb') as f:
+    res = pickle.load(f)
+
+ind_specifics = dict()
+ind_specifics[-1] = range(h.shape[-1]) # The rest
+for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
+    h_normvar_all = res['h_normvar_all'][:, res['rules'].index(rule)]
+    # Find indices and convert them
+    ind_tmp = np.where(h_normvar_all>0.5)[0]
+    ind_tmp_orig = res['ind_orig'][ind_tmp]
+    ind_specifics[rule] = list()
+    for i in ind_tmp_orig:
+        j = np.where(ind_orig==i)[0]
+        if len(j) > 0:
+            ind_specifics[rule].append(j[0])
+            ind_specifics[-1].pop(ind_specifics[-1].index(j[0]))
+
 # coef_ = coef.reshape((-1, 6))
 coef_ = coef_maxt
-fs = 6
 fig, axarr = plt.subplots(6, 6, sharex='col', sharey='row', figsize=(4,4))
+colors = sns.xkcd_palette(['red', 'blue', 'green'])
+# colors = sns.xkcd_palette(['red'] * 3)
 for i in range(6):
     for j in range(6):
         ax = axarr[i, j]
-        ax.plot(coef_[:,j], coef_[:, i], 'o', ms=1, mec='white', mew=0.25)
+        for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
+                           ['red', 'blue', 'green']):
+            ind = ind_specifics[rule]
+            ax.plot(coef_[ind,j], coef_[ind, i], 'o', color=c, ms=1, mec='white', mew=0.25)
         ax.axis('off')
         if i == 5:
             med_x = np.median(coef_[:,j])

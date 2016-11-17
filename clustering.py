@@ -16,7 +16,7 @@ from task import *
 from run import Run
 
 ########################## Running the network ################################
-save_addon = 'tf_latest_500'
+save_addon = 'tf_latest_400'
 data_type = 'rule'
 
 rules = [GO, INHGO, DELAYGO,\
