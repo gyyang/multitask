@@ -211,8 +211,8 @@ nrule = (nx-2*nr-1)
 l = 0.25
 l0 = (1-1.5*l)/nh
 plot_infos = [(w_rec[ind_orig,:][:,ind_orig], [l               ,l          ,nh*l0    ,nh*l0]),
-              (w_in[ind_orig,0]             , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
-              (w_in[ind_orig,1:nr+1]        , [l-(nx-11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
+              (w_in[ind_orig,0,np.newaxis]  , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
+              (w_in[ind_orig,1:nr+1]        , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
               (w_in[ind_orig,nr+1:2*nr+1]   , [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
               (w_in[ind_orig,2*nr+1:]       , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
               (w_out[:, ind_orig]           , [l               ,l-(ny+6)*l0,nh*l0    ,ny*l0]),
