@@ -23,13 +23,6 @@ def train(HDIM):
     tf.reset_default_graph()
 
     N_RING = 16
-    config = {'h_type'      : 'leaky_rec',
-              'alpha'       : 0.2, # \Delta t/tau
-              'dt'          : 0.2*TAU,
-              'HDIM'        : HDIM,
-              'N_RING'      : N_RING,
-              'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : 'tf_choiceonly_'+str(HDIM)}
 
     # Rules
     rules = [FIXATION, GO, INHGO, DELAYGO,\
@@ -42,6 +35,16 @@ def train(HDIM):
     # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
 
     rule_weights = np.ones(len(rules))
+
+    config = {'h_type'      : 'leaky_rec',
+              'alpha'       : 0.2, # \Delta t/tau
+              'dt'          : 0.2*TAU,
+              'HDIM'        : HDIM,
+              'N_RING'      : N_RING,
+              'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
+              'save_addon'  : 'tf_choiceonly_'+str(HDIM),
+              'rules'       : rules,
+              'rule_weights': rule_weights}
 
     # Parameters
     # learning_rate = 0.001
