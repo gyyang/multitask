@@ -207,15 +207,17 @@ with Run(save_addon) as R:
 
 nh = len(ind_orig)
 nr = n_ring
+nrule = (nx-2*nr-1)
 l = 0.25
 l0 = (1-1.5*l)/nh
-plot_infos = [(w_rec[ind_orig,:][:,ind_orig], [l               ,l          ,nh*l0       ,nh*l0]),
-              (w_in[ind_orig,:nr]           , [l-(nx+12)*l0    ,l          ,nr*l0       ,nh*l0]),
-              (w_in[ind_orig,nr:2*nr]       , [l-(nx-nr+9)*l0  ,l          ,nr*l0       ,nh*l0]),
-              (w_in[ind_orig,2*nr:]         , [l-(nx-2*nr+6)*l0,l          ,(nx-2*nr)*l0,nh*l0]),
-              (w_out[:, ind_orig]           , [l               ,l-(ny+6)*l0,nh*l0       ,ny*l0]),
-              (b_rec[ind_orig, np.newaxis]  , [l+(nh+6)*l0     ,l          ,l0          ,nh*l0]),
-              (b_out[:, np.newaxis]         , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0          ,ny*l0])]
+plot_infos = [(w_rec[ind_orig,:][:,ind_orig], [l               ,l          ,nh*l0    ,nh*l0]),
+              (w_in[ind_orig,0]             , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
+              (w_in[ind_orig,1:nr+1]        , [l-(nx-11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
+              (w_in[ind_orig,nr+1:2*nr+1]   , [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
+              (w_in[ind_orig,2*nr+1:]       , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
+              (w_out[:, ind_orig]           , [l               ,l-(ny+6)*l0,nh*l0    ,ny*l0]),
+              (b_rec[ind_orig, np.newaxis]  , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
+              (b_out[:, np.newaxis]         , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
 
 cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
 fig = plt.figure(figsize=(4,4))
