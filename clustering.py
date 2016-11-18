@@ -38,7 +38,8 @@ with Run(save_addon) as R:
             if 'fix' not in e_name:
                 h_all_byepoch[(rule, e_name)] = h_all_byrule[rule][e_time[0]:e_time[1],:,:]
 
-    w_in = R.w_in # for later sorting
+w_in  = R.w_in # for later sorting
+w_out = R.w_out
 
 # Reorder h_all_byepoch by epoch-first
 keys = h_all_byepoch.keys()
@@ -109,13 +110,18 @@ for i, ind in enumerate(ind_label_sort):
 labels = labels2
 
 # Sort data by labels and by input connectivity
-w_in = w_in[ind_active, :]
-w_in_mod1 = w_in[:, 1:n_ring+1]
-w_in_mod2 = w_in[:, n_ring+1:2*n_ring+1]
-w_in_modboth = w_in_mod1 + w_in_mod2
-w_in_prefs = np.argmax(w_in_modboth, axis=1)
+sort_by = 'w_in'
+if sort_by == 'w_in':
+    w_in = w_in[ind_active, :]
+    w_in_mod1 = w_in[:, 1:n_ring+1]
+    w_in_mod2 = w_in[:, n_ring+1:2*n_ring+1]
+    w_in_modboth = w_in_mod1 + w_in_mod2
+    w_prefs = np.argmax(w_in_modboth, axis=1)
+elif sort_by == 'w_out':
+    w_out = w_out[1:, ind_active]
+    w_prefs = np.argmax(w_out, axis=0)
 
-ind_sort        = np.lexsort((w_in_prefs, labels)) # sort by labels then by prefs
+ind_sort        = np.lexsort((w_prefs, labels)) # sort by labels then by prefs
 labels          = labels[ind_sort]
 h_normvar_all   = h_normvar_all[ind_sort, :]
 ind_active      = ind_active[ind_sort]
