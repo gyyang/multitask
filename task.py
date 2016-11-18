@@ -10,13 +10,21 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-N_RULE          = 22
-FIXATION, GO, INHGO, DELAYGO,\
+N_RULE          = 18
+# FIXATION, GO, INHGO, DELAYGO,\
+# CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+# CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+# TIMEDGO, DELAYTIMEDGO,\
+# REMAP, INHREMAP, DELAYREMAP,\
+# DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO, INTREPRO = range(N_RULE)
+
+GO, INHGO, DELAYGO,\
 CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
 CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
-TIMEDGO, DELAYTIMEDGO,\
 REMAP, INHREMAP, DELAYREMAP,\
-DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO, INTREPRO = range(N_RULE)
+DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO = range(N_RULE)
+
+FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
 
 TEST_INIT = -1
 
@@ -27,7 +35,7 @@ TEST_INIT = -1
 # Time constant
 TAU                 = 100 # ms
 # Noise level for training
-SIGMA               = 0.02
+SIGMA               = 0.01
 
 def get_dist(original_dist): # Get the distance in periodic boundary conditions
     return np.minimum(abs(original_dist),2*np.pi-abs(original_dist))

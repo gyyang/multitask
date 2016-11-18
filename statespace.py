@@ -62,6 +62,9 @@ def gen_taskparams(n_tar, n_rep, tar_str_range):
 
 with Run(save_addon) as R:
     config = R.config
+    w_out  = R.w_out
+    w_in   = R.w_in
+    w_rec  = R.w_rec
 
     params, batch_size = gen_taskparams(n_tar=6, n_rep=10, tar_str_range=0.2)
 
@@ -100,8 +103,13 @@ with Run(save_addon) as R:
 nt, nb, nh = H.shape
 h = H.reshape((-1, nh))
 ind_active = np.where(h.var(axis=0) > 1e-4)[0]
+# ind_active = range(nh)
 ind_orig   = np.arange(nh)[ind_active]
 h = h[:, ind_active]
+
+w_in  = w_in[ind_active, :]
+w_rec = w_rec[ind_active, :][:, ind_active]
+w_out = w_out[:, ind_active]
 
 # Z-score response (will have a strong impact on results)
 if z_score:
@@ -111,6 +119,27 @@ if z_score:
     h = h/stdh
 
 h = h.reshape((nt, nb, h.shape[-1]))
+
+
+# Load clustering results
+# Get task-specific units for Att1 and Att2
+with open('data/clustering'+save_addon+'.pkl','rb') as f:
+    res = pickle.load(f)
+
+ind_specifics = dict()
+ind_specifics[-1] = range(h.shape[-1]) # The rest
+for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
+    h_normvar_all = res['h_normvar_all'][:, res['rules'].index(rule)]
+    # Find indices and convert them
+    ind_tmp = np.where(h_normvar_all>0.5)[0]
+    ind_tmp_orig = res['ind_orig'][ind_tmp]
+    ind_specifics[rule] = list()
+    for i in ind_tmp_orig:
+        j = np.where(ind_orig==i)[0]
+        if len(j) > 0:
+            ind_specifics[rule].append(j[0])
+            ind_specifics[-1].pop(ind_specifics[-1].index(j[0]))
+
 
 
 ################################### Regression ################################
@@ -365,48 +394,86 @@ if False:
 
 
 ############################## Plot beta weights ##############################
-# Load clustering results
-with open('data/clustering'+save_addon+'.pkl','rb') as f:
-    res = pickle.load(f)
-
-ind_specifics = dict()
-ind_specifics[-1] = range(h.shape[-1]) # The rest
-for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
-    h_normvar_all = res['h_normvar_all'][:, res['rules'].index(rule)]
-    # Find indices and convert them
-    ind_tmp = np.where(h_normvar_all>0.5)[0]
-    ind_tmp_orig = res['ind_orig'][ind_tmp]
-    ind_specifics[rule] = list()
-    for i in ind_tmp_orig:
-        j = np.where(ind_orig==i)[0]
-        if len(j) > 0:
-            ind_specifics[rule].append(j[0])
-            ind_specifics[-1].pop(ind_specifics[-1].index(j[0]))
-
+# Plot beta weights
 # coef_ = coef.reshape((-1, 6))
 coef_ = coef_maxt
-fig, axarr = plt.subplots(6, 6, sharex='col', sharey='row', figsize=(4,4))
-colors = sns.xkcd_palette(['red', 'blue', 'green'])
-# colors = sns.xkcd_palette(['red'] * 3)
-for i in range(6):
-    for j in range(6):
-        ax = axarr[i, j]
-        for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
-                           ['red', 'blue', 'green']):
+if False:
+    # Plot all comparisons
+    fig, axarr = plt.subplots(6, 6, sharex='col', sharey='row', figsize=(4,4))
+    colors = sns.xkcd_palette(['grey', 'red', 'blue'])
+    # colors = sns.xkcd_palette(['red'] * 3)
+    fs = 6
+    for i in range(6):
+        for j in range(6):
+            ax = axarr[i, j]
+            for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2], colors):
+                ind = ind_specifics[rule]
+                ax.plot(coef_[ind,j], coef_[ind, i], 'o', color=c, ms=1, mec='white', mew=0.15)
+            ax.axis('off')
+            if i == 5:
+                med_x = np.median(coef_[:,j])
+                ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
+                bot_y = np.min(coef_[:,i])
+                ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
+                ax.text(med_x, bot_y, regr_names[j], fontsize=fs, va='top', ha='center')
+            if j == 0:
+                med_y = np.median(coef_[:,i])
+                ran_y = (np.max(coef_[:,i]) - np.min(coef_[:,i]))/5
+                left_x = np.min(coef_[:,j])
+                ax.plot([left_x, left_x], [med_y-ran_y, med_y+ran_y], color='black', lw=1.0)
+                ax.text(left_x, med_y, regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
+    plt.savefig('figure/beta_weights_full.pdf', transparent=True)
+    plt.show()
+
+if False:
+    # Plot important comparisons
+    fig, axarr = plt.subplots(1, 4, sharex='col', sharey='row', figsize=(4,1))
+    colors = sns.xkcd_palette(['grey', 'red', 'blue'])
+    # colors = sns.xkcd_palette(['red'] * 3)
+    fs = 6
+    i = Choice
+    for k_j, j in enumerate([Mod1, Mod2, Rule_mod1, Rule_mod2]):
+        ax = axarr[k_j]
+        for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2], colors):
             ind = ind_specifics[rule]
-            ax.plot(coef_[ind,j], coef_[ind, i], 'o', color=c, ms=1, mec='white', mew=0.25)
+            ax.plot(coef_[ind,j], coef_[ind, i], 'o', color=c, ms=1.5, mec='white', mew=0.2)
         ax.axis('off')
-        if i == 5:
-            med_x = np.median(coef_[:,j])
-            ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
-            bot_y = np.min(coef_[:,i])
-            ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
-            ax.text(med_x, bot_y, regr_names[j], fontsize=fs, va='top', ha='center')
-        if j == 0:
+
+        med_x = np.median(coef_[:,j])
+        ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
+        bot_y = np.min(coef_[:,i])
+        ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
+        ax.text(med_x, bot_y, regr_names[j], fontsize=fs, va='top', ha='center')
+
+        if k_j == 0:
             med_y = np.median(coef_[:,i])
             ran_y = (np.max(coef_[:,i]) - np.min(coef_[:,i]))/5
             left_x = np.min(coef_[:,j])
             ax.plot([left_x, left_x], [med_y-ran_y, med_y+ran_y], color='black', lw=1.0)
             ax.text(left_x, med_y, regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
-plt.savefig('figure/temp.pdf', transparent=True)
+    plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
+    plt.show()
+
+
+######################### Study connection weights ##############################
+w_in_specifics = w_in[ind_specifics[CHOICEATTEND_MOD2], :]
+n_ring = config['N_RING']
+rules = [FIXATION, GO, INHGO, DELAYGO,\
+    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+    REMAP, INHREMAP, DELAYREMAP,\
+    DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+
+fs = 6
+fig = plt.figure()
+plt.plot(w_in_specifics[:, 2*n_ring+1:].mean(axis=0), 'o-')
+plt.xticks(rules, [rule_name[rule] for rule in rules], rotation=90, fontsize=fs)
+plt.show()
+
+fig = plt.figure()
+_ = plt.plot(w_in_specifics[:, 1:n_ring+1].T)
+plt.show()
+
+fig = plt.figure()
+_ = plt.plot(w_in_specifics[:, n_ring+1:2*n_ring+1].T)
 plt.show()
