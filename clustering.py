@@ -16,7 +16,7 @@ from task import *
 from run import Run
 
 ########################## Running the network ################################
-save_addon = 'tf_latest_400'
+save_addon = 'tf_withrecnoise_400'
 data_type = 'rule'
 
 rules = [GO, INHGO, DELAYGO,\
@@ -37,6 +37,8 @@ with Run(save_addon) as R:
         for e_name, e_time in task.epochs.iteritems():
             if 'fix' not in e_name:
                 h_all_byepoch[(rule, e_name)] = h_all_byrule[rule][e_time[0]:e_time[1],:,:]
+
+    w_in = R.w_in # for later sorting
 
 # Reorder h_all_byepoch by epoch-first
 keys = h_all_byepoch.keys()
@@ -84,9 +86,7 @@ plt.show()
 
 # First only get active units. Total variance across tasks larger than 1e-3
 ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
-ind_orig   = np.arange(nh)
 h_var_all  = h_var_all[ind_active, :]
-ind_orig   = ind_orig[ind_active]
 
 # Normalize by the total variance across tasks
 h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
@@ -108,17 +108,23 @@ for i, ind in enumerate(ind_label_sort):
     labels2[labels==ind] = i
 labels = labels2
 
-# Sort data by labels
-ind_sort        = np.argsort(labels)
+# Sort data by labels and by input connectivity
+w_in = w_in[ind_active, :]
+w_in_mod1 = w_in[:, 1:n_ring+1]
+w_in_mod2 = w_in[:, n_ring+1:2*n_ring+1]
+w_in_modboth = w_in_mod1 + w_in_mod2
+w_in_prefs = np.argmax(w_in_modboth, axis=1)
+
+ind_sort        = np.lexsort((w_in_prefs, labels)) # sort by labels then by prefs
 labels          = labels[ind_sort]
 h_normvar_all   = h_normvar_all[ind_sort, :]
-ind_orig        = ind_orig[ind_sort]
+ind_active      = ind_active[ind_sort]
 
 # Save results
 result = {'labels'          : labels,
           'label_prefs'     : label_prefs,
           'h_normvar_all'   : h_normvar_all,
-          'ind_orig'        : ind_orig,
+          'ind_active'      : ind_active,
           'rules'           : rules,
           'data_type'       : data_type}
 
@@ -205,19 +211,22 @@ with Run(save_addon) as R:
     b_rec  = R.b_rec
     b_out  = R.b_out
 
-nh = len(ind_orig)
+nh = len(ind_active)
 nr = n_ring
 nrule = (nx-2*nr-1)
+ind = ind_active
+
 l = 0.25
 l0 = (1-1.5*l)/nh
-plot_infos = [(w_rec[ind_orig,:][:,ind_orig], [l               ,l          ,nh*l0    ,nh*l0]),
-              (w_in[ind_orig,0,np.newaxis]  , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
-              (w_in[ind_orig,1:nr+1]        , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
-              (w_in[ind_orig,nr+1:2*nr+1]   , [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
-              (w_in[ind_orig,2*nr+1:]       , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
-              (w_out[:, ind_orig]           , [l               ,l-(ny+6)*l0,nh*l0    ,ny*l0]),
-              (b_rec[ind_orig, np.newaxis]  , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
-              (b_out[:, np.newaxis]         , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
+
+plot_infos = [(w_rec[ind,:][:,ind]     , [l               ,l          ,nh*l0    ,nh*l0]),
+              (w_in[ind,0,np.newaxis]  , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
+              (w_in[ind,1:nr+1]        , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
+              (w_in[ind,nr+1:2*nr+1]   , [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
+              (w_in[ind,2*nr+1:]       , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
+              (w_out[:, ind]           , [l               ,l-(ny+6)*l0,nh*l0    ,ny*l0]),
+              (b_rec[ind, np.newaxis]  , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
+              (b_out[:, np.newaxis]    , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
 
 cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
 fig = plt.figure(figsize=(4,4))
