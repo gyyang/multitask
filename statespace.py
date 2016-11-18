@@ -22,12 +22,21 @@ from network import get_perf
 # from slowpoints import find_slowpoints
 
 
-save_addon = 'tf_latest_400'
-rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
+save_addon = 'tf_withrecnoise_500'
+analyze_threerules = False
+analyze_allunits = False
 
-# Regressors
-Choice, Mod1, Mod2, Rule_mod1, Rule_mod2, Rule_int = range(6)
-regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule attend 1', 'Rule attend 2', 'Rule int']
+if analyze_threerules:
+    rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
+    # Regressors
+    Choice, Mod1, Mod2, Rule_mod1, Rule_mod2, Rule_int = range(6)
+    regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule attend 1', 'Rule attend 2', 'Rule int']
+else:
+    rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+    # Regressors
+    Choice, Mod1, Mod2, Rule = range(4)
+    regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
+
 
 z_score = True
 
@@ -60,15 +69,16 @@ def gen_taskparams(n_tar, n_rep, tar_str_range):
     return params, batch_size
 
 
-with Run(save_addon) as R:
+with Run(save_addon, sigma_rec=None) as R:
     config = R.config
     w_out  = R.w_out
     w_in   = R.w_in
     w_rec  = R.w_rec
 
-    params, batch_size = gen_taskparams(n_tar=6, n_rep=10, tar_str_range=0.2)
+    tar_str_range = 0.2
+    params, batch_size = gen_taskparams(n_tar=6, n_rep=10, tar_str_range=tar_str_range)
 
-    X = np.zeros((len(rules)*batch_size, 3+3)) # regressors
+    X = np.zeros((len(rules)*batch_size, len(regr_names))) # regressors
     trial_rules = np.zeros(len(rules)*batch_size)
     H = np.array([])
     Perfs = np.array([])
@@ -93,18 +103,23 @@ with Run(save_addon) as R:
             H = np.concatenate((H, h_sample), axis=1)
             Perfs = np.concatenate((Perfs, perfs))
 
-        tar1_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
-        tar1_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
-        X[i*batch_size:(i+1)*batch_size, :3] = np.array([y_choice, tar1_mod1_cohs, tar1_mod2_cohs]).T
-        X[i*batch_size:(i+1)*batch_size, 3+i] = 1
+        tar_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
+        tar_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
+        X[i*batch_size:(i+1)*batch_size, :3] = \
+            np.array([y_choice, tar_mod1_cohs/tar_str_range, tar_mod2_cohs/tar_str_range]).T
+        if analyze_threerules:
+            X[i*batch_size:(i+1)*batch_size, 3+i] = 1
+        else:
+            X[i*batch_size:(i+1)*batch_size, 3] = i*2-1
         trial_rules[i*batch_size:(i+1)*batch_size] = rule
 
 # Include only active units
 nt, nb, nh = H.shape
 h = H.reshape((-1, nh))
-ind_active = np.where(h.var(axis=0) > 1e-4)[0]
-# ind_active = range(nh)
-ind_orig   = np.arange(nh)[ind_active]
+if analyze_allunits:
+    ind_active = range(nh)
+else:
+    ind_active = np.where(h.var(axis=0) > 1e-4)[0]
 h = h[:, ind_active]
 
 w_in  = w_in[ind_active, :]
@@ -132,10 +147,10 @@ for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
     h_normvar_all = res['h_normvar_all'][:, res['rules'].index(rule)]
     # Find indices and convert them
     ind_tmp = np.where(h_normvar_all>0.5)[0]
-    ind_tmp_orig = res['ind_orig'][ind_tmp]
+    ind_tmp_active = res['ind_active'][ind_tmp]
     ind_specifics[rule] = list()
-    for i in ind_tmp_orig:
-        j = np.where(ind_orig==i)[0]
+    for i in ind_tmp_active:
+        j = np.where(ind_active==i)[0]
         if len(j) > 0:
             ind_specifics[rule].append(j[0])
             ind_specifics[-1].pop(ind_specifics[-1].index(j[0]))
@@ -302,7 +317,7 @@ if False:
     colors1 = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
     colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
 
-    fig, axarr = plt.subplots(2, 3, sharex=True, sharey='row', figsize=(3,2))
+    fig, axarr = plt.subplots(2, len(rules), sharex=True, sharey='row', figsize=(len(rules)*1,2))
     for i_col, rule in enumerate(rules):
         for i_row in range(2):
             ax = axarr[i_row, i_col]
@@ -425,14 +440,20 @@ if False:
     plt.savefig('figure/beta_weights_full.pdf', transparent=True)
     plt.show()
 
-if False:
+if True:
+    if analyze_threerules:
+        n_subplot = 4
+        regr_list = [Mod1, Mod2, Rule_mod1, Rule_mod2]
+    else:
+        n_subplot = 3
+        regr_list = [Mod1, Mod2, Rule]
     # Plot important comparisons
-    fig, axarr = plt.subplots(1, 4, sharex='col', sharey='row', figsize=(4,1))
+    fig, axarr = plt.subplots(1, n_subplot, sharex='col', sharey='row', figsize=(n_subplot*1,1))
     colors = sns.xkcd_palette(['grey', 'red', 'blue'])
     # colors = sns.xkcd_palette(['red'] * 3)
     fs = 6
     i = Choice
-    for k_j, j in enumerate([Mod1, Mod2, Rule_mod1, Rule_mod2]):
+    for k_j, j in enumerate(regr_list):
         ax = axarr[k_j]
         for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2], colors):
             ind = ind_specifics[rule]
