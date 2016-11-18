@@ -246,7 +246,11 @@ def psychometric_delaychoice(save_addon, **kwargs):
                               legtitle='Delay (ms)',rule=CHOICEDELAY_MOD1, **kwargs)
 
 def psychometric_choiceattend(save_addon, **kwargs):
-    print('Starting standard analysis of the CHOICEATTEND task...')
+    psychometric_choiceattend_(save_addon, CHOICEATTEND_MOD1, **kwargs)
+    psychometric_choiceattend_(save_addon, CHOICEATTEND_MOD2, **kwargs)
+
+def psychometric_choiceattend_(save_addon, rule, **kwargs):
+    print('Starting standard analysis of the {:s} task...'.format(rule_name[rule]))
     with Run(save_addon) as R:
 
         from task import get_dist
@@ -274,7 +278,7 @@ def psychometric_choiceattend(save_addon, **kwargs):
                   'tar2_mod2_strengths' : tar2_mod2_strengths,
                   'tar_time'    : 800}
 
-        task  = generate_onebatch(CHOICEATTEND_MOD1, R.config, 'psychometric', params=params)
+        task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
         y_loc_sample = R.f_y_loc_from_x(task.x)
         y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
 
@@ -288,10 +292,12 @@ def psychometric_choiceattend(save_addon, **kwargs):
         xdatas = [tar_str_range*(-1+2*np.arange(n_tar)/(n_tar-1))]*2
         ydatas = [prop1s.mean(axis=k) for k in [1,0]]
 
+        labels = ['Attend', 'Ignore'] if rule==CHOICEATTEND_MOD1 else ['Ignore', 'Attend']
+
         plot_psychometric_choice(xdatas, ydatas,
-                                  labels=['Attend', 'Ignore'],
+                                  labels=labels,
                                   colors=sns.color_palette("Set2",2),
-                                  legtitle='Modality',rule=CHOICEATTEND_MOD1, **kwargs)
+                                  legtitle='Modality',rule=rule, **kwargs)
 
 def psychometric_choiceattend_varytime(save_addon, **kwargs):
     print('Starting second analysis of the CHOICEATTEND task...')
@@ -495,7 +501,7 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     if 'savename_append' in kwargs:
         savename += kwargs['savename_append']
 
-    #plt.savefig(savename+'.pdf', transparent=True)
+    plt.savefig(savename+'.pdf', transparent=True)
     plt.show()
     return fits
 
