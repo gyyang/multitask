@@ -35,6 +35,11 @@ class Run(Session):
         config['dt']    = 1
         config['alpha'] = config['dt']/TAU
 
+        # TODO: Temporary measure
+        if 'sigma_rec' not in config:
+            print('Warning: sigma_rec not in config')
+            config['sigma_rec'] = 0.15
+
         # Network Parameters
         n_input, n_hidden, n_output = config['shape']
 
@@ -50,7 +55,7 @@ class Run(Session):
         h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
 
         # Recurrent activity
-        cell = LeakyRNNCell(n_hidden, config['alpha'])
+        cell = LeakyRNNCell(n_hidden, config['alpha'], sigma_rec=config['sigma_rec'])
         h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc),
                                     dtype=tf.float32, time_major=True) # time_major is important
 

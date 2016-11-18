@@ -39,6 +39,7 @@ def train(HDIM):
     config = {'h_type'      : 'leaky_rec',
               'alpha'       : 0.2, # \Delta t/tau
               'dt'          : 0.2*TAU,
+              'sigma_rec'   : 0.15,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
@@ -77,7 +78,7 @@ def train(HDIM):
     h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
 
     # Recurrent activity
-    cell = LeakyRNNCell(n_hidden, config['alpha'])
+    cell = LeakyRNNCell(n_hidden, config['alpha'], sigma_rec=config['sigma_rec'])
     h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc), dtype=tf.float32, time_major=True) # time_major is important
 
     # Output
