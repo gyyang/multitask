@@ -16,14 +16,16 @@ from task import *
 from run import Run
 
 ########################## Running the network ################################
-save_addon = 'tf_withrecnoise_500'
+save_addon = 'tf_attendonly_500'
 data_type = 'rule'
 
-rules = [GO, INHGO, DELAYGO,\
-    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
-    REMAP, INHREMAP, DELAYREMAP,\
-    DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+# rules = [GO, INHGO, DELAYGO,\
+#     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+#     CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+#     REMAP, INHREMAP, DELAYREMAP,\
+#     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+
+rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
 
 with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
     res = pickle.load(f)
@@ -39,7 +41,8 @@ h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
 ################################## Clustering ################################
 if data_type == 'rule':
-    n_cluster = 12
+    # n_cluster = 12
+    n_cluster = 3
 elif data_type == 'epoch':
     n_cluster = 15
 else:
@@ -84,16 +87,16 @@ labels          = labels[ind_sort]
 h_normvar_all   = h_normvar_all[ind_sort, :]
 ind_active      = ind_active[ind_sort]
 
-# Save results
-result = {'labels'          : labels,
-          'label_prefs'     : label_prefs,
-          'h_normvar_all'   : h_normvar_all,
-          'ind_active'      : ind_active,
-          'rules'           : rules,
-          'data_type'       : data_type}
-
-with open('data/clustering'+save_addon+'.pkl','wb') as f:
-    pickle.dump(result, f)
+# # Save results
+# result = {'labels'          : labels,
+#           'label_prefs'     : label_prefs,
+#           'h_normvar_all'   : h_normvar_all,
+#           'ind_active'      : ind_active,
+#           'rules'           : rules,
+#           'data_type'       : data_type}
+#
+# with open('data/clustering'+save_addon+'.pkl','wb') as f:
+#     pickle.dump(result, f)
 
 ######################### Plotting Variance ###################################
 # Plot Normalized Variance
