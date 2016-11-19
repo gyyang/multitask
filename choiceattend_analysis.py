@@ -21,7 +21,7 @@ from run import Run
 from network import get_perf
 from slowpoints import find_slowpoints
 
-def gen_taskparams(tar1_loc, n_tar, n_rep, tar_str_range):
+def gen_taskparams(tar1_loc, n_tar, n_rep):
     batch_size = n_rep * n_tar**2
     batch_shape = (n_rep, n_tar, n_tar)
     ind_rep, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
@@ -29,20 +29,17 @@ def gen_taskparams(tar1_loc, n_tar, n_rep, tar_str_range):
     tar1_locs = np.ones(batch_size)*tar1_loc
     tar2_locs = (tar1_locs+np.pi) % (2*np.pi)
 
-    tar1_mod1_cohs = -tar_str_range/2+tar_str_range*ind_tar_mod1/(n_tar-1)
-    tar1_mod2_cohs = -tar_str_range/2+tar_str_range*ind_tar_mod2/(n_tar-1)
-    tar1_mod1_strengths = 1 + tar1_mod1_cohs
-    tar2_mod1_strengths = 1 - tar1_mod1_cohs
-    tar1_mod2_strengths = 1 + tar1_mod2_cohs
-    tar2_mod2_strengths = 1 - tar1_mod2_cohs
+    tar_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.3
+    tar_mod1_cohs = np.array([tar_cohs[i] for i in ind_tar_mod1])
+    tar_mod2_cohs = np.array([tar_cohs[i] for i in ind_tar_mod2])
 
     params = {'tar1_locs' : tar1_locs,
               'tar2_locs' : tar2_locs,
-              'tar1_mod1_strengths' : tar1_mod1_strengths,
-              'tar2_mod1_strengths' : tar2_mod1_strengths,
-              'tar1_mod2_strengths' : tar1_mod2_strengths,
-              'tar2_mod2_strengths' : tar2_mod2_strengths,
-              'tar_time'    : 800}
+              'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+              'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+              'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
+              'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
+              'tar_time'    : 500}
               # If tar_time is long (~1600), we can reproduce the curving trajectories
     return params, batch_size
 
@@ -73,23 +70,23 @@ class ChoiceAttAnalysis(object):
         tar1_loc  = 0
 
 
-
         with Run(save_addon, sigma_rec=0) as R:
+        #with Run(save_addon) as R:
             self.config = R.config
             w_out  = R.w_out
             w_in   = R.w_in
             w_rec  = R.w_rec
 
-            tar_str_range = 0.2
-            params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=1, tar_str_range=tar_str_range)
+            params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=1)
 
             X = np.zeros((len(self.rules)*batch_size, len(self.regr_names))) # regressors
             trial_rules = np.zeros(len(self.rules)*batch_size)
             H = np.array([])
-            Perfs = np.array([])
+            Perfs = np.array([]) # Performance
+
             for i, rule in enumerate(self.rules):
                 print('Starting standard analysis of the '+rule_name[rule]+' task...')
-                task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=False)
+                task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=True)
                 # Only study target epoch
                 epoch = task.epochs['tar1']
                 h_sample = R.f_h(task.x)
@@ -111,7 +108,7 @@ class ChoiceAttAnalysis(object):
                 tar_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
                 tar_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
                 X[i*batch_size:(i+1)*batch_size, :3] = \
-                    np.array([y_choice, tar_mod1_cohs/tar_str_range, tar_mod2_cohs/tar_str_range]).T
+                    np.array([y_choice, tar_mod1_cohs/tar_mod1_cohs.max(), tar_mod2_cohs/tar_mod2_cohs.max()]).T
                 if self.setting['analyze_threerules']:
                     X[i*batch_size:(i+1)*batch_size, 3+i] = 1
                 else:
@@ -119,13 +116,16 @@ class ChoiceAttAnalysis(object):
                 trial_rules[i*batch_size:(i+1)*batch_size] = rule
 
         self.X = X
-        self.Perfs = Perfs
+        self.performances = Perfs
         self.trial_rules = trial_rules
+
+        # Get preferences (+1 if activity is higher for choice=+1)
+        self.preferences = (H[-1, X[:,0]==1, :].mean(axis=0) > H[-1, X[:,0]==-1, :].mean(axis=0))*2-1
 
         # Include only active units
         nt, nb, nh = H.shape # time, batch, hidden units
         h = H.reshape((-1, nh))
-        # noinspection PyUnboundLocalVariable
+
         if self.setting['analyze_allunits']:
             ind_active = range(nh)
         else:
@@ -146,53 +146,50 @@ class ChoiceAttAnalysis(object):
         h = h.reshape((nt, nb, h.shape[-1]))
         self.h = h
 
+        # Temporarily disabled
         # Load clustering results
         # Get task-specific units for Att1 and Att2
-        data_type = 'rule'
-        with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
-            res = pickle.load(f)
-        # Normalize by the total variance across tasks
-        res['h_normvar_all'] = (res['h_var_all'].T/np.sum(res['h_var_all'], axis=1)).T
-        res['ind_active'] = np.arange(nh) # temp
-        self.res = res
+        # data_type = 'rule'
+        # with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
+        #     res = pickle.load(f)
+        # # Normalize by the total variance across tasks
+        # res['h_normvar_all'] = (res['h_var_all'].T/np.sum(res['h_var_all'], axis=1)).T
+        # res['ind_active'] = ind_active # temp
+        # self.res = res
 
-        thre = 0.5 # threshold for variance ratio
-        thre = 0.8
-        ind_specifics = dict()
-        ind_specifics[-1] = range(self.h.shape[-1]) # The rest
-        for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
-            h_normvar_all = res['h_normvar_all'][:, res['keys'].index(rule)]
-            # Find indices and convert them
-            ind_tmp = np.where(h_normvar_all>thre)[0]
-            ind_tmp_active = res['ind_active'][ind_tmp]
-            ind_specifics[rule] = list()
-            for i in ind_tmp_active:
-                j = np.where(ind_active==i)[0]
-                if len(j) > 0:
-                    ind_specifics[rule].append(j[0])
-                    ind_specifics[-1].pop(ind_specifics[-1].index(j[0]))
+        # thre = 0.5 # threshold for variance ratio
+        # thre = 0.8
+        # ind_specifics = dict()
+        # ind_specifics[-1] = range(self.h.shape[-1]) # The rest
+        # for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
+        #     h_normvar_all = res['h_normvar_all'][:, res['keys'].index(rule)]
+        #     # Find indices and convert them
+        #     ind_tmp = np.where(h_normvar_all>thre)[0]
+        #     ind_tmp_active = res['ind_active'][ind_tmp]
+        #     ind_specifics[rule] = list()
+        #     for i in ind_tmp_active:
+        #         j = np.where(ind_active==i)[0]
+        #         if len(j) > 0:
+        #             ind_specifics[rule].append(j[0])
+        #             ind_specifics[-1].pop(ind_specifics[-1].index(j[0]))
 
 
 
         ################################### Regression ################################
         from sklearn import linear_model
-        # Create linear regression object
+        # Looping over units
+        # Although this is slower, it's still quite fast, and more flexible
+        coef_maxt = np.zeros((h.shape[2], X.shape[1])) # Units, Coefs
+        for i in range(h.shape[-1]):
+            Y = np.swapaxes(h[:,:,i], 0, 1)
+            regr = linear_model.LinearRegression() # Create linear regression object
+            regr.fit(X, Y)
+            coef = regr.coef_
+            ind = np.argmax(np.sum(coef**2,axis=1))
+            coef_maxt[i, :] = coef[ind,:]
 
-        # Train the model using the training sets
-        Y = np.swapaxes(h, 0, 1)
-        Y = Y.reshape((Y.shape[0], -1))
-        regr = linear_model.LinearRegression()
-        regr.fit(X, Y)
-        coef = regr.coef_
-        coef = coef.reshape((h.shape[0],h.shape[2],X.shape[1])) # Time, Units, Coefs
-        # Get coeff at time when norm is maximum
-        coef_maxt = np.zeros((h.shape[2],X.shape[1])) # Units, Coefs
-        for i in range(h.shape[2]):
-            ind = np.argmax(np.sum(coef[:,i,:]**2,axis=1))
-            coef_maxt[i, :] = coef[ind,i,:]
         # Orthogonalize
         q, r = np.linalg.qr(coef_maxt)
-
 
         self.q = q
         self.h_tran = np.dot(h, q) # Transform
@@ -277,9 +274,6 @@ class ChoiceAttAnalysis(object):
                 slow_points_trans.append(slow_points_tran)
             slow_points_trans = np.array(slow_points_trans)
             self.slow_points_trans_all[rule] = slow_points_trans
-
-
-
 
     def plot_statespace(self, plot_slowpoints=True):
         if plot_slowpoints:
@@ -515,6 +509,6 @@ class ChoiceAttAnalysis(object):
         plt.show()
 
 
-save_addon = 'tf_attendonly_500'
-caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False, analyze_allunits=False)
-caa.plot_statespace(plot_slowpoints=False)
+save_addon = 'tf_attendonly_150'
+caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False, analyze_allunits=True)
+# caa.plot_statespace(plot_slowpoints=False)
