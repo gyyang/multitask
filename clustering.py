@@ -16,7 +16,7 @@ from task import *
 from run import Run
 
 ########################## Running the network ################################
-save_addon = 'tf_withrecnoise_400'
+save_addon = 'tf_withrecnoise_500'
 data_type = 'rule'
 
 rules = [GO, INHGO, DELAYGO,\
@@ -25,65 +25,10 @@ rules = [GO, INHGO, DELAYGO,\
     REMAP, INHREMAP, DELAYREMAP,\
     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
 
-n_rules = len(rules)
-
-h_all_byrule  = OrderedDict()
-h_all_byepoch = OrderedDict()
-with Run(save_addon) as R:
-    config = R.config
-    for rule in rules:
-        task = generate_onebatch(rule=rule, config=config, mode='test')
-        h_all_byrule[rule] = R.f_h(task.x)
-        for e_name, e_time in task.epochs.iteritems():
-            if 'fix' not in e_name:
-                h_all_byepoch[(rule, e_name)] = h_all_byrule[rule][e_time[0]:e_time[1],:,:]
-
-w_in  = R.w_in # for later sorting
-w_out = R.w_out
-
-# Reorder h_all_byepoch by epoch-first
-keys = h_all_byepoch.keys()
-ind_key_sort = np.lexsort(zip(*keys))
-h_all_byepoch = OrderedDict([(keys[i], h_all_byepoch[keys[i]]) for i in ind_key_sort])
-
-nx, nh, ny = config['shape']
-n_ring = config['N_RING']
-
-if data_type == 'rule':
-    h_all = h_all_byrule
-    t_start = 500 # Important: Ignore the initial transition
-    n_cluster = 12
-elif data_type == 'epoch':
-    h_all = h_all_byepoch
-    t_start = None
-    n_cluster = 15
-else:
-    raise ValueError
-
-h_var_all = np.zeros((nh, len(h_all.keys())))
-for i, val in enumerate(h_all.values()):
-    # val is Time, Batch, Units
-    # Variance across time and stimulus
-    # h_var_all[:, i] = val[t_start:].reshape((-1, nh)).var(axis=0)
-    # Variance acros stimulus, then averaged across time
-    h_var_all[:, i] = val[t_start:].var(axis=1).mean(axis=0)
-
-# Plot total variance distribution
-fig = plt.figure(figsize=(1.5,1.2))
-ax = fig.add_axes([0.3,0.3,0.6,0.5])
-hist, bins_edge = np.histogram(np.log10(h_var_all.sum(axis=1)), bins=30)
-ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-       color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
-plt.xlabel(r'$log_{10}$ total variance', fontsize=7, labelpad=1)
-plt.ylabel('counts', fontsize=7)
-plt.locator_params(nbins=3)
-ax.tick_params(axis='both', which='major', labelsize=7)
-ax.spines["right"].set_visible(False)
-ax.spines["top"].set_visible(False)
-ax.xaxis.set_ticks_position('bottom')
-ax.yaxis.set_ticks_position('left')
-plt.savefig('figure/hist_totalvar.pdf', transparent=True)
-plt.show()
+with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
+    res = pickle.load(f)
+h_var_all = res['h_var_all']
+keys      = res['keys']
 
 # First only get active units. Total variance across tasks larger than 1e-3
 ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
@@ -93,6 +38,12 @@ h_var_all  = h_var_all[ind_active, :]
 h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
 ################################## Clustering ################################
+if data_type == 'rule':
+    n_cluster = 12
+elif data_type == 'epoch':
+    n_cluster = 15
+else:
+    raise ValueError
 # Clustering
 from sklearn.cluster import AgglomerativeClustering
 ac = AgglomerativeClustering(n_cluster, affinity='cosine', linkage='average')
@@ -110,6 +61,13 @@ for i, ind in enumerate(ind_label_sort):
 labels = labels2
 
 # Sort data by labels and by input connectivity
+with Run(save_addon, sigma_rec=0) as R:
+    w_in  = R.w_in # for later sorting
+    w_out = R.w_out
+    config = R.config
+nx, nh, ny = config['shape']
+n_ring = config['N_RING']
+
 sort_by = 'w_in'
 if sort_by == 'w_in':
     w_in = w_in[ind_active, :]
@@ -144,7 +102,7 @@ if data_type == 'rule':
     tick_names = [rule_name[r] for r in rules]
 elif data_type == 'epoch':
     figsize = (3.5,4.5)
-    tick_names = [rule_name[key[0]]+' '+key[1] for key in h_all.keys()]
+    tick_names = [rule_name[key[0]]+' '+key[1] for key in keys]
 else:
     raise ValueError
 
@@ -230,7 +188,8 @@ plot_infos = [(w_rec[ind,:][:,ind]     , [l               ,l          ,nh*l0    
               (w_in[ind,1:nr+1]        , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
               (w_in[ind,nr+1:2*nr+1]   , [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
               (w_in[ind,2*nr+1:]       , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
-              (w_out[:, ind]           , [l               ,l-(ny+6)*l0,nh*l0    ,ny*l0]),
+              (w_out[np.newaxis,0,ind] , [l               ,l-(4)*l0,nh*l0    ,1*l0]),
+              (w_out[1:, ind]          , [l               ,l-(ny+6)*l0,nh*l0    ,(ny-1)*l0]),
               (b_rec[ind, np.newaxis]  , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
               (b_out[:, np.newaxis]    , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
 
@@ -257,14 +216,3 @@ ax1.axis('off')
 ax2.axis('off')
 plt.savefig('figure/connectivity_by'+data_type+'.pdf', transparent=True)
 plt.show()
-
-
-
-#==============================================================================
-# with Run(save_addon) as R:
-#     config = R.config
-#     rule = DMCGO
-#     task = generate_onebatch(rule=rule, config=config, mode='test')
-#     h0 = R.f_h(task.x)
-#     y0 = R.f_y(h0)
-#==============================================================================
