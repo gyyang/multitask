@@ -466,7 +466,7 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 
         xdata = xdatas[i]
         ydata = ydatas[i]
-        (mu,sigma), _ = curve_fit(cdf_gaussian, xdata, ydata, bounds=([-0.5,0.01],[0.5,1]))
+        (mu,sigma), _ = curve_fit(cdf_gaussian, xdata, ydata, bounds=([-0.5,0.001],[0.5,10]))
         fits.append((mu,sigma))
         x_plot = np.linspace(xdata[0],xdata[-1],100)
         ax.plot(x_plot, cdf_gaussian(x_plot,mu,sigma), label=labels[i],
@@ -510,7 +510,7 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 # plot_finalperformance('tf_withrecnoise')
 
 # psychometric_choice('tf_withrecnoise_400')
-# psychometric_choiceattend('tf_withrecnoise_400')
+psychometric_choiceattend('tf_attendonly_500')
 # psychometric_choiceattend_varytime('tf_withrecnoise_400')
 # psychometric_choiceint('tf_withrecnoise_400')
 # psychometric_delaychoice('tf_withrecnoise_400')
