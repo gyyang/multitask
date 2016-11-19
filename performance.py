@@ -264,18 +264,16 @@ def psychometric_choiceattend_(save_addon, rule, **kwargs):
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-        tar_str_range = 0.25
-        tar1_mod1_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar_mod1/(n_tar-1)
-        tar2_mod1_strengths = 2 - tar1_mod1_strengths
-        tar1_mod2_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar_mod2/(n_tar-1)
-        tar2_mod2_strengths = 2 - tar1_mod2_strengths
+        tar_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.3
+        tar_mod1_cohs = np.array([tar_cohs[i] for i in ind_tar_mod1])
+        tar_mod2_cohs = np.array([tar_cohs[i] for i in ind_tar_mod2])
 
         params = {'tar1_locs' : tar1_locs,
                   'tar2_locs' : tar2_locs,
-                  'tar1_mod1_strengths' : tar1_mod1_strengths,
-                  'tar2_mod1_strengths' : tar2_mod1_strengths,
-                  'tar1_mod2_strengths' : tar1_mod2_strengths,
-                  'tar2_mod2_strengths' : tar2_mod2_strengths,
+                  'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+                  'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+                  'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
+                  'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
                   'tar_time'    : 800}
 
         task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
@@ -289,7 +287,7 @@ def psychometric_choiceattend_(save_addon, rule, **kwargs):
         choose2 = (get_dist(y_loc_sample - tar2_locs_) < 0.3*np.pi).sum(axis=0)
         prop1s = choose1/(choose1 + choose2)
 
-        xdatas = [tar_str_range*(-1+2*np.arange(n_tar)/(n_tar-1))]*2
+        xdatas = [tar_cohs]*2
         ydatas = [prop1s.mean(axis=k) for k in [1,0]]
 
         labels = ['Attend', 'Ignore'] if rule==CHOICEATTEND_MOD1 else ['Ignore', 'Attend']
@@ -510,7 +508,7 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 # plot_finalperformance('tf_withrecnoise')
 
 # psychometric_choice('tf_withrecnoise_400')
-psychometric_choiceattend('tf_attendonly_500')
+psychometric_choiceattend('tf_attendonly_200')
 # psychometric_choiceattend_varytime('tf_withrecnoise_400')
 # psychometric_choiceint('tf_withrecnoise_400')
 # psychometric_delaychoice('tf_withrecnoise_400')
