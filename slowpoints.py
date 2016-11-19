@@ -11,23 +11,26 @@ import tensorflow as tf
 from task import *
 from run import Run
 
-def find_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True):
+def find_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True, dtype='float64'):
     if find_fixedpoints:
         # Finding fixed points require less tolerange
         print('Findings fixed points...')
-        options = {'ftol':1e-20, 'gtol': 1e-9}
+        options = {'ftol':1e-10, 'gtol': 1e-10} # for L-BFGS-B
+        # options = {'ftol':1e-7, 'gtol': 1e-7} # for L-BFGS-B
+        # options = {'xtol': 1e-10}
     else:
         # Finding slow points allow more tolerange
         print('Findings slow points...')
-        options = {'ftol':1e-3, 'gtol': 1e-3}
+        options = {'ftol':1e-4, 'gtol': 1e-4} # for L-BFGS-B
+        # options = {'xtol': 1e-5}
     with Run(save_addon) as R:
-        w_rec = R.w_rec.astype('float64')
-        w_in  = R.w_in.astype('float64')
-        b_rec = R.b_rec.astype('float64')
+        w_rec = R.w_rec.astype(dtype)
+        w_in  = R.w_in.astype(dtype)
+        b_rec = R.b_rec.astype(dtype)
 
     nh = len(b_rec)
     # Add constant input to baseline
-    input = input.astype('float64')
+    input = input.astype(dtype)
     b_rec = b_rec + np.dot(w_in, input)
 
     def dgdx(x):
@@ -46,8 +49,8 @@ def find_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True)
 
     res_list = list()
     for start_point in start_points:
-        start_point = start_point.astype('float64')
-        # res = minimize(g, x0, method='Newton-CG', jac=dgdx, options={'xtol': 1e-7})
+        start_point = start_point.astype(dtype)
+        # res = minimize(g, start_point, method='Newton-CG', jac=dgdx, options=options)
         res = minimize(g, start_point, method='L-BFGS-B', jac=dgdx,
                        bounds=[(0,100)]*nh, options=options)
         # ftol may be important for how slow points are

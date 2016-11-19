@@ -19,7 +19,7 @@ import seaborn.apionly as sns # If you don't have this, then some colormaps won'
 from task import *
 from run import Run
 from network import get_perf
-# from slowpoints import find_slowpoints
+from slowpoints import find_slowpoints
 
 
 save_addon = 'tf_withrecnoise_500'
@@ -116,6 +116,7 @@ with Run(save_addon, sigma_rec=None) as R:
 # Include only active units
 nt, nb, nh = H.shape
 h = H.reshape((-1, nh))
+# noinspection PyUnboundLocalVariable
 if analyze_allunits:
     ind_active = range(nh)
 else:
@@ -180,54 +181,6 @@ h_tran = np.dot(h, q) # Transform
 
 
 ####################### Find Fixed & Slow Points ##############################
-def find_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True, dtype='float64'):
-    if find_fixedpoints:
-        # Finding fixed points require less tolerange
-        print('Findings fixed points...')
-        options = {'ftol':1e-10, 'gtol': 1e-10} # for L-BFGS-B
-        # options = {'ftol':1e-7, 'gtol': 1e-7} # for L-BFGS-B
-        # options = {'xtol': 1e-10}
-    else:
-        # Finding slow points allow more tolerange
-        print('Findings slow points...')
-        options = {'ftol':1e-4, 'gtol': 1e-4} # for L-BFGS-B
-        # options = {'xtol': 1e-5}
-    with Run(save_addon) as R:
-        w_rec = R.w_rec.astype(dtype)
-        w_in  = R.w_in.astype(dtype)
-        b_rec = R.b_rec.astype(dtype)
-
-    nh = len(b_rec)
-    # Add constant input to baseline
-    input = input.astype(dtype)
-    b_rec = b_rec + np.dot(w_in, input)
-
-    def dgdx(x):
-        expy = np.exp(np.dot(w_rec, x) + b_rec)
-        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
-        dfdx = 1/(1+1/expy)
-        return (-F + np.dot(w_rec.T, F*dfdx))
-
-    def g(x):
-        expy = np.exp(np.dot(w_rec, x) + b_rec)
-        F = -x + np.log(1.+expy) # Assume standard softplus nonlinearity
-        return np.sum(F**2)/2
-
-    if start_points is None:
-        start_points = [np.ones(nh)]
-
-    res_list = list()
-    for start_point in start_points:
-        start_point = start_point.astype(dtype)
-        # res = minimize(g, start_point, method='Newton-CG', jac=dgdx, options=options)
-        res = minimize(g, start_point, method='L-BFGS-B', jac=dgdx,
-                       bounds=[(0,100)]*nh, options=options)
-        # ftol may be important for how slow points are
-        # If I pick gtol=1e-7, ftol=1e-20. Then regardless of starting points
-        # I find only one fixed point, which depends on the input to the network
-        res_list.append(res)
-    return res_list
-
 if False:
     # Find Fixed points
     # Choosing starting points
