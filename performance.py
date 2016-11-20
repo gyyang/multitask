@@ -16,6 +16,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
 from task import *
+from network import get_perf
 from run import Run
 
 color_rules = np.array([
@@ -24,6 +25,8 @@ color_rules = np.array([
             [157,204,0],[194,0,136],[0,51,128],[255,164,5],[255,168,187],[66,102,0],
             [255,0,16],[94,241,242],[0,153,143],[224,255,102],[116,10,255],
             [153,0,0],[255,255,128],[255,255,0],[255,80,5]])/255.
+
+fast_eval = True
 
 def plot_trainingprogress(save_addon, rule_plot=None, save=True):
     # Plot Training Progress
@@ -251,20 +254,26 @@ def psychometric_choiceattend(save_addon, **kwargs):
 
 def psychometric_choiceattend_(save_addon, rule, **kwargs):
     print('Starting standard analysis of the {:s} task...'.format(rule_name[rule]))
-    with Run(save_addon) as R:
+    with Run(save_addon, fast_eval=fast_eval) as R:
 
         from task import get_dist
 
+        # tar_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.5
+        tar_cohs = np.array([-0.5, -0.3, -0.1, 0.1, 0.3, 0.5])*0.5
+
         n_tar_loc = 12 # increase repeat by increasing this
-        n_tar = 7
+        n_tar = len(tar_cohs)
         batch_size = n_tar_loc * n_tar**2
         batch_shape = (n_tar_loc,n_tar,n_tar)
         ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
 
-        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
+        # tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        # tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-        tar_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.3
+        tar1_locs = np.ones(len(ind_tar_loc)) * np.pi/2
+        tar2_locs = (tar1_locs + np.pi) % (2*np.pi)
+
+
         tar_mod1_cohs = np.array([tar_cohs[i] for i in ind_tar_mod1])
         tar_mod2_cohs = np.array([tar_cohs[i] for i in ind_tar_mod2])
 
@@ -277,17 +286,21 @@ def psychometric_choiceattend_(save_addon, rule, **kwargs):
                   'tar_time'    : 800}
 
         task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
-        y_loc_sample = R.f_y_loc_from_x(task.x)
-        y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
+        y_sample = R.f_y_from_x(task.x)
+        y_sample_loc = R.f_y_loc(y_sample)
+        perf = get_perf(y_sample, task.y_loc)
+        print('Performance {:0.3f}'.format(np.mean(perf)))
+
 
         tar1_locs_ = np.reshape(tar1_locs, batch_shape)
         tar2_locs_ = np.reshape(tar2_locs, batch_shape)
 
-        choose1 = (get_dist(y_loc_sample - tar1_locs_) < 0.3*np.pi).sum(axis=0)
-        choose2 = (get_dist(y_loc_sample - tar2_locs_) < 0.3*np.pi).sum(axis=0)
+        y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
+        choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
+        choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
         prop1s = choose1/(choose1 + choose2)
 
-        xdatas = [tar_cohs]*2
+        xdatas = [tar_cohs*2]*2
         ydatas = [prop1s.mean(axis=k) for k in [1,0]]
 
         labels = ['Attend', 'Ignore'] if rule==CHOICEATTEND_MOD1 else ['Ignore', 'Attend']
@@ -464,12 +477,16 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 
         xdata = xdatas[i]
         ydata = ydatas[i]
-        (mu,sigma), _ = curve_fit(cdf_gaussian, xdata, ydata, bounds=([-0.5,0.001],[0.5,10]))
-        fits.append((mu,sigma))
-        x_plot = np.linspace(xdata[0],xdata[-1],100)
-        ax.plot(x_plot, cdf_gaussian(x_plot,mu,sigma), label=labels[i],
-                linewidth=1, color=colors[i])
         ax.plot(xdata, ydata, 'o', markersize=3.5, color=colors[i])
+
+        try:
+            x_plot = np.linspace(xdata[0],xdata[-1],100)
+            (mu,sigma), _ = curve_fit(cdf_gaussian, xdata, ydata, bounds=([-0.5,0.001],[0.5,10]))
+            fits.append((mu,sigma))
+            ax.plot(x_plot, cdf_gaussian(x_plot,mu,sigma), label=labels[i],
+                    linewidth=1, color=colors[i])
+        except:
+            pass
 
     plt.xlabel('Target 1 - Target 2',fontsize=7)
     plt.ylim([-0.05,1.05])
@@ -504,13 +521,12 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     return fits
 
 
-# plot_trainingprogress('tf_withrecnoise_400')
+# plot_trainingprogress('tf_attendonly_500')
 # plot_finalperformance('tf_withrecnoise')
 
 # psychometric_choice('tf_withrecnoise_400')
-psychometric_choiceattend('tf_attendonly_200')
+psychometric_choiceattend('tf_attendonly_500')
 # psychometric_choiceattend_varytime('tf_withrecnoise_400')
 # psychometric_choiceint('tf_withrecnoise_400')
 # psychometric_delaychoice('tf_withrecnoise_400')
-
 

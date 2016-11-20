@@ -17,7 +17,7 @@ from task import *
 from network import LeakyRNNCell, popvec
 
 class Run(Session):
-    def __init__(self, save_addon, sigma_rec=None, lesion_units=None):
+    def __init__(self, save_addon, sigma_rec=None, lesion_units=None, fast_eval=False):
         '''
         save_addon: add on for loading and saving
         inh_id    : Ids of units to inhibit inputs or outputs
@@ -33,6 +33,10 @@ class Run(Session):
         with open('data/config'+save_addon+'.pkl','rb') as f:
             config = pickle.load(f)
         config['dt']    = 1
+        if fast_eval:
+            config['dt']    = 10
+            print('Currently using fast evaluation')
+
         config['alpha'] = config['dt']/TAU
 
         if sigma_rec is not None:
