@@ -69,7 +69,7 @@ class ChoiceAttAnalysis(object):
             # Regressors
             self.regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
 
-        tar1_loc  = np.pi/2
+        tar1_loc  = 0
 
 
         with Run(save_addon, sigma_rec=0, fast_eval=self.setting['fast_eval']) as R:
@@ -79,7 +79,7 @@ class ChoiceAttAnalysis(object):
             w_in   = R.w_in
             w_rec  = R.w_rec
 
-            params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=5)
+            params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=1)
             self.params = params
 
             X = np.zeros((len(self.rules)*batch_size, len(self.regr_names))) # regressors
@@ -137,10 +137,6 @@ class ChoiceAttAnalysis(object):
                             H[:, X[:,0]==-1, :].mean(axis=(0,1)))*2-1
         # self.preferences = (H[-1, X[:,0]== 1, :].mean(axis=0) >
         #                     H[-1, X[:,0]==-1, :].mean(axis=0))*2-1
-
-        self.h1_ = H[:, X[:,0]== 1, :]
-        self.h1 = H[:, X[:,0]== 1, :].reshape((-1, H.shape[-1]))
-        self.h2 = H[:, X[:,0]==-1, :].reshape((-1, H.shape[-1]))
 
         # Include only active units
         nt, nb, nh = H.shape # time, batch, hidden units
@@ -203,9 +199,8 @@ class ChoiceAttAnalysis(object):
         coef_maxt = np.zeros((h.shape[2], X.shape[1])) # Units, Coefs
         for i in range(h.shape[-1]):
             # For each unit, relabel choice, mod 1,2 such that preferred choice is 1
-            Xi = X[:]
-
-            # Xi[:, :3] = Xi[:, :3]*self.preferences[i]
+            Xi = X.copy() # slicing method doesn't work for numpy array
+            Xi[:, :3] = Xi[:, :3]*self.preferences[i]
 
             # Xi = X[:,0,np.newaxis]
             # Xi = Xi*self.preferences[i]
@@ -320,7 +315,7 @@ class ChoiceAttAnalysis(object):
         plot_onlycorrect = True # Only plotting correct trials
         fs = 6
 
-        Perfs = self.Perfs.astype(bool)
+        Perfs = self.performances.astype(bool)
 
         colors1 = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
         colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
@@ -457,7 +452,7 @@ class ChoiceAttAnalysis(object):
             n_regr = 3
 
         # Plot important comparisons
-        fig, axarr = plt.subplots(1, n_regr, sharex='col', sharey='row', figsize=(n_regr*1,1))
+        fig, axarr = plt.subplots(1, n_regr, sharex='col', sharey='row', figsize=(n_regr*2,2))
         colors = sns.xkcd_palette(['grey', 'red', 'blue'])
         # colors = sns.xkcd_palette(['red'] * 3)
         fs = 6
@@ -471,20 +466,32 @@ class ChoiceAttAnalysis(object):
 
             ax.plot(coef_[:,j], coef_[:, i], 'o', color='black', ms=1.5, mec='white', mew=0.2)
 
-            ax.axis('off')
+            # ax.axis('off')
 
-            med_x = np.median(coef_[:,j])
-            ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
-            bot_y = np.min(coef_[:,i])
-            ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
-            ax.text(med_x, bot_y, self.regr_names[j], fontsize=fs, va='top', ha='center')
+            # med_x = np.median(coef_[:,j])
+            # ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
+            # bot_y = np.min(coef_[:,i])
+            # ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
+            # ax.text(med_x, bot_y, self.regr_names[j], fontsize=fs, va='top', ha='center')
 
-            if j == 0:
-                med_y = np.median(coef_[:,i])
-                ran_y = (np.max(coef_[:,i]) - np.min(coef_[:,i]))/5
-                left_x = np.min(coef_[:,j])
-                ax.plot([left_x, left_x], [med_y-ran_y, med_y+ran_y], color='black', lw=1.0)
-                ax.text(left_x, med_y, self.regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
+            # if j == 0:
+            #     med_y = np.median(coef_[:,i])
+            #     ran_y = (np.max(coef_[:,i]) - np.min(coef_[:,i]))/5
+            #     left_x = np.min(coef_[:,j])
+            #     ax.plot([left_x, left_x], [med_y-ran_y, med_y+ran_y], color='black', lw=1.0)
+            #     ax.text(left_x, med_y, self.regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
+            ax.set_xlabel(self.regr_names[j], fontsize=fs)
+            if j == 1:
+                ax.set_ylabel(self.regr_names[i], fontsize=fs)
+
+            ax.tick_params(axis='both', which='major', labelsize=6)
+            ax.locator_params(nbins=2)
+            ax.spines["right"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+
+        plt.tight_layout()
 
         plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
         plt.show()
@@ -548,8 +555,8 @@ class ChoiceAttAnalysis(object):
         plt.show()
 
 
-save_addon = 'tf_attendonly_500'
+save_addon = 'tf_withrecnoise_500'
 caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False,
                         analyze_allunits=False, fast_eval=True)
 caa.plot_betaweights()
-
+caa.plot_statespace(plot_slowpoints=False)
