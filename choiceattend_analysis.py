@@ -29,7 +29,8 @@ def gen_taskparams(tar1_loc, n_tar, n_rep):
     tar1_locs = np.ones(batch_size)*tar1_loc
     tar2_locs = (tar1_locs+np.pi) % (2*np.pi)
 
-    tar_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.3
+    # tar_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.3
+    tar_cohs = np.array([-0.5, -0.3, -0.1, 0.1, 0.3, 0.5])*0.5
     tar_mod1_cohs = np.array([tar_cohs[i] for i in ind_tar_mod1])
     tar_mod2_cohs = np.array([tar_cohs[i] for i in ind_tar_mod2])
 
@@ -39,7 +40,7 @@ def gen_taskparams(tar1_loc, n_tar, n_rep):
               'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
               'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
               'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-              'tar_time'    : 500}
+              'tar_time'    : 1000}
               # If tar_time is long (~1600), we can reproduce the curving trajectories
     return params, batch_size
 
@@ -49,7 +50,8 @@ class ChoiceAttAnalysis(object):
             'save_addon'         : save_addon,
             'analyze_threerules' : False,
             'analyze_allunits'   : False,
-            'z_score'            : True}
+            'z_score'            : True,
+            'fast_eval'          : False}
 
         self.setting = default_setting
         for key, val in kwargs.iteritems():
@@ -67,17 +69,18 @@ class ChoiceAttAnalysis(object):
             # Regressors
             self.regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
 
-        tar1_loc  = 0
+        tar1_loc  = np.pi/2
 
 
-        with Run(save_addon, sigma_rec=0) as R:
-        #with Run(save_addon) as R:
+        with Run(save_addon, sigma_rec=0, fast_eval=self.setting['fast_eval']) as R:
+        # with Run(save_addon) as R:
             self.config = R.config
             w_out  = R.w_out
             w_in   = R.w_in
             w_rec  = R.w_rec
 
-            params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=1)
+            params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=5)
+            self.params = params
 
             X = np.zeros((len(self.rules)*batch_size, len(self.regr_names))) # regressors
             trial_rules = np.zeros(len(self.rules)*batch_size)
@@ -92,12 +95,22 @@ class ChoiceAttAnalysis(object):
                 h_sample = R.f_h(task.x)
                 y_sample = R.f_y(h_sample)
                 y_sample_loc = R.f_y_loc(y_sample)
+                # y_sample_loc = task.y_loc
 
                 perfs = get_perf(y_sample, task.y_loc)
                 # y_choice is 1 for choosing tar1_loc, otherwise -1
                 y_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
 
-                h_sample = h_sample[epoch[0]:epoch[1],...][::50,...] # every 50 ms
+                # Not the real problem
+                # y_choice1 = (get_dist(y_sample_loc[-1] - tar1_loc) < 0.3*np.pi)
+                # y_choice2 = (get_dist(y_sample_loc[-1] - (tar1_loc+np.pi)) < 0.3*np.pi)
+                # y_choice = np.zeros(batch_size)
+                # y_choice[y_choice1] = +1
+                # y_choice[y_choice2] = -1
+
+                every_t = int(50/self.config['dt'])
+
+                h_sample = h_sample[epoch[0]:epoch[1],...][::every_t,...] # every 50 ms
                 if i == 0:
                     H = h_sample
                     Perfs = perfs
@@ -112,7 +125,7 @@ class ChoiceAttAnalysis(object):
                 if self.setting['analyze_threerules']:
                     X[i*batch_size:(i+1)*batch_size, 3+i] = 1
                 else:
-                    X[i*batch_size:(i+1)*batch_size, 3] = i*2-1
+                    X[i*batch_size:(i+1)*batch_size, 3] = 1-i*2
                 trial_rules[i*batch_size:(i+1)*batch_size] = rule
 
         self.X = X
@@ -120,7 +133,14 @@ class ChoiceAttAnalysis(object):
         self.trial_rules = trial_rules
 
         # Get preferences (+1 if activity is higher for choice=+1)
-        self.preferences = (H[-1, X[:,0]==1, :].mean(axis=0) > H[-1, X[:,0]==-1, :].mean(axis=0))*2-1
+        self.preferences = (H[:, X[:,0]== 1, :].mean(axis=(0,1)) >
+                            H[:, X[:,0]==-1, :].mean(axis=(0,1)))*2-1
+        # self.preferences = (H[-1, X[:,0]== 1, :].mean(axis=0) >
+        #                     H[-1, X[:,0]==-1, :].mean(axis=0))*2-1
+
+        self.h1_ = H[:, X[:,0]== 1, :]
+        self.h1 = H[:, X[:,0]== 1, :].reshape((-1, H.shape[-1]))
+        self.h2 = H[:, X[:,0]==-1, :].reshape((-1, H.shape[-1]))
 
         # Include only active units
         nt, nb, nh = H.shape # time, batch, hidden units
@@ -131,6 +151,7 @@ class ChoiceAttAnalysis(object):
         else:
             ind_active = np.where(h.var(axis=0) > 1e-4)[0]
         h = h[:, ind_active]
+        self.preferences = self.preferences[ind_active]
 
         w_in  = w_in[ind_active, :]
         w_rec = w_rec[ind_active, :][:, ind_active]
@@ -181,12 +202,24 @@ class ChoiceAttAnalysis(object):
         # Although this is slower, it's still quite fast, and more flexible
         coef_maxt = np.zeros((h.shape[2], X.shape[1])) # Units, Coefs
         for i in range(h.shape[-1]):
+            # For each unit, relabel choice, mod 1,2 such that preferred choice is 1
+            Xi = X[:]
+
+            # Xi[:, :3] = Xi[:, :3]*self.preferences[i]
+
+            # Xi = X[:,0,np.newaxis]
+            # Xi = Xi*self.preferences[i]
+
             Y = np.swapaxes(h[:,:,i], 0, 1)
             regr = linear_model.LinearRegression() # Create linear regression object
-            regr.fit(X, Y)
+            regr.fit(Xi, Y)
+
             coef = regr.coef_
             ind = np.argmax(np.sum(coef**2,axis=1))
             coef_maxt[i, :] = coef[ind,:]
+            # coef_maxt[i, :] = coef[-1,:]
+
+        self.coef_maxt = coef_maxt
 
         # Orthogonalize
         q, r = np.linalg.qr(coef_maxt)
@@ -388,65 +421,71 @@ class ChoiceAttAnalysis(object):
         ############################## Plot beta weights ##############################
         # Plot beta weights
         # coef_ = coef.reshape((-1, 6))
-        coef_ = coef_maxt
-        # Plot all comparisons
-        fig, axarr = plt.subplots(6, 6, sharex='col', sharey='row', figsize=(4,4))
-        colors = sns.xkcd_palette(['grey', 'red', 'blue'])
-        # colors = sns.xkcd_palette(['red'] * 3)
-        fs = 6
-        for i in range(6):
-            for j in range(6):
-                ax = axarr[i, j]
-                for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2], colors):
-                    ind = ind_specifics[rule]
-                    ax.plot(coef_[ind,j], coef_[ind, i], 'o', color=c, ms=1, mec='white', mew=0.15)
-                ax.axis('off')
-                if i == 5:
-                    med_x = np.median(coef_[:,j])
-                    ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
-                    bot_y = np.min(coef_[:,i])
-                    ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
-                    ax.text(med_x, bot_y, regr_names[j], fontsize=fs, va='top', ha='center')
-                if j == 0:
-                    med_y = np.median(coef_[:,i])
-                    ran_y = (np.max(coef_[:,i]) - np.min(coef_[:,i]))/5
-                    left_x = np.min(coef_[:,j])
-                    ax.plot([left_x, left_x], [med_y-ran_y, med_y+ran_y], color='black', lw=1.0)
-                    ax.text(left_x, med_y, regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
-        plt.savefig('figure/beta_weights_full.pdf', transparent=True)
-        plt.show()
+        coef_ = self.coef_maxt
 
-        if analyze_threerules:
-            n_subplot = 4
-            regr_list = [Mod1, Mod2, Rule_mod1, Rule_mod2]
+
+        # # Plot all comparisons
+        # fig, axarr = plt.subplots(6, 6, sharex='col', sharey='row', figsize=(4,4))
+        # colors = sns.xkcd_palette(['grey', 'red', 'blue'])
+        # # colors = sns.xkcd_palette(['red'] * 3)
+        # fs = 6
+        # for i in range(6):
+        #     for j in range(6):
+        #         ax = axarr[i, j]
+        #         for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2], colors):
+        #             ind = ind_specifics[rule]
+        #             ax.plot(coef_[ind,j], coef_[ind, i], 'o', color=c, ms=1, mec='white', mew=0.15)
+        #         ax.axis('off')
+        #         if i == 5:
+        #             med_x = np.median(coef_[:,j])
+        #             ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
+        #             bot_y = np.min(coef_[:,i])
+        #             ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
+        #             ax.text(med_x, bot_y, regr_names[j], fontsize=fs, va='top', ha='center')
+        #         if j == 0:
+        #             med_y = np.median(coef_[:,i])
+        #             ran_y = (np.max(coef_[:,i]) - np.min(coef_[:,i]))/5
+        #             left_x = np.min(coef_[:,j])
+        #             ax.plot([left_x, left_x], [med_y-ran_y, med_y+ran_y], color='black', lw=1.0)
+        #             ax.text(left_x, med_y, regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
+        # plt.savefig('figure/beta_weights_full.pdf', transparent=True)
+        # plt.show()
+
+        if self.setting['analyze_threerules']:
+            n_regr = 4
         else:
-            n_subplot = 3
-            regr_list = [Mod1, Mod2, Rule]
+            n_regr = 3
+
         # Plot important comparisons
-        fig, axarr = plt.subplots(1, n_subplot, sharex='col', sharey='row', figsize=(n_subplot*1,1))
+        fig, axarr = plt.subplots(1, n_regr, sharex='col', sharey='row', figsize=(n_regr*1,1))
         colors = sns.xkcd_palette(['grey', 'red', 'blue'])
         # colors = sns.xkcd_palette(['red'] * 3)
         fs = 6
-        i = Choice
-        for k_j, j in enumerate(regr_list):
-            ax = axarr[k_j]
-            for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2], colors):
-                ind = ind_specifics[rule]
-                ax.plot(coef_[ind,j], coef_[ind, i], 'o', color=c, ms=1.5, mec='white', mew=0.2)
+        i = 0
+        for j in range(1, 1+n_regr):
+            ax = axarr[j-1]
+
+            # for rule, c in zip([-1, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2], colors):
+            #     ind = ind_specifics[rule]
+            #     ax.plot(coef_[ind,j], coef_[ind, i], 'o', color=c, ms=1.5, mec='white', mew=0.2)
+
+            ax.plot(coef_[:,j], coef_[:, i], 'o', color='black', ms=1.5, mec='white', mew=0.2)
+
             ax.axis('off')
 
             med_x = np.median(coef_[:,j])
             ran_x = (np.max(coef_[:,j]) - np.min(coef_[:,j]))/5
             bot_y = np.min(coef_[:,i])
             ax.plot([med_x-ran_x, med_x+ran_x], [bot_y, bot_y], color='black', lw=1.0)
-            ax.text(med_x, bot_y, regr_names[j], fontsize=fs, va='top', ha='center')
+            ax.text(med_x, bot_y, self.regr_names[j], fontsize=fs, va='top', ha='center')
 
-            if k_j == 0:
+            if j == 0:
                 med_y = np.median(coef_[:,i])
                 ran_y = (np.max(coef_[:,i]) - np.min(coef_[:,i]))/5
                 left_x = np.min(coef_[:,j])
                 ax.plot([left_x, left_x], [med_y-ran_y, med_y+ran_y], color='black', lw=1.0)
-                ax.text(left_x, med_y, regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
+                ax.text(left_x, med_y, self.regr_names[i], fontsize=fs, rotation=90, ha='right', va='center')
+
         plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
         plt.show()
 
@@ -509,6 +548,8 @@ class ChoiceAttAnalysis(object):
         plt.show()
 
 
-save_addon = 'tf_attendonly_150'
-caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False, analyze_allunits=True)
-# caa.plot_statespace(plot_slowpoints=False)
+save_addon = 'tf_attendonly_500'
+caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False,
+                        analyze_allunits=False, fast_eval=True)
+caa.plot_betaweights()
+
