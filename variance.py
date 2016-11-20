@@ -89,7 +89,7 @@ def plot_variance(save_addon, data_type):
 
 if __name__ == '__main__':
     # save_addon = 'tf_withrecnoise_500'
-    save_addon = 'tf_attendonly_500'
+    save_addon = 'tf_attendonly_150'
     data_type = 'rule'
 
     # rules = [GO, INHGO, DELAYGO,\

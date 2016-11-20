@@ -17,7 +17,7 @@ from task import *
 from network import LeakyRNNCell, popvec
 
 class Run(Session):
-    def __init__(self, save_addon, lesion_units=None):
+    def __init__(self, save_addon, sigma_rec=None, lesion_units=None):
         '''
         save_addon: add on for loading and saving
         inh_id    : Ids of units to inhibit inputs or outputs
@@ -35,10 +35,9 @@ class Run(Session):
         config['dt']    = 1
         config['alpha'] = config['dt']/TAU
 
-        # TODO: Temporary measure
-        if 'sigma_rec' not in config:
-            print('Warning: sigma_rec not in config')
-            config['sigma_rec'] = 0.15
+        if sigma_rec is not None:
+            print('Overwrite original sigma_rec with {:0.3f}'.format(sigma_rec))
+            config['sigma_rec'] = sigma_rec
 
         # Network Parameters
         n_input, n_hidden, n_output = config['shape']
@@ -375,6 +374,6 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
 
 
 if __name__ == "__main__":
-    sample_plot(save_addon='tf_latest_400', rule=CHOICEATTEND_MOD1)
+    sample_plot(save_addon='tf_withrecnoise_400', rule=CHOICEATTEND_MOD1)
     pass
 
