@@ -40,7 +40,7 @@ def gen_taskparams(tar1_loc, n_tar, n_rep):
               'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
               'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
               'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-              'tar_time'    : 1000}
+              'tar_time'    : 1600}
               # If tar_time is long (~1600), we can reproduce the curving trajectories
     return params, batch_size
 
@@ -50,6 +50,7 @@ class ChoiceAttAnalysis(object):
             'save_addon'         : save_addon,
             'analyze_threerules' : False,
             'analyze_allunits'   : False,
+            'redefine_choice'    : True,
             'z_score'            : True,
             'fast_eval'          : False}
 
@@ -95,18 +96,10 @@ class ChoiceAttAnalysis(object):
                 h_sample = R.f_h(task.x)
                 y_sample = R.f_y(h_sample)
                 y_sample_loc = R.f_y_loc(y_sample)
-                # y_sample_loc = task.y_loc
 
                 perfs = get_perf(y_sample, task.y_loc)
                 # y_choice is 1 for choosing tar1_loc, otherwise -1
                 y_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
-
-                # Not the real problem
-                # y_choice1 = (get_dist(y_sample_loc[-1] - tar1_loc) < 0.3*np.pi)
-                # y_choice2 = (get_dist(y_sample_loc[-1] - (tar1_loc+np.pi)) < 0.3*np.pi)
-                # y_choice = np.zeros(batch_size)
-                # y_choice[y_choice1] = +1
-                # y_choice[y_choice2] = -1
 
                 every_t = int(50/self.config['dt'])
 
@@ -129,14 +122,13 @@ class ChoiceAttAnalysis(object):
                 trial_rules[i*batch_size:(i+1)*batch_size] = rule
 
         self.X = X
+        self.H = H
         self.performances = Perfs
         self.trial_rules = trial_rules
 
         # Get preferences (+1 if activity is higher for choice=+1)
-        self.preferences = (H[:, X[:,0]== 1, :].mean(axis=(0,1)) >
-                            H[:, X[:,0]==-1, :].mean(axis=(0,1)))*2-1
-        # self.preferences = (H[-1, X[:,0]== 1, :].mean(axis=0) >
-        #                     H[-1, X[:,0]==-1, :].mean(axis=0))*2-1
+        preferences = (H[:, X[:,0]== 1, :].mean(axis=(0,1)) >
+                       H[:, X[:,0]==-1, :].mean(axis=(0,1)))*2-1
 
         # Include only active units
         nt, nb, nh = H.shape # time, batch, hidden units
@@ -146,8 +138,10 @@ class ChoiceAttAnalysis(object):
             ind_active = range(nh)
         else:
             ind_active = np.where(h.var(axis=0) > 1e-4)[0]
+
+
         h = h[:, ind_active]
-        self.preferences = self.preferences[ind_active]
+        preferences = preferences[ind_active]
 
         w_in  = w_in[ind_active, :]
         w_rec = w_rec[ind_active, :][:, ind_active]
@@ -161,7 +155,7 @@ class ChoiceAttAnalysis(object):
             h = h/self.stdh
 
         h = h.reshape((nt, nb, h.shape[-1]))
-        self.h = h
+
 
         # Temporarily disabled
         # Load clustering results
@@ -200,10 +194,9 @@ class ChoiceAttAnalysis(object):
         for i in range(h.shape[-1]):
             # For each unit, relabel choice, mod 1,2 such that preferred choice is 1
             Xi = X.copy() # slicing method doesn't work for numpy array
-            Xi[:, :3] = Xi[:, :3]*self.preferences[i]
-
-            # Xi = X[:,0,np.newaxis]
-            # Xi = Xi*self.preferences[i]
+            if self.setting['redefine_choice']:
+                Xi[:, :3] = Xi[:, :3]*preferences[i]
+            # Notice this also has to be taken care of when plotting state-space
 
             Y = np.swapaxes(h[:,:,i], 0, 1)
             regr = linear_model.LinearRegression() # Create linear regression object
@@ -212,19 +205,22 @@ class ChoiceAttAnalysis(object):
             coef = regr.coef_
             ind = np.argmax(np.sum(coef**2,axis=1))
             coef_maxt[i, :] = coef[ind,:]
-            # coef_maxt[i, :] = coef[-1,:]
 
-        self.coef_maxt = coef_maxt
+
 
         # Orthogonalize
         q, r = np.linalg.qr(coef_maxt)
 
+        self.ind_active = ind_active
+        self.h = h
+        self.preferences = preferences
+        self.coef_maxt = coef_maxt
         self.q = q
         self.h_tran = np.dot(h, q) # Transform
 
     def find_slowpoints(self):
     ####################### Find Fixed & Slow Points ##############################
-        nt, nb, nh = self.config['shape']
+        nt, nb, nh = self.H.shape # time, batch, hidden units
         # Find Fixed points
         # Choosing starting points
         self.fixed_points_trans_all = dict()
@@ -236,9 +232,10 @@ class ChoiceAttAnalysis(object):
                       'tar2_mod1_strengths' : [1],
                       'tar1_mod2_strengths' : [1],
                       'tar2_mod2_strengths' : [1],
-                      'tar_time'    : 1600}
+                      'tar_time'    : 1000}
             print(rule_name[rule])
             task  = generate_onebatch(rule, self.config, 'psychometric', noise_on=False, params=params)
+            epoch = task.epochs['tar1']
 
             #tmp = np.array([h[-1, X[:,0]==ch, :].mean(axis=0) for ch in [1, -1]])
             tmp = list()
@@ -252,10 +249,11 @@ class ChoiceAttAnalysis(object):
                 tmp *= self.stdh
                 tmp += self.meanh
             start_points = np.zeros((tmp.shape[0], nh))
-            start_points[:, self.res['ind_active']] = tmp
+            print(start_points.shape)
+            start_points[:, self.ind_active] = tmp
 
             # Find fixed points
-            res_list = find_slowpoints(save_addon, task.x[1000,0,:],
+            res_list = find_slowpoints(save_addon, task.x[epoch[1]-1,0,:],
                                        start_points=start_points, find_fixedpoints=True)
             fixed_points_raws  = list()
             fixed_points_trans = list()
@@ -263,11 +261,11 @@ class ChoiceAttAnalysis(object):
                 print(res.success, res.message, res.fun)
                 fixed_points_raws.append(res.x)
                 # fixed_points = start_points[i,ind_active]
-                fixed_points = res.x[self.res['ind_active']]
+                fixed_points = res.x[self.ind_active]
                 if self.setting['z_score']:
                     fixed_points -= self.meanh
                     fixed_points /= self.stdh
-                fixed_points_tran = np.dot(fixed_points, q)
+                fixed_points_tran = np.dot(fixed_points, self.q)
                 fixed_points_trans.append(fixed_points_tran)
 
             fixed_points_raws  = np.array(fixed_points_raws)
@@ -287,14 +285,14 @@ class ChoiceAttAnalysis(object):
 
             # start_points = np.random.rand(100, nh)*3
 
-            res_list = find_slowpoints(save_addon, task.x[1000,0,:],
+            res_list = find_slowpoints(save_addon, task.x[epoch[1]-1,0,:],
                                        start_points=start_points, find_fixedpoints=False)
 
             slow_points_trans = list()
             for i, res in enumerate(res_list):
                 # print(res.fun)
                 # slow_points = start_points[i,ind_active]
-                slow_points = res.x[self.res['ind_active']]
+                slow_points = res.x[self.ind_active]
                 if self.setting['z_score']:
                     slow_points -= self.meanh
                     slow_points /= self.stdh
@@ -304,6 +302,7 @@ class ChoiceAttAnalysis(object):
             self.slow_points_trans_all[rule] = slow_points_trans
 
     def plot_statespace(self, plot_slowpoints=True):
+        # TODO: Need to take into account the flipping of choice labeling
         if plot_slowpoints:
             try:
                 _ = self.slow_points_trans_all
@@ -311,7 +310,6 @@ class ChoiceAttAnalysis(object):
                 self.find_slowpoints()
 
         ################ Pretty Plotting of State-space Results #######################
-        plot_eachcurve = False
         plot_onlycorrect = True # Only plotting correct trials
         fs = 6
 
@@ -327,24 +325,19 @@ class ChoiceAttAnalysis(object):
                 ch_list = [-1,1]
                 if i_row == 0:
                     pcs = [0, 1] # Choice, Mod1
-                    separate_by = 'tar1_mod1_strengths'
+                    sep_by = 1 # Separate by Mod 1
+                    colors = colors1
                     ax.set_title(rule_name[rule], fontsize=fs, y=0.8)
                 else:
                     pcs = [0, 2] # Choice, Mod1
-                    separate_by = 'tar1_mod2_strengths'
-                ax.set_ylim([self.h_tran[:,:,pcs[1]].min(),self.h_tran[:,:,pcs[1]].max()])
-                ax.set_xlim([self.h_tran[:,:,pcs[0]].min(),self.h_tran[:,:,pcs[0]].max()])
-
-                if separate_by == 'tar1_mod1_strengths':
-                    sep_by = 1
-                    colors = colors1
-                elif separate_by == 'tar1_mod2_strengths':
-                    sep_by = 2
+                    sep_by = 2 # Separate by Mod 2
                     colors = colors2
-                else:
-                    raise ValueError
 
+                # ax.set_ylim([self.h_tran[:,:,pcs[1]].min(),self.h_tran[:,:,pcs[1]].max()])
+                # ax.set_xlim([self.h_tran[:,:,pcs[0]].min(),self.h_tran[:,:,pcs[0]].max()])
                 ax.axis('off')
+
+
                 if i_col == 0:
                     anc = [self.h_tran[:,:,pcs[0]].min()+1, self.h_tran[:,:,pcs[1]].max()-5] # anchor point
                     ax.plot([anc[0], anc[0]], [anc[1]-5, anc[1]-1], color='black', lw=1.0)
@@ -352,28 +345,52 @@ class ChoiceAttAnalysis(object):
                     ax.text(anc[0], anc[1], self.regr_names[pcs[0]], fontsize=fs, va='bottom')
                     ax.text(anc[0], anc[1], self.regr_names[pcs[1]], fontsize=fs, rotation=90, ha='right', va='top')
 
+                # Loop over coherences of Mod 1 or 2
                 for i, s in enumerate(np.unique(self.X[:,sep_by])):
                     for ch in ch_list: # Choice
-                        if ch == -1:
-                            kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
-                        else:
+                        if ch == 1:
                             kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
-                        ind = (self.X[:,sep_by]==s)*(self.trial_rules==rule)*(self.X[:,0]==ch)
-                        if plot_onlycorrect:
-                            ind *= Perfs
-
-                        if not np.any(ind):
-                            continue
-
-                        h_plot = self.h_tran[:,ind,:]
-                        if plot_eachcurve:
-                            for j in range(h_plot.shape[1]):
-                                ax.plot(h_plot[:,j,pcs[0]], h_plot[:,j,pcs[1]],
-                                        '.-', markersize=2, color=colors[i])
                         else:
-                            h_plot = h_plot.mean(axis=1)
-                            ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
-                                    '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
+                            kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+
+                        if self.setting['redefine_choice']:
+                            h_plot = np.zeros((self.h.shape[0],self.h.shape[2])) # Time, Regress
+                            # If choices are redefined, then we need to get the
+                            # activity of units that prefer original tar1 and tar2 separately
+                            ind1 = (self.X[:,sep_by]== s)*(self.trial_rules==rule)*(self.X[:,0]== ch) # for batch
+                            if plot_onlycorrect:
+                                ind1 *= Perfs
+
+                            if np.any(ind1):
+                                # Average across these batches
+                                tmp = self.h[:,ind1,:].mean(axis=1)
+                                h_plot[:, self.preferences== 1] = tmp[:, self.preferences== 1]
+
+                            ind2 = (self.X[:,sep_by]==-s)*(self.trial_rules==rule)*(self.X[:,0]==-ch) # for batch
+                            if plot_onlycorrect:
+                                ind2 *= Perfs
+
+                            if np.any(ind2):
+                                tmp = self.h[:,ind2,:].mean(axis=1)
+                                h_plot[:, self.preferences==-1] = tmp[:, self.preferences==-1]
+
+                            if not (np.any(ind1) or np.any(ind2)):
+                                continue
+
+                        else:
+                            ind = (self.X[:,sep_by]==s)*(self.trial_rules==rule)*(self.X[:,0]==ch) # for batch
+                            if plot_onlycorrect:
+                                ind *= Perfs
+
+                            if not np.any(ind):
+                                continue
+
+                            h_plot = self.h[:,ind,:].mean(axis=1)
+
+                        h_plot = np.dot(h_plot, self.q) # Transform
+
+                        ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
+                                '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
 
                         if not plot_slowpoints:
                             continue
@@ -555,8 +572,8 @@ class ChoiceAttAnalysis(object):
         plt.show()
 
 
-save_addon = 'tf_withrecnoise_500'
+save_addon = 'tf_attendonly_500'
 caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False,
-                        analyze_allunits=False, fast_eval=True)
+                        analyze_allunits=False, fast_eval=True, redefine_choice=False)
 caa.plot_betaweights()
-caa.plot_statespace(plot_slowpoints=False)
+caa.plot_statespace(plot_slowpoints=True)
