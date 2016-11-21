@@ -149,6 +149,10 @@ def train(HDIM):
 
         print("Optimization Finished!")
 
+        from variance import compute_variance
+        compute_variance(config['save_addon'], 'rule', rules)
+        print('Computed variance')
+
 
 if __name__ == '__main__':
     train(HDIM=200)
