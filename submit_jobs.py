@@ -114,16 +114,17 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 # Submit a job
 #=========================================================================================
 
-nunits = range(5,501,5)[::-1]
+nunits = range(20,501,20)[::-1]
 for nunit in nunits:
-    jobname = 'job_{:d}'.format(nunit)
-    cmd     = 'python -u main.py -n {:d}'.format(nunit)
-    pbspath = './pbs/'
-    scratchpath = '/scratch/gy441/multitask/'
+    for saveaddontype in [0,1,2,3,4,5]:
+        jobname = 'job_{:d}_{:d}'.format(saveaddontype, nunit)
+        cmd     = 'python -u main.py -n {:d} -s {:d}'.format(nunit, saveaddontype)
+        pbspath = './pbs/'
+        scratchpath = '/scratch/gy441/multitask/'
 
-    jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
-                                     ppn=1, gpus=0)
-    subprocess.call(['qsub', jobfile])
+        jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
+                                         ppn=1, gpus=0)
+        subprocess.call(['qsub', jobfile])
 
 
 

@@ -19,31 +19,38 @@ from task import *
 from network import LeakyRNNCell, get_perf
 
 
-def train(HDIM):
+def train(HDIM, save_addon_type):
     tf.reset_default_graph()
 
     N_RING = 16
 
-    # Rules
-    rules = [GO, INHGO, DELAYGO,\
-    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
-    REMAP, INHREMAP, DELAYREMAP,\
-    DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+    if 'nonoise' in save_addon_type:
+        sigma_rec = 0
+    elif 'weaknoise' in save_addon_type:
+        sigma_rec = 0.05
+    elif 'strongnoise' in save_addon_type:
+        sigma_rec = 0.15
 
-    # rules = [CHOICE_MOD1]
-    # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
+    if 'allrule' in save_addon_type:
+        # Rules
+        rules = [GO, INHGO, DELAYGO,\
+        CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+        CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+        REMAP, INHREMAP, DELAYREMAP,\
+        DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+    elif 'attendonly' in save_addon_type:
+        rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
 
     rule_weights = np.ones(len(rules))
 
     config = {'h_type'      : 'leaky_rec',
               'alpha'       : 0.2, # \Delta t/tau
               'dt'          : 0.2*TAU,
-              'sigma_rec'   : 0.05,
+              'sigma_rec'   : sigma_rec,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : 'tf_weakrecnoise_'+str(HDIM),
+              'save_addon'  : save_addon_type + '_' + str(HDIM),
               'rules'       : rules,
               'rule_weights': rule_weights}
 
@@ -149,10 +156,11 @@ def train(HDIM):
 
         print("Optimization Finished!")
 
-        from variance import compute_variance
-        compute_variance(config['save_addon'], 'rule', rules)
-        print('Computed variance')
+
+    from variance import compute_variance
+    compute_variance(config['save_addon'], 'rule', rules)
+    print('Computed variance')
 
 
 if __name__ == '__main__':
-    train(HDIM=200)
+    train(HDIM=200, save_addon_type='attendonly_nonoise')
