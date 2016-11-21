@@ -232,7 +232,7 @@ class ChoiceAttAnalysis(object):
                       'tar2_mod1_strengths' : [1],
                       'tar1_mod2_strengths' : [1],
                       'tar2_mod2_strengths' : [1],
-                      'tar_time'    : 1000}
+                      'tar_time'    : 600}
             print(rule_name[rule])
             task  = generate_onebatch(rule, self.config, 'psychometric', noise_on=False, params=params)
             epoch = task.epochs['tar1']
@@ -572,7 +572,7 @@ class ChoiceAttAnalysis(object):
         plt.show()
 
 
-save_addon = 'tf_attendonly_500'
+save_addon = 'tf_withrecnoise_500'
 caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False,
                         analyze_allunits=False, fast_eval=True, redefine_choice=False)
 caa.plot_betaweights()

@@ -45,11 +45,9 @@ def compute_variance(save_addon, data_type, rules):
     if data_type == 'rule':
         h_all = h_all_byrule
         t_start = 500 # Important: Ignore the initial transition
-        n_cluster = 12
     elif data_type == 'epoch':
         h_all = h_all_byepoch
         t_start = None
-        n_cluster = 15
     else:
         raise ValueError
 
