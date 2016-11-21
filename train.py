@@ -39,11 +39,11 @@ def train(HDIM):
     config = {'h_type'      : 'leaky_rec',
               'alpha'       : 0.2, # \Delta t/tau
               'dt'          : 0.2*TAU,
-              'sigma_rec'   : 0.15,
+              'sigma_rec'   : 0.05,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : 'tf_withrecnoise_'+str(HDIM),
+              'save_addon'  : 'tf_weakrecnoise_'+str(HDIM),
               'rules'       : rules,
               'rule_weights': rule_weights}
 
