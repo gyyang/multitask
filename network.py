@@ -42,7 +42,7 @@ class LeakyRNNCell(RNNCell):
         with vs.variable_scope(scope or type(self).__name__):    # "LeakyRNNCell"
             output = (1-self._alpha)*state + \
                      self._alpha * self._activation(_linear([inputs, state], self._num_units, True)) + \
-                tf.random_normal([self._num_units], mean=0, stddev=self._sigma, dtype = tf.float32)
+                tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma, dtype = tf.float32)
 
         return output, output
 
