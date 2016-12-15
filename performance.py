@@ -273,15 +273,16 @@ def psychometric_choiceattend_(save_addon, rule, **kwargs):
         batch_shape = (n_tar_loc,n_tar,n_tar)
         ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
 
+        # Looping target location
         # tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         # tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
+        # Constant location
         tar1_locs = np.ones(len(ind_tar_loc)) * np.pi/2
         tar2_locs = (tar1_locs + np.pi) % (2*np.pi)
 
-
-        tar_mod1_cohs = np.array([tar_cohs[i] for i in ind_tar_mod1])
-        tar_mod2_cohs = np.array([tar_cohs[i] for i in ind_tar_mod2])
+        tar_mod1_cohs = tar_cohs[ind_tar_mod1]
+        tar_mod2_cohs = tar_cohs[ind_tar_mod2]
 
         params = {'tar1_locs' : tar1_locs,
                   'tar2_locs' : tar2_locs,
@@ -315,59 +316,6 @@ def psychometric_choiceattend_(save_addon, rule, **kwargs):
                                   labels=labels,
                                   colors=sns.color_palette("Set2",2),
                                   legtitle='Modality',rule=rule, **kwargs)
-
-def psychometric_choiceattend_varytime(save_addon, **kwargs):
-    print('Starting second analysis of the CHOICEATTEND task...')
-    with Run(save_addon, fast_eval=fast_eval) as R:
-
-        from task import get_dist
-
-        n_tar_loc = 12 # increase repeat by increasing this
-        n_tar = 7
-        batch_size = n_tar_loc * n_tar**2
-        batch_shape = (n_tar_loc,n_tar,n_tar)
-        ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
-
-        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-
-        tar_str_range = 0.25
-        tar1_mod1_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar_mod1/(n_tar-1)
-        tar2_mod1_strengths = 2 - tar1_mod1_strengths
-        tar1_mod2_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar_mod2/(n_tar-1)
-        tar2_mod2_strengths = 2 - tar1_mod2_strengths
-
-        xdatas = list()
-        ydatas = list()
-        tar_times = [200, 400, 800, 1200]
-        for tar_time in tar_times:
-            params = {'tar1_locs' : tar1_locs,
-                      'tar2_locs' : tar2_locs,
-                      'tar1_mod1_strengths' : tar1_mod1_strengths,
-                      'tar2_mod1_strengths' : tar2_mod1_strengths,
-                      'tar1_mod2_strengths' : tar1_mod2_strengths,
-                      'tar2_mod2_strengths' : tar2_mod2_strengths,
-                      'tar_time'    : tar_time}
-
-            task  = generate_onebatch(CHOICEATTEND_MOD1, R.config, 'psychometric', params=params)
-            y_loc_sample = R.f_y_loc_from_x(task.x)
-            y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
-
-            tar1_locs_ = np.reshape(tar1_locs, batch_shape)
-            tar2_locs_ = np.reshape(tar2_locs, batch_shape)
-
-            choose1 = (get_dist(y_loc_sample - tar1_locs_) < 0.3*np.pi).sum(axis=0)
-            choose2 = (get_dist(y_loc_sample - tar2_locs_) < 0.3*np.pi).sum(axis=0)
-            prop1s = choose1/(choose1 + choose2)
-
-            xdatas.extend([tar_str_range*(-1+2*np.arange(n_tar)/(n_tar-1))])
-            ydatas.extend([prop1s.mean(axis=k) for k in [1]])
-
-        plot_psychometric_choice(xdatas, ydatas,
-                                 labels=[str(t) for t in tar_times],
-                                 colors=sns.dark_palette("light blue", len(tar_times), input="xkcd"),
-                                 legtitle='Stim. time (ms)',rule=CHOICEATTEND_MOD1,
-                                 savename_append='2', **kwargs)
 
 def psychometric_choiceint(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICEINT task...')
@@ -615,6 +563,71 @@ def plot_psychometric_varytime(xdatas, ydatas, labels, colors, **kwargs):
     plt.savefig(savename+'.pdf', transparent=True)
     plt.show()
 
+def psychometric_choiceattend_varytime(save_addon, **kwargs):
+    psychometric_choiceattend_varytime_(save_addon, CHOICEATTEND_MOD1, **kwargs)
+    psychometric_choiceattend_varytime_(save_addon, CHOICEATTEND_MOD2, **kwargs)
+
+def psychometric_choiceattend_varytime_(save_addon, rule, **kwargs):
+    print('Starting standard analysis of the {:s} task...'.format(rule_name[rule]))
+    with Run(save_addon, fast_eval=fast_eval) as R:
+
+        from task import get_dist
+
+        tar_str_range = 0.08
+
+        n_tar_loc = 200 # increase repeat by increasing this
+        n_tar = 4
+        batch_size = n_tar_loc * n_tar
+        batch_shape = (n_tar_loc,n_tar)
+        ind_tar_loc, ind_tar = np.unravel_index(range(batch_size),batch_shape)
+
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
+
+        tar_cohs = tar_str_range*(2**np.arange(n_tar))/(2**(n_tar-1))
+
+        if rule == CHOICEATTEND_MOD1:
+            att = '1'
+            ign = '2'
+        else:
+            att = '2'
+            ign = '1'
+
+
+        tar_times = range(50,650,100)+range(650,3000,300)
+
+        ydatas = list()
+        for tar_time in tar_times:
+
+            params = {'tar1_locs' : tar1_locs,
+                      'tar2_locs' : tar2_locs,
+                      'tar1_mod'+att+'_strengths' : 1 + tar_cohs[ind_tar],
+                      'tar2_mod'+att+'_strengths' : 1 - tar_cohs[ind_tar],
+                      'tar1_mod'+ign+'_strengths' : np.ones(batch_size),
+                      'tar2_mod'+ign+'_strengths' : np.ones(batch_size),
+                      'tar_time'    : tar_time}
+
+            task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+            y_sample = R.f_y_from_x(task.x)
+            y_sample_loc = R.f_y_loc(y_sample)
+            perf = get_perf(y_sample, task.y_loc)
+
+            tar1_locs_ = np.reshape(tar1_locs, batch_shape)
+            tar2_locs_ = np.reshape(tar2_locs, batch_shape)
+
+            y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
+            choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
+            choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
+            ydatas.append(choose1/(choose1 + choose2))
+
+        xdatas = [tar_times] * n_tar
+        ydatas = np.array(ydatas).T
+
+        plot_psychometric_varytime(xdatas, ydatas,
+                                  labels=['{:0.3f}'.format(t) for t in 2*tar_cohs],
+                                  colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
+                                  legtitle='Tar1 - Tar2',rule=rule, **kwargs)
+
 # plot_trainingprogress('allrule_strongnoise_500')
 # plot_finalperformance('tf_withrecnoise')
 
@@ -625,65 +638,59 @@ def plot_psychometric_varytime(xdatas, ydatas, labels, colors, **kwargs):
 # psychometric_delaychoice('tf_withrecnoise_400')
 
 # psychometric_choice_varytime('allrule_strongnoise_500')
+psychometric_choiceattend_varytime('attendonly_weaknoise_200')
 
 
-# def psychometric_choiceattend_(save_addon, rule, **kwargs):
-rule = CHOICEATTEND_MOD1
-save_addon = 'allrule_nonoise_200'
-kwargs = dict()
-print('Starting standard analysis of the {:s} task...'.format(rule_name[rule]))
-with Run(save_addon, fast_eval=fast_eval) as R:
+def psychometric_choiceint_varytime(save_addon, rule, **kwargs):
+    print('Starting standard analysis of the {:s} task...'.format(rule_name[rule]))
+    with Run(save_addon, fast_eval=fast_eval) as R:
 
-    from task import get_dist
+        from task import get_dist
 
-    # tar_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.5
-    tar_cohs = np.array([-0.5, -0.3, -0.1, 0.1, 0.3, 0.5])*0.5
-
-    n_tar_loc = 12 # increase repeat by increasing this
-    n_tar = len(tar_cohs)
-    batch_size = n_tar_loc * n_tar**2
-    batch_shape = (n_tar_loc,n_tar,n_tar)
-    ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
-
-    # tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-    # tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-
-    tar1_locs = np.ones(len(ind_tar_loc)) * np.pi/2
-    tar2_locs = (tar1_locs + np.pi) % (2*np.pi)
+        tar_str_range = 0.08
 
 
-    tar_mod1_cohs = np.array([tar_cohs[i] for i in ind_tar_mod1])
-    tar_mod2_cohs = np.array([tar_cohs[i] for i in ind_tar_mod2])
+        n_tar_loc = 500 # increase repeat by increasing this
+        n_tar = 4
+        batch_size = n_tar_loc * n_tar
+        batch_shape = (n_tar_loc,n_tar)
+        ind_tar_loc, ind_tar = np.unravel_index(range(batch_size),batch_shape)
 
-    params = {'tar1_locs' : tar1_locs,
-              'tar2_locs' : tar2_locs,
-              'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
-              'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
-              'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
-              'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-              'tar_time'    : 800}
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-    task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
-    y_sample = R.f_y_from_x(task.x)
-    y_sample_loc = R.f_y_loc(y_sample)
-    perf = get_perf(y_sample, task.y_loc)
-    print('Performance {:0.3f}'.format(np.mean(perf)))
+        tar_cohs = tar_str_range*(2**np.arange(n_tar))/(2**(n_tar-1))
 
+        tar_times = range(50,650,100)+range(650,3000,300)
 
-    tar1_locs_ = np.reshape(tar1_locs, batch_shape)
-    tar2_locs_ = np.reshape(tar2_locs, batch_shape)
+        ydatas = list()
+        for tar_time in tar_times:
 
-    y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
-    choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
-    choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
-    prop1s = choose1/(choose1 + choose2)
+            params = {'tar1_locs' : tar1_locs,
+                      'tar2_locs' : tar2_locs,
+                      'tar1_mod1_strengths' : 1 + tar_cohs[ind_tar],
+                      'tar2_mod1_strengths' : 1 - tar_cohs[ind_tar],
+                      'tar1_mod2_strengths' : np.ones(batch_size),
+                      'tar2_mod2_strengths' : np.ones(batch_size),
+                      'tar_time'    : tar_time}
 
-    xdatas = [tar_cohs*2]*2
-    ydatas = [prop1s.mean(axis=k) for k in [1,0]]
+            task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+            y_sample = R.f_y_from_x(task.x)
+            y_sample_loc = R.f_y_loc(y_sample)
+            perf = get_perf(y_sample, task.y_loc)
 
-    labels = ['Attend', 'Ignore'] if rule==CHOICEATTEND_MOD1 else ['Ignore', 'Attend']
+            tar1_locs_ = np.reshape(tar1_locs, batch_shape)
+            tar2_locs_ = np.reshape(tar2_locs, batch_shape)
 
-    plot_psychometric_choice(xdatas, ydatas,
-                              labels=labels,
-                              colors=sns.color_palette("Set2",2),
-                              legtitle='Modality',rule=rule, **kwargs)
+            y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
+            choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
+            choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
+            ydatas.append(choose1/(choose1 + choose2))
+
+        xdatas = [tar_times] * n_tar
+        ydatas = np.array(ydatas).T
+
+        plot_psychometric_varytime(xdatas, ydatas,
+                                  labels=['{:0.3f}'.format(t) for t in 2*tar_cohs],
+                                  colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
+                                  legtitle='Tar1 - Tar2',rule=CHOICEATTEND_MOD1, **kwargs)
