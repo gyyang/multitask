@@ -628,29 +628,15 @@ def psychometric_choiceattend_varytime_(save_addon, rule, **kwargs):
                                   colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
                                   legtitle='Tar1 - Tar2',rule=rule, **kwargs)
 
-# plot_trainingprogress('allrule_strongnoise_500')
-# plot_finalperformance('tf_withrecnoise')
-
-# psychometric_choice('allrule_strongnoise_500')
-# psychometric_choiceattend('tf_attendonly_500')
-# psychometric_choiceattend_varytime('tf_withrecnoise_400')
-# psychometric_choiceint('tf_withrecnoise_400')
-# psychometric_delaychoice('tf_withrecnoise_400')
-
-# psychometric_choice_varytime('allrule_strongnoise_500')
-psychometric_choiceattend_varytime('attendonly_weaknoise_200')
-
-
-def psychometric_choiceint_varytime(save_addon, rule, **kwargs):
-    print('Starting standard analysis of the {:s} task...'.format(rule_name[rule]))
+def psychometric_choiceint_varytime(save_addon, **kwargs):
+    print('Starting standard analysis of the {:s} task...'.format(rule_name[CHOICE_INT]))
     with Run(save_addon, fast_eval=fast_eval) as R:
 
         from task import get_dist
 
-        tar_str_range = 0.08
+        tar_str_range = 0.04
 
-
-        n_tar_loc = 500 # increase repeat by increasing this
+        n_tar_loc = 100 # increase repeat by increasing this
         n_tar = 4
         batch_size = n_tar_loc * n_tar
         batch_shape = (n_tar_loc,n_tar)
@@ -670,11 +656,11 @@ def psychometric_choiceint_varytime(save_addon, rule, **kwargs):
                       'tar2_locs' : tar2_locs,
                       'tar1_mod1_strengths' : 1 + tar_cohs[ind_tar],
                       'tar2_mod1_strengths' : 1 - tar_cohs[ind_tar],
-                      'tar1_mod2_strengths' : np.ones(batch_size),
-                      'tar2_mod2_strengths' : np.ones(batch_size),
+                      'tar1_mod2_strengths' : 1 + tar_cohs[ind_tar],
+                      'tar2_mod2_strengths' : 1 - tar_cohs[ind_tar],
                       'tar_time'    : tar_time}
 
-            task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+            task  = generate_onebatch(CHOICE_INT, R.config, 'psychometric', params=params)
             y_sample = R.f_y_from_x(task.x)
             y_sample_loc = R.f_y_loc(y_sample)
             perf = get_perf(y_sample, task.y_loc)
@@ -693,4 +679,19 @@ def psychometric_choiceint_varytime(save_addon, rule, **kwargs):
         plot_psychometric_varytime(xdatas, ydatas,
                                   labels=['{:0.3f}'.format(t) for t in 2*tar_cohs],
                                   colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
-                                  legtitle='Tar1 - Tar2',rule=CHOICEATTEND_MOD1, **kwargs)
+                                  legtitle='Tar1 - Tar2',rule=CHOICE_INT, **kwargs)
+
+# plot_trainingprogress('allrule_strongnoise_500')
+# plot_finalperformance('tf_withrecnoise')
+
+# psychometric_choice('allrule_strongnoise_500')
+# psychometric_choiceattend('tf_attendonly_500')
+# psychometric_choiceattend_varytime('tf_withrecnoise_400')
+# psychometric_choiceint('tf_withrecnoise_400')
+# psychometric_delaychoice('tf_withrecnoise_400')
+
+# psychometric_choice_varytime('allrule_strongnoise_500')
+# psychometric_choiceattend_varytime('attendonly_weaknoise_200')
+# psychometric_choiceint_varytime('allrule_weaknoise_200')
+
+
