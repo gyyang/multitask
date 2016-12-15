@@ -51,6 +51,7 @@ class ChoiceAttAnalysis(object):
             'analyze_threerules' : False,
             'analyze_allunits'   : False,
             'redefine_choice'    : True,
+            'regress_product'    : False, # regression of interaction terms
             'z_score'            : True,
             'fast_eval'          : False}
 
@@ -69,6 +70,8 @@ class ChoiceAttAnalysis(object):
             self.rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
             # Regressors
             self.regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
+        n_rule = len(self.rules)
+        n_regr = len(self.regr_names)
 
         tar1_loc  = 0
 
@@ -83,8 +86,8 @@ class ChoiceAttAnalysis(object):
             params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=1)
             self.params = params
 
-            X = np.zeros((len(self.rules)*batch_size, len(self.regr_names))) # regressors
-            trial_rules = np.zeros(len(self.rules)*batch_size)
+            X = np.zeros((n_rule*batch_size, n_regr)) # regressors
+            trial_rules = np.zeros(n_rule*batch_size)
             H = np.array([])
             Perfs = np.array([]) # Performance
 
@@ -200,7 +203,19 @@ class ChoiceAttAnalysis(object):
 
             Y = np.swapaxes(h[:,:,i], 0, 1)
             regr = linear_model.LinearRegression() # Create linear regression object
-            regr.fit(Xi, Y)
+
+            if self.setting['regress_product']:
+                Xi_ = np.zeros((Xi.shape[0], n_regr + n_regr*(n_regr-1)/2))
+                Xi_[:, :n_regr] = Xi
+                k = 0
+                for l in range(n_regr-1):
+                    for m in range(l+1, n_regr):
+                        Xi_[:, n_regr+k] = Xi[:, l] * Xi[:, m]
+                        k += 1
+            else:
+                Xi_ = Xi
+
+            regr.fit(Xi_, Y)
 
             coef = regr.coef_
             ind = np.argmax(np.sum(coef**2,axis=1))
@@ -303,6 +318,9 @@ class ChoiceAttAnalysis(object):
 
     def plot_statespace(self, plot_slowpoints=True):
         # TODO: Need to take into account the flipping of choice labeling
+        if self.setting['redefine_choice']:
+            raise ValueError('Redefine choice not supported for state space plots yet.')
+
         if plot_slowpoints:
             try:
                 _ = self.slow_points_trans_all
@@ -572,7 +590,7 @@ class ChoiceAttAnalysis(object):
         plt.show()
 
 
-save_addon = 'tf_withrecnoise_500'
+save_addon = 'attendonly_strongnoise_500'
 caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False,
                         analyze_allunits=False, fast_eval=True, redefine_choice=False)
 caa.plot_betaweights()
