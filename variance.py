@@ -87,7 +87,7 @@ def plot_variance(save_addon, data_type):
 
 if __name__ == '__main__':
     # save_addon = 'tf_withrecnoise_500'
-    save_addon = 'tf_attendonly_150'
+    save_addon = 'allrule_weaknoise_500'
     data_type = 'rule'
 
     # rules = [GO, INHGO, DELAYGO,\
@@ -96,8 +96,11 @@ if __name__ == '__main__':
     #     REMAP, INHREMAP, DELAYREMAP,\
     #     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
 
-    rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+    # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+    rules = [DELAYMATCHGO, DMCGO]
 
-    start = time.time()
+    # start = time.time()
     compute_variance(save_addon, data_type, rules)
-    print('Time taken {:0.2f} s'.format(time.time()-start))
+    plot_variance(save_addon, data_type)
+    # print('Time taken {:0.2f} s'.format(time.time()-start))
+

@@ -63,7 +63,7 @@ def plot_trainingprogress(save_addon, rule_plot=None, save=True):
     ax2.set_ylabel('performance',fontsize=7)
     ax1.set_ylabel('log(cost)',fontsize=7)
     ax1.set_xticklabels([])
-    ax1.set_title('Training time {:0.0f} s'.format(times[-1]),fontsize=7)
+    ax1.set_title('Training time {:0.1f} hours'.format(times[-1]/3600.),fontsize=7)
     lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.65,0.5),
                     fontsize=7,labelspacing=0.3,loc=6)
     plt.setp(lg.get_title(),fontsize=7)
@@ -152,9 +152,9 @@ def plot_finalperformance(save_type='tf'):
 
 def psychometric_choice(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICE task...')
-    with Run(save_addon) as R:
-        n_tar_loc = 120
-        n_tar = 7
+    with Run(save_addon, fast_eval=fast_eval) as R:
+        n_tar_loc = 300
+        n_tar = 9
         batch_size = n_tar_loc * n_tar
         batch_shape = (n_tar_loc,n_tar)
         ind_tar_loc, ind_tar = np.unravel_index(range(batch_size),batch_shape)
@@ -162,12 +162,12 @@ def psychometric_choice(save_addon, **kwargs):
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-        tar_str_range = 0.2
+        tar_str_range = 0.05
         tar1_strengths = (1-tar_str_range/2)+tar_str_range*ind_tar/(n_tar-1)
         tar2_strengths = 2 - tar1_strengths
 
         ydatas = list()
-        tar_times = [200, 400, 800]
+        tar_times = [200, 400, 1600]
         for tar_time in tar_times:
             params = {'tar1_locs' : tar1_locs,
                       'tar2_locs' : tar2_locs,
@@ -195,7 +195,7 @@ def psychometric_choice(save_addon, **kwargs):
 
 def psychometric_delaychoice(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICEDELAY task...')
-    with Run(save_addon) as R:
+    with Run(save_addon, fast_eval=fast_eval) as R:
         n_tar_loc = 120
         n_tar = 7
         batch_size = n_tar_loc * n_tar
@@ -312,7 +312,7 @@ def psychometric_choiceattend_(save_addon, rule, **kwargs):
 
 def psychometric_choiceattend_varytime(save_addon, **kwargs):
     print('Starting second analysis of the CHOICEATTEND task...')
-    with Run(save_addon) as R:
+    with Run(save_addon, fast_eval=fast_eval) as R:
 
         from task import get_dist
 
@@ -365,7 +365,7 @@ def psychometric_choiceattend_varytime(save_addon, **kwargs):
 
 def psychometric_choiceint(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICEINT task...')
-    with Run(save_addon) as R:
+    with Run(save_addon, fast_eval=fast_eval) as R:
 
 
         n_tar_loc = 100 # increase repeat by increasing this
@@ -415,7 +415,7 @@ def psychometric_choiceint(save_addon, **kwargs):
         print(sigmas)
 
 def psychometric_intrepro(save_addon):
-    with Run(save_addon) as R:
+    with Run(save_addon, fast_eval=fast_eval) as R:
 
         n_tar_loc = 360
         # intervals = [700]
@@ -521,11 +521,11 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     return fits
 
 
-# plot_trainingprogress('tf_attendonly_500')
+# plot_trainingprogress('allrule_strongnoise_500')
 # plot_finalperformance('tf_withrecnoise')
 
-# psychometric_choice('tf_withrecnoise_400')
-psychometric_choiceattend('tf_attendonly_500')
+psychometric_choice('allrule_strongnoise_500')
+# psychometric_choiceattend('tf_attendonly_500')
 # psychometric_choiceattend_varytime('tf_withrecnoise_400')
 # psychometric_choiceint('tf_withrecnoise_400')
 # psychometric_delaychoice('tf_withrecnoise_400')

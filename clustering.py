@@ -16,16 +16,16 @@ from task import *
 from run import Run
 
 ########################## Running the network ################################
-save_addon = 'tf_attendonly_150'
+save_addon = 'allrule_strongnoise_500'
 data_type = 'rule'
 
-# rules = [GO, INHGO, DELAYGO,\
-#     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-#     CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
-#     REMAP, INHREMAP, DELAYREMAP,\
-#     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+rules = [GO, INHGO, DELAYGO,\
+    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+    REMAP, INHREMAP, DELAYREMAP,\
+    DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
 
-rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+# rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
 
 with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
     res = pickle.load(f)
@@ -41,8 +41,8 @@ h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
 ################################## Clustering ################################
 if data_type == 'rule':
-    # n_cluster = 12
-    n_cluster = 3
+    n_cluster = 12
+    # n_cluster = 3
 elif data_type == 'epoch':
     n_cluster = 15
 else:
@@ -115,7 +115,7 @@ vmin, vmax = 0, 1
 fig = plt.figure(figsize=figsize)
 ax = fig.add_axes([0.25, 0.2, 0.6, 0.7])
 im = ax.imshow(h_plot, cmap='hot',
-               aspect='auto', interpolation='none', vmin=vmin, vmax=vmax)
+               aspect='auto', interpolation='nearest', vmin=vmin, vmax=vmax)
 
 plt.yticks(range(len(tick_names)), tick_names,
            rotation=0, va='center', fontsize=6)
@@ -145,7 +145,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 similarity = cosine_similarity(h_normvar_all) # TODO: check
 fig = plt.figure(figsize=(3.5, 3.5))
 ax = fig.add_axes([0.25, 0.25, 0.6, 0.6])
-im = ax.imshow(similarity, cmap='hot', interpolation='none', vmin=0, vmax=1)
+im = ax.imshow(similarity, cmap='hot', interpolation='nearest', vmin=0, vmax=1)
 ax.axis('off')
 
 ax = fig.add_axes([0.87, 0.25, 0.03, 0.6])
@@ -169,6 +169,48 @@ ax2.axis('off')
 plt.savefig('figure/feature_similarity_by'+data_type+'.pdf', transparent=True)
 plt.show()
 
+
+# Plot variance for an example unit
+ind = 0 # example unit
+fig = plt.figure(figsize=(1.5,1.2))
+ax = fig.add_axes([0.3,0.3,0.6,0.5])
+ax.plot(range(h_plot.shape[0]), h_plot[:, ind], 'o-', color='black', lw=1, ms=2)
+plt.xticks(range(len(tick_names)), [tick_names[0]] + ['.']*(len(tick_names)-1),
+           rotation=90, fontsize=6)
+plt.xlabel('rule', fontsize=7, labelpad=1)
+plt.ylabel('Normalized var.', fontsize=7)
+plt.title('Unit {:d}'.format(ind_active[ind]), fontsize=7, y=0.85)
+plt.locator_params(axis='y', nbins=3)
+ax.tick_params(axis='both', which='major', labelsize=7, length=2)
+ax.spines["right"].set_visible(False)
+ax.spines["top"].set_visible(False)
+ax.xaxis.set_ticks_position('bottom')
+ax.yaxis.set_ticks_position('left')
+plt.savefig('figure/exampleunit_variance.pdf', transparent=True)
+plt.show()
+
+################ Plotting distribution of variance ratio ######################
+rule_hist = CHOICEATTEND_MOD1
+if rule_hist is not None and data_type=='rule':
+    fig = plt.figure(figsize=(1.5,1.2))
+    ax = fig.add_axes([0.3,0.3,0.6,0.5])
+    hist, bins_edge = np.histogram(h_normvar_all[:, keys.index(rule_hist)], bins=30, range=(0,1))
+    ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
+           color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([hist.max()*-0.05, hist.max()*1.1])
+    plt.xlabel(r'Variance ratio', fontsize=7, labelpad=1)
+    plt.ylabel('counts', fontsize=7)
+    plt.title(rule_name[rule_hist], fontsize=7)
+    plt.locator_params(nbins=3)
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    plt.savefig('figure/hist_totalvar.pdf', transparent=True)
+    plt.show()
+
 ######################### Plotting Connectivity ###############################
 with Run(save_addon) as R:
     params = R.params
@@ -183,7 +225,7 @@ nr = n_ring
 nrule = (nx-2*nr-1)
 ind = ind_active
 
-l = 0.25
+l = 0.35
 l0 = (1-1.5*l)/nh
 
 plot_infos = [(w_rec[ind,:][:,ind]     , [l               ,l          ,nh*l0    ,nh*l0]),
@@ -197,11 +239,11 @@ plot_infos = [(w_rec[ind,:][:,ind]     , [l               ,l          ,nh*l0    
               (b_out[:, np.newaxis]    , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
 
 cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
-fig = plt.figure(figsize=(4,4))
+fig = plt.figure(figsize=(6,6))
 for plot_info in plot_infos:
     ax = fig.add_axes(plot_info[1])
     vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [5,50,95])
-    _ = ax.imshow(plot_info[0], interpolation='none', cmap=cmap, aspect='auto',
+    _ = ax.imshow(plot_info[0], interpolation='nearest', cmap=cmap, aspect='auto',
                   vmin=vmid-(vmax-vmin)/2, vmax=vmid+(vmax-vmin)/2)
     ax.axis('off')
 

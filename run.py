@@ -115,8 +115,7 @@ class Run(Session):
 
         self.test_ran = False
 
-def sample_plot(save_addon, rule):
-    save = False
+def sample_plot(save_addon, rule, save=False):
 
     with Run(save_addon) as R:
         config = R.config
@@ -181,7 +180,7 @@ def sample_plot(save_addon, rule):
         ax.get_yaxis().set_label_coords(-0.12,0.5)
 
     if save:
-        plt.savefig('figure/sample_'+rule_name[rule].replace(' ','')+config['save_addon']+'.pdf')
+        plt.savefig('figure/sample_'+rule_name[rule].replace(' ','')+config['save_addon']+'.pdf', transparent=True)
     plt.show()
 
 
@@ -189,7 +188,7 @@ def sample_plot(save_addon, rule):
     plt.show()
 
 def schematic_plot():
-    save_addon = 'tf_latest_500'
+    save_addon = 'allrule_strongnoise_500'
     fontsize = 5
 
     rule = CHOICE_MOD1
@@ -332,7 +331,7 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
 
     t_start = 500
     h_tests = dict()
-    with Run(save_addon) as R:
+    with Run(save_addon, sigma_rec=0.0) as R:
         config = R.config
         for rule in rules:
             task = generate_onebatch(rule=rule, config=config, mode='test')
@@ -346,7 +345,7 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
             ax = fig.add_axes([0.35,0.25,0.55,0.55])
             ax.set_color_cycle(sns.color_palette("husl", h_tests[rule].shape[1]))
             _ = ax.plot(np.arange(h_tests[rule][t_start:].shape[0])/1000.,
-                        h_tests[rule][t_start:,:,neuron])
+                        h_tests[rule][t_start:,:,neuron], lw=0.5)
 
             if epoch is not None:
                 e0, e1 = task.epochs[epoch]
@@ -366,7 +365,7 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
                 ax.set_yticklabels([])
             else:
                 plt.ylabel('activitity (a.u.)', fontsize=fs)
-            plt.title('Unit {:d} '.format(neuron) + rule_name[rule], fontsize=fs)
+            plt.title('Unit {:d} '.format(neuron) + rule_name[rule], fontsize=5)
             ax.tick_params(axis='both', which='major', labelsize=fs)
             ax.spines["right"].set_visible(False)
             ax.spines["top"].set_visible(False)
@@ -378,6 +377,9 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
 
 
 if __name__ == "__main__":
-    sample_plot(save_addon='tf_withrecnoise_400', rule=CHOICEATTEND_MOD1)
+    # schematic_plot()
+    # sample_plot(save_addon='allrule_weaknoise_500', rule=INHREMAP, save=True)
+    plot_singleneuron_intime('allrule_strongnoise_500', [412], [GO, CHOICEDELAY_MOD2, DMCNOGO],
+                             epoch=None, save=True, ylabel_firstonly=True)
     pass
 
