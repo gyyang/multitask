@@ -10,7 +10,7 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-N_RULE          = 18
+N_RULE          = 17
 # FIXATION, GO, INHGO, DELAYGO,\
 # CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
 # CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
@@ -20,11 +20,11 @@ N_RULE          = 18
 
 GO, INHGO, DELAYGO,\
 CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
 REMAP, INHREMAP, DELAYREMAP,\
 DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO = range(N_RULE)
 
-FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
+CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
 
 TEST_INIT = -1
 
@@ -366,15 +366,24 @@ def choicego_(config, mode, tar_mod, **kwargs):
         tdim = int(np.random.uniform(1000,3000)/dt)
 
         # A list of locations of fixation points and fixation off time
-        fix_offs = (0.7*np.ones(batch_size)*tdim).astype(int)
+        fix_offs = tdim - (np.ones(batch_size)*500/dt).astype(int)
 
         # A list of locations of targets (they are always on)
         tar_dist = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
         tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
         tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
 
-        tar1_strengths = np.random.uniform(0.8,1.2,(batch_size,))
-        tar2_strengths = np.random.uniform(0.8,1.2,(batch_size,))
+
+        tars_mean = np.random.uniform(0.8,1.2,(batch_size,))
+        tars_diff = np.random.uniform(0.01,0.2,(batch_size,))
+        # tars_diff = np.random.choice([0.005, 0.01, 0.02, 0.04, 0.08, 0.16],(batch_size,))
+        tars_sign = np.random.choice([1,-1], (batch_size,))
+
+        tar1_strengths = tars_mean + tars_diff*tars_sign/2
+        tar2_strengths = tars_mean - tars_diff*tars_sign/2
+
+        # tar1_strengths = np.random.uniform(0.8,1.2,(batch_size,))
+        # tar2_strengths = np.random.uniform(0.8,1.2,(batch_size,))
 
         # Time of targets on/off
         tar_ons = (np.ones(batch_size)*np.random.uniform(100,400)/dt).astype(int)
@@ -715,8 +724,15 @@ def choicedelaygo_(config, mode, tar_mod, **kwargs):
         tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
         tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
 
-        tar1_strengths = np.random.uniform(0.25,1.75,(batch_size,))
-        tar2_strengths = np.random.uniform(0.25,1.75,(batch_size,))
+        tars_mean = np.random.uniform(0.8,1.2,(batch_size,))
+        tars_diff = np.random.uniform(0.3,0.5,(batch_size,))
+        tars_sign = np.random.choice([1,-1], (batch_size,))
+
+        tar1_strengths = tars_mean + tars_diff*tars_sign/2
+        tar2_strengths = tars_mean - tars_diff*tars_sign/2
+
+        # tar1_strengths = np.random.uniform(0.25,1.75,(batch_size,))
+        # tar2_strengths = np.random.uniform(0.25,1.75,(batch_size,))
 
         # Time of targets on/off
         tar1_ons  = (np.ones(batch_size)*np.random.uniform(100,300)/dt).astype(int)
@@ -771,8 +787,8 @@ def choicedelaygo_(config, mode, tar_mod, **kwargs):
         tar2_offs       = int(p['tar2_offs']/dt)
         batch_size = len(tar1_locs)
 
-        fix_offs = int(400/dt) + tar2_offs
-        tdim = int(400/dt) + fix_offs
+        fix_offs = int(200/dt) + tar2_offs
+        tdim = int(300/dt) + fix_offs
 
     # time to check the saccade location
     check_ons  = fix_offs + int(100/dt)

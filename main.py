@@ -19,6 +19,24 @@ elif s == 3:
 elif s == 4:
     save_addon_type = 'attendonly_weaknoise'
 elif s == 5:
-    save_addon_type = 'attendonly_strongnoise'
+    save_addon_type = 'choiceonly_strongnoise'
+elif s == 6:
+    save_addon_type = 'choiceonly_nonoise'
+elif s == 7:
+    save_addon_type = 'choiceonly_weaknoise'
+elif s == 8:
+    save_addon_type = 'choiceonly_strongnoise'
+elif s == 9:
+    save_addon_type = 'choiceonly_exp_nonoise'
+elif s == 10:
+    save_addon_type = 'choiceonly_exp_weaknoise'
+elif s == 11:
+    save_addon_type = 'choiceonly_exp_strongnoise'
+elif s == 12:
+    save_addon_type = 'delaychoiceonly_nonoise'
+elif s == 13:
+    save_addon_type = 'delaychoiceonly_weaknoise'
+elif s == 14:
+    save_addon_type = 'delaychoiceonly_strongnoise'
 
 train.train(a.nunit, save_addon_type)

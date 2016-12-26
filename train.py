@@ -35,11 +35,15 @@ def train(HDIM, save_addon_type):
         # Rules
         rules = [GO, INHGO, DELAYGO,\
         CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-        CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+        CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
         REMAP, INHREMAP, DELAYREMAP,\
         DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
     elif 'attendonly' in save_addon_type:
         rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+    elif 'choiceonly' in save_addon_type:
+        rules = [CHOICE_MOD1, CHOICE_MOD2]
+    elif 'delaychoiceonly' in save_addon_type:
+        rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
 
     rule_weights = np.ones(len(rules))
 
@@ -62,7 +66,7 @@ def train(HDIM, save_addon_type):
     display_step = 200
 
     # learning_rate = 0.001
-    # training_iters = 200000
+    # training_iters = 500000
     # batch_size_train = 100
     # batch_size_test = 200
     # display_step = 200
@@ -163,4 +167,4 @@ def train(HDIM, save_addon_type):
 
 
 if __name__ == '__main__':
-    train(HDIM=200, save_addon_type='attendonly_nonoise')
+    train(HDIM=100, save_addon_type='delaychoiceonly_weaknoise')

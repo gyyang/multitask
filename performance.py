@@ -156,6 +156,9 @@ def plot_finalperformance(save_type):
     plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
     plt.show()
 
+
+################ Psychometric - Varying Coherence #############################
+
 def psychometric_choice(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICE task...')
     with Run(save_addon, fast_eval=fast_eval) as R:
@@ -477,10 +480,12 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     return fits
 
 
+################ Psychometric - Varying Stim Time #############################
+
 def psychometric_choice_varytime(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICE task...')
     with Run(save_addon, fast_eval=fast_eval) as R:
-        n_tar_loc = 1000
+        n_tar_loc = 300
         n_tar = 5
         batch_size = n_tar_loc * n_tar
         batch_shape = (n_tar_loc,n_tar)
@@ -547,9 +552,10 @@ def psychometric_choice_varytime(save_addon, **kwargs):
     plt.figure()
     plt.plot(np.log(tar_times), np.log(alpha_fits), 'o-')
     plt.plot(np.log(tar_times), -0.5*np.log(tar_times)+b, color='red')
-    _ = plt.xticks(np.log(np.array([100,200,400,800])), ['100','200', '400', '800'])
+    _ = plt.xticks(np.log(np.array([100,200,400,600,800])),
+                   ['100','200','400','600','800'])
     #plt.xlim([80,1500])
-    savename = 'figure/analyze_'+rule_name[CHOICE_MOD1].replace(' ','') + '_performance_type2'
+    savename = 'figure/analyze_'+rule_name[CHOICE_MOD1].replace(' ','') + '_varytime2'
     if 'savename_append' in kwargs:
         savename += kwargs['savename_append']
     plt.savefig(savename+'.pdf', transparent=True)
@@ -712,58 +718,57 @@ def plot_psychometric_varytime(xdatas, ydatas, labels, colors, **kwargs):
     ax.spines["top"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-    savename = 'figure/analyze_'+rule_name[kwargs['rule']].replace(' ','') + '_performance_temp'
+    savename = 'figure/analyze_'+rule_name[kwargs['rule']].replace(' ','') + '_varytime'
     if 'savename_append' in kwargs:
         savename += kwargs['savename_append']
 
     plt.savefig(savename+'.pdf', transparent=True)
     # plt.show()
 
-#def temp_unfinished():
-save_addon = 'choiceonly_weaknoise_220'
-kwargs = dict()
-print('Starting standard analysis of the CHOICE task...')
-with Run(save_addon, fast_eval=fast_eval) as R:
-    n_rep = 100
-    n_tar = 3
-    n_tar_loc = 36
-    batch_size = n_rep * n_tar * n_tar_loc
-    batch_shape = (n_rep,n_tar,n_tar_loc)
-    ind_rep, ind_tar, ind_tar_loc = np.unravel_index(range(batch_size),batch_shape)
+################ Psychometric - Varying Stim Loc ##############################
 
-    tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-    tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
+def psychometric_choice_varyloc(save_addon, **kwargs):
+    print('Starting standard analysis of the CHOICE task...')
+    with Run(save_addon, fast_eval=fast_eval) as R:
+        n_rep = 100
+        n_tar = 5
+        n_tar_loc = 36
+        batch_size = n_rep * n_tar * n_tar_loc
+        batch_shape = (n_rep,n_tar,n_tar_loc)
+        ind_rep, ind_tar, ind_tar_loc = np.unravel_index(range(batch_size),batch_shape)
 
-    tar_str_range = 0.04
-    cohs = tar_str_range*np.arange(n_tar)/(n_tar-1)
-    tar1_strengths = 1 + cohs[ind_tar]
-    tar2_strengths = 2 - tar1_strengths
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-    params = {'tar1_locs' : tar1_locs,
-              'tar2_locs' : tar2_locs,
-              'tar1_strengths' : tar1_strengths,
-              'tar2_strengths' : tar2_strengths,
-              'tar_time'    : 600}
+        tar_str_range = 0.04
+        cohs = tar_str_range*np.arange(n_tar)/(n_tar-1)
+        tar1_strengths = 1 + cohs[ind_tar]
+        tar2_strengths = 2 - tar1_strengths
 
-    task  = generate_onebatch(CHOICE_MOD1, R.config, 'psychometric', params=params)
-    y_sample = R.f_y_from_x(task.x)
-    y_sample_loc = R.f_y_loc(y_sample)
+        params = {'tar1_locs' : tar1_locs,
+                  'tar2_locs' : tar2_locs,
+                  'tar1_strengths' : tar1_strengths,
+                  'tar2_strengths' : tar2_strengths,
+                  'tar_time'    : 600}
 
-    tar1_locs_ = np.reshape(tar1_locs, batch_shape)
-    tar2_locs_ = np.reshape(tar2_locs, batch_shape)
+        task  = generate_onebatch(CHOICE_MOD1, R.config, 'psychometric', params=params)
+        y_sample = R.f_y_from_x(task.x)
+        y_sample_loc = R.f_y_loc(y_sample)
 
-    y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
-    choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
-    choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
-    ydatas = choose1/(choose1 + choose2)
+        tar1_locs_ = np.reshape(tar1_locs, batch_shape)
+        tar2_locs_ = np.reshape(tar2_locs, batch_shape)
 
-xdatas = [2*np.pi*np.arange(n_tar_loc)/n_tar_loc] * n_tar
+        y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
+        choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
+        choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
+        ydatas = choose1/(choose1 + choose2)
 
-plot_psychometric_varytime(xdatas, ydatas,
-                          labels=['{:0.3f}'.format(t) for t in 2*cohs],
-                          colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
-                          legtitle='Tar1 - Tar2',rule=CHOICE_MOD1, **kwargs)
+    xdatas = [2*np.pi*np.arange(n_tar_loc)/n_tar_loc] * n_tar
 
+    plot_psychometric_varyloc(xdatas, ydatas,
+                              labels=['{:0.3f}'.format(t) for t in 2*cohs],
+                              colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
+                              legtitle='Tar1 - Tar2',rule=CHOICE_MOD1, **kwargs)
 
 def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
     '''
@@ -781,10 +786,10 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
         ax.plot(xdata, ydata, 'o-', color=colors[i], label=labels[i], markersize=3)
 
     plt.xlabel('Stim. Time (ms)',fontsize=7)
-    plt.ylim([0.45,1.05])
-    plt.yticks([0.5,1])
+    plt.ylim([-0.05,1.05])
+    plt.yticks([0, 0.5, 1])
     if 'no_ylabel' in kwargs and kwargs['no_ylabel']:
-        plt.yticks([0.5,1],['',''])
+        plt.yticks([0, 0.5,1],['',''])
     else:
         plt.ylabel('Performance',fontsize=6)
     plt.title(rule_name[kwargs['rule']], fontsize=6)
@@ -799,15 +804,15 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
     ax.spines["top"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-    savename = 'figure/analyze_'+rule_name[kwargs['rule']].replace(' ','') + '_performance_temp'
+    savename = 'figure/analyze_'+rule_name[kwargs['rule']].replace(' ','') + '_varyloc'
     if 'savename_append' in kwargs:
         savename += kwargs['savename_append']
 
     plt.savefig(savename+'.pdf', transparent=True)
     # plt.show()
     
-# plot_trainingprogress('choiceonly_strongnoise_500')
-# plot_finalperformance('choiceonly_strongnoise')
+# plot_trainingprogress('allrule_weaknoise_400')
+# plot_finalperformance('allrule_weaknoise')
 
 # psychometric_choice('choiceonly_exp_weaknoise_300')
 # psychometric_choiceattend('tf_attendonly_500')
@@ -815,8 +820,9 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
 # psychometric_choiceint('tf_withrecnoise_400')
 # psychometric_delaychoice('tf_withrecnoise_400')
 
-save_addon = 'choiceonly_weaknoise_220'
-# psychometric_choice_varytime(save_addon, savename_append=save_addon)
+save_addon = 'allrule_weaknoise_500'
+psychometric_choice_varytime(save_addon, savename_append=save_addon)
 # psychometric_choiceattend_varytime('attendonly_weaknoise_200')
 # psychometric_choiceint_varytime('allrule_weaknoise_200')
 
+# psychometric_choice_varyloc(save_addon, savename_append=save_addon)
