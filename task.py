@@ -362,31 +362,27 @@ def choicego_(config, mode, tar_mod, **kwargs):
     dt = config['dt']
     if mode == 'random': # Randomly generate parameters
         batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,3000)/dt)
-
-        # A list of locations of fixation points and fixation off time
-        fix_offs = tdim - (np.ones(batch_size)*500/dt).astype(int)
 
         # A list of locations of targets (they are always on)
         tar_dist = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
         tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
         tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
 
-
+        # Target strengths
         tars_mean = np.random.uniform(0.8,1.2,(batch_size,))
         tars_diff = np.random.uniform(0.01,0.2,(batch_size,))
-        # tars_diff = np.random.choice([0.005, 0.01, 0.02, 0.04, 0.08, 0.16],(batch_size,))
         tars_sign = np.random.choice([1,-1], (batch_size,))
 
         tar1_strengths = tars_mean + tars_diff*tars_sign/2
         tar2_strengths = tars_mean - tars_diff*tars_sign/2
 
-        # tar1_strengths = np.random.uniform(0.8,1.2,(batch_size,))
-        # tar2_strengths = np.random.uniform(0.8,1.2,(batch_size,))
-
         # Time of targets on/off
-        tar_ons = (np.ones(batch_size)*np.random.uniform(100,400)/dt).astype(int)
+        tar_on = int(np.random.uniform(100,400)/dt)
+        tar_ons = (np.ones(batch_size)*tar_on).astype(int)
+        tar_dur = int(np.random.uniform(500,2100)/dt)
+        fix_offs = (tar_ons+tar_dur).astype(int)
+        # each batch consists of sequences of equal length
+        tdim = tar_on+tar_dur+int(500/dt)
 
     elif mode == 'sample':
         tdim = int(kwargs['t_tot']/dt)
@@ -748,14 +744,15 @@ def choicedelaygo_(config, mode, tar_mod, **kwargs):
         tdim = max(fix_offs) + int(300/dt) # longest trial
 
     elif mode == 'sample':
-        tdim = int(3300/dt)
-        fix_offs  = np.array([int(2800/dt)])
         tar1_locs = [0.5*np.pi]
         tar2_locs = [1.5*np.pi]
         tar1_strengths = [2.0] # always make tar1 stronger
         tar2_strengths = [0.75]
         tar1_ons = [int(100/dt)]
         tar1_offs = [int(300/dt)]
+
+        tdim = int(3300/dt)
+        fix_offs  = np.array([int(2800/dt)])
         tar2_ons = [int(2500/dt)]
         tar2_offs = [int(2700/dt)]
         batch_size = 1

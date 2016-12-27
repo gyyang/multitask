@@ -684,6 +684,69 @@ def psychometric_choiceint_varytime(save_addon, **kwargs):
                                   colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
                                   legtitle='Tar1 - Tar2',rule=CHOICE_INT, **kwargs)
 
+def psychometric_delaychoice_varytime(save_addon, **kwargs):
+    print('Starting standard analysis of the DELAY CHOICE task...')
+    with Run(save_addon, fast_eval=fast_eval) as R:
+        n_tar_loc = 300
+        n_tar = 1
+        batch_size = n_tar_loc * n_tar
+        batch_shape = (n_tar_loc,n_tar)
+        ind_tar_loc, ind_tar = np.unravel_index(range(batch_size),batch_shape)
+
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
+
+        tar_str_range = 0.2
+        cohs = tar_str_range*(2**np.arange(n_tar))/(2**(n_tar-1))
+        tar1_strengths = 1 + cohs[ind_tar]
+        tar2_strengths = 2 - tar1_strengths
+
+        tar1_ons = 200
+        tar1_offs = 500
+        # tar1 offset and tar2 onset time difference
+        dtars = np.logspace(np.log10(100), np.log10(5000), 5, dtype=int)
+        # dtars = np.array([400,600,1000,1400,2000]) - 500
+        ydatas = list()
+        for dtar in dtars:
+            tar2_ons  = tar1_offs + dtar
+            tar2_offs = tar2_ons + 200
+            params = {'tar1_locs'    : tar1_locs,
+                      'tar2_locs'    : tar2_locs,
+                      'tar1_strengths' : tar1_strengths,
+                      'tar2_strengths' : tar2_strengths,
+                      'tar1_ons'     : tar1_ons,
+                      'tar1_offs'    : tar1_offs,
+                      'tar2_ons'     : tar2_ons,
+                      'tar2_offs'    : tar2_offs,
+                      }
+
+            task  = generate_onebatch(CHOICEDELAY_MOD1, R.config, 'psychometric', params=params)
+            # y_loc_sample = R.f_y_loc_from_x(task.x)
+            y_sample = R.f_y_from_x(task.x)
+            y_loc_sample = R.f_y_loc(y_sample)
+            perf = get_perf(y_sample, task.y_loc)
+            print('Performance {:0.3f}'.format(np.mean(perf)))
+
+            y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
+
+            tar1_locs_ = np.reshape(tar1_locs, batch_shape)
+            tar2_locs_ = np.reshape(tar2_locs, batch_shape)
+
+            choose1 = (get_dist(y_loc_sample - tar1_locs_) < 0.3*np.pi).sum(axis=0)
+            choose2 = (get_dist(y_loc_sample - tar2_locs_) < 0.3*np.pi).sum(axis=0)
+            ydatas.append(choose1/(choose1 + choose2))
+
+        xdatas = [dtars] * n_tar
+        ydatas = np.array(ydatas).T
+
+
+    plot_psychometric_varytime(xdatas, ydatas,
+                               labels=['{:0.3f}'.format(t) for t in 2*cohs],
+                               colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
+                               legtitle='Tar1 - Tar2',rule=CHOICEDELAY_MOD1,
+                               xlabel='Delay time (ms)', **kwargs)
+
+
 def plot_psychometric_varytime(xdatas, ydatas, labels, colors, **kwargs):
     '''
     Standard function for plotting the psychometric curves
@@ -699,9 +762,13 @@ def plot_psychometric_varytime(xdatas, ydatas, labels, colors, **kwargs):
         ydata = ydatas[i]
         ax.plot(xdata, ydata, 'o-', color=colors[i], label=labels[i], markersize=3)
 
-    plt.xlabel('Stim. Time (ms)',fontsize=7)
-    plt.ylim([0.45,1.05])
-    plt.yticks([0.5,1])
+    if 'xlabel' in kwargs:
+        xlabel = kwargs['xlabel']
+    else:
+        xlabel = 'Stim. Time (ms)'
+    plt.xlabel(xlabel,fontsize=7)
+    # plt.ylim([0.45,1.05])
+    # plt.yticks([0.5,1])
     if 'no_ylabel' in kwargs and kwargs['no_ylabel']:
         plt.yticks([0.5,1],['',''])
     else:
@@ -811,7 +878,7 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
     plt.savefig(savename+'.pdf', transparent=True)
     # plt.show()
     
-# plot_trainingprogress('allrule_weaknoise_400')
+plot_trainingprogress('allrule_weaknoise_400')
 # plot_finalperformance('allrule_weaknoise')
 
 # psychometric_choice('choiceonly_exp_weaknoise_300')
@@ -820,9 +887,50 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
 # psychometric_choiceint('tf_withrecnoise_400')
 # psychometric_delaychoice('tf_withrecnoise_400')
 
-save_addon = 'allrule_weaknoise_500'
-psychometric_choice_varytime(save_addon, savename_append=save_addon)
+# save_addon = 'delaychoiceonly_weaknoise_140'
+# save_addon = 'allrule_weaknoise_100'
+# psychometric_choice_varytime(save_addon, savename_append=save_addon)
 # psychometric_choiceattend_varytime('attendonly_weaknoise_200')
 # psychometric_choiceint_varytime('allrule_weaknoise_200')
+# psychometric_delaychoice_varytime(save_addon, savename_append=save_addon)
 
 # psychometric_choice_varyloc(save_addon, savename_append=save_addon)
+
+
+
+# Debug
+#==============================================================================
+# save_addon = 'delaychoiceonly_weaknoise_500'
+# perfs1 = list()
+# times1 = list()
+# for j in range(5):
+#     start = time.time()
+#     with Run(save_addon, fast_eval=fast_eval) as R:
+#         task  = generate_onebatch(CHOICE_MOD1, R.config, 'random', batch_size=200)
+#         y_sample = R.f_y_from_x(task.x)
+#         y_loc_sample = R.f_y_loc(y_sample)
+#         perf = get_perf(y_sample, task.y_loc)
+#     print('Performance {:0.3f}'.format(np.mean(perf)))
+#     print(time.time()-start)
+#     times1.append(time.time()-start)
+#     perfs1.append(np.mean(perf))
+#==============================================================================
+
+#==============================================================================
+# perfs2 = list()
+# times2 = list()
+# for j in range(20):
+#     start = time.time()
+#     perf = list()
+#     with Run(save_addon, fast_eval=fast_eval) as R:
+#         for i in range(20):
+#             task  = generate_onebatch(CHOICE_MOD1, R.config, 'random', batch_size=int(2000/20))
+#             y_sample = R.f_y_from_x(task.x)
+#             y_loc_sample = R.f_y_loc(y_sample)
+#             perf.append(get_perf(y_sample, task.y_loc))
+#     perf = np.array(perf)
+#     print('Performance {:0.3f}'.format(np.mean(perf)))
+#     print(time.time()-start)
+#     times2.append(time.time()-start)
+#     perfs2.append(np.mean(perf))
+#==============================================================================

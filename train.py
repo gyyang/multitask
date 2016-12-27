@@ -40,10 +40,11 @@ def train(HDIM, save_addon_type):
         DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
     elif 'attendonly' in save_addon_type:
         rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+    elif 'delaychoiceonly' in save_addon_type: # This has to be before choiceonly
+        rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
     elif 'choiceonly' in save_addon_type:
         rules = [CHOICE_MOD1, CHOICE_MOD2]
-    elif 'delaychoiceonly' in save_addon_type:
-        rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
+
 
     rule_weights = np.ones(len(rules))
 
@@ -62,8 +63,8 @@ def train(HDIM, save_addon_type):
     learning_rate = 0.001
     training_iters = 2000000
     batch_size_train = 50
-    batch_size_test = 200
-    display_step = 200
+    batch_size_test = 2000
+    display_step = 1000
 
     # learning_rate = 0.001
     # training_iters = 500000
@@ -133,16 +134,24 @@ def train(HDIM, save_addon_type):
                     print('Trial {:7d}'.format(trials[-1]) +
                           '  | Time {:0.2f} s'.format(times[-1]))
                     for rule in rules:
-                        task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test)
-                        y_hat_test = sess.run(y_hat, feed_dict={x: task.x})
-                        y_hat_test = y_hat_test.reshape((-1,batch_size_test,n_output))
-                        c_test = np.mean(((y_hat_test-task.y)*task.c_mask)**2)
-                        perf_test = np.mean(get_perf(y_hat_test, task.y_loc))
-                        cost_tests[rule].append(c_test)
-                        perf_tests[rule].append(perf_test)
+                        n_rep = 20
+                        batch_size_test_rep = int(batch_size_test/n_rep)
+                        c_rep = list()
+                        perf_rep = list()
+                        for i_rep in range(n_rep):
+                            task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep)
+                            y_hat_test = sess.run(y_hat, feed_dict={x: task.x})
+                            y_hat_test = y_hat_test.reshape((-1,batch_size_test_rep,n_output))
+                            c_test = np.mean(((y_hat_test-task.y)*task.c_mask)**2)
+                            perf_test = np.mean(get_perf(y_hat_test, task.y_loc))
+                            c_rep.append(c_test)
+                            perf_rep.append(perf_test)
+
+                        cost_tests[rule].append(np.mean(c_rep))
+                        perf_tests[rule].append(np.mean(perf_rep))
                         print('{:15s}'.format(rule_name[rule]) +
-                              '| cost {:0.5f}'.format(c_test)  +
-                              '  | perf {:0.2f}'.format(perf_test))
+                              '| cost {:0.5f}'.format(cost_tests[rule][-1])  +
+                              '  | perf {:0.2f}'.format(perf_tests[rule][-1]))
                 step += 1
             except KeyboardInterrupt:
                 break
@@ -167,4 +176,4 @@ def train(HDIM, save_addon_type):
 
 
 if __name__ == '__main__':
-    train(HDIM=100, save_addon_type='delaychoiceonly_weaknoise')
+    train(HDIM=40, save_addon_type='allrule_weaknoise')
