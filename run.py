@@ -378,7 +378,7 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
 
 if __name__ == "__main__":
     # schematic_plot()
-    sample_plot(save_addon='allrule_weaknoise_140', rule=CHOICEDELAY_MOD1, save=False)
+    sample_plot(save_addon='allrule_weaknoise_300', rule=CHOICEDELAY_MOD1, save=False)
     # plot_singleneuron_intime('allrule_strongnoise_500', [412], [GO, CHOICEDELAY_MOD2, DMCNOGO],
     #                          epoch=None, save=True, ylabel_firstonly=True)
     pass

@@ -878,7 +878,7 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
     plt.savefig(savename+'.pdf', transparent=True)
     # plt.show()
     
-plot_trainingprogress('allrule_weaknoise_400')
+plot_trainingprogress('allrule_weaknoise_320')
 # plot_finalperformance('allrule_weaknoise')
 
 # psychometric_choice('choiceonly_exp_weaknoise_300')
@@ -888,7 +888,7 @@ plot_trainingprogress('allrule_weaknoise_400')
 # psychometric_delaychoice('tf_withrecnoise_400')
 
 # save_addon = 'delaychoiceonly_weaknoise_140'
-# save_addon = 'allrule_weaknoise_100'
+# save_addon = 'allrule_weaknoise_320'
 # psychometric_choice_varytime(save_addon, savename_append=save_addon)
 # psychometric_choiceattend_varytime('attendonly_weaknoise_200')
 # psychometric_choiceint_varytime('allrule_weaknoise_200')

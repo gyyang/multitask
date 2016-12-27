@@ -129,14 +129,21 @@ class Task(object):
         Scale the mask weight for the post period so in total it's as important
         as the pre period
         '''
-        pre_on   = int(50/self.dt) # never check the first 50ms
+        pre_on   = int(100/self.dt) # never check the first 100ms
         pre_offs = self.expand(pre_offs)
         post_ons = self.expand(post_ons)
 
+        if post_ons[0] is None:
+            ValueError('Post_on can no longer be None')
+
         for i in range(self.batch_size):
-            self.c_mask[pre_on:pre_offs[i], i, :] = 1.
-            if post_ons[i] is not None:
-                self.c_mask[post_ons[i]:, i, :] = (pre_offs[i]-pre_on)/(self.tdim-post_ons[i])
+            # Post response periods usually have the same length across tasks
+            self.c_mask[post_ons[i]:, i, :] = 1.
+            # Pre-response periods usually have different lengths across tasks
+            # To keep cost comparable across tasks
+            # Scale the cost mask of the pre-response period by a factor
+            self.c_mask[pre_on:pre_offs[i], i, :] = (self.tdim-post_ons[i])/(pre_offs[i]-pre_on)
+
         #self.c_mask[:, :, 0] *= self.N_RING # Fixation is important
         self.c_mask[:, :, 0] *= 2 # Fixation is important
 
