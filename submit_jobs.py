@@ -114,17 +114,22 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 # Submit a job
 #=========================================================================================
 
-nunits = range(20,1001,20)[::-1]
+nunits = range(20,501,20)[::-1]
+s_list = [0, 1, 2]
+
 for nunit in nunits:
-    for saveaddontype in [0, 1, 2]:
-        jobname = 'job_{:d}_{:d}'.format(saveaddontype, nunit)
-        cmd     = 'python -u main.py -n {:d} -s {:d}'.format(nunit, saveaddontype)
+    for s in s_list:
+
+        jobname = 'job_{:d}_{:d}'.format(s, nunit)
+        train_arg = 'HDIM={:d}, s={:d}'.format(nunit, s)
+        cmd     = r'''python -c "import train as t;t.train('''+train_arg+''')"'''
+
         pbspath = './pbs/'
         scratchpath = '/scratch/gy441/multitask/'
 
         jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
                                          ppn=1, gpus=0)
-        subprocess.call(['qsub', jobfile])
+        # subprocess.call(['qsub', jobfile])
 
 
 

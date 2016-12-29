@@ -19,7 +19,32 @@ from task import *
 from network import LeakyRNNCell, get_perf
 
 
-def train(HDIM, save_addon_type):
+def train(HDIM, s):
+    if s == 0:
+        save_addon_type = 'allrule_nonoise'
+    elif s == 1:
+        save_addon_type = 'allrule_weaknoise'
+    elif s == 2:
+        save_addon_type = 'allrule_strongnoise'
+    elif s == 3:
+        save_addon_type = 'attendonly_nonoise'
+    elif s == 4:
+        save_addon_type = 'attendonly_weaknoise'
+    elif s == 5:
+        save_addon_type = 'attendonly_strongnoise'
+    elif s == 6:
+        save_addon_type = 'choiceonly_nonoise'
+    elif s == 7:
+        save_addon_type = 'choiceonly_weaknoise'
+    elif s == 8:
+        save_addon_type = 'choiceonly_strongnoise'
+    elif s == 9:
+        save_addon_type = 'delaychoiceonly_nonoise'
+    elif s == 10:
+        save_addon_type = 'delaychoiceonly_weaknoise'
+    elif s == 11:
+        save_addon_type = 'delaychoiceonly_strongnoise'
+
     tf.reset_default_graph()
 
     N_RING = 16
@@ -61,7 +86,7 @@ def train(HDIM, save_addon_type):
 
     # Parameters
     learning_rate = 0.001
-    training_iters = 2000000
+    training_iters = 3000000
     batch_size_train = 50
     batch_size_test = 2000
     display_step = 1000
@@ -182,4 +207,4 @@ def train(HDIM, save_addon_type):
 
 
 if __name__ == '__main__':
-    train(HDIM=40, save_addon_type='allrule_weaknoise')
+    train(HDIM=40, s=1)
