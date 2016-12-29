@@ -142,6 +142,7 @@ def train(HDIM, save_addon_type):
                             task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep)
                             y_hat_test = sess.run(y_hat, feed_dict={x: task.x})
                             y_hat_test = y_hat_test.reshape((-1,batch_size_test_rep,n_output))
+
                             # Cost is first summed over time, and averaged across batch and units
                             # We did the averaging over time through c_mask
                             c_test = np.mean(np.sum(((y_hat_test-task.y)*task.c_mask)**2, axis=0))
@@ -175,6 +176,9 @@ def train(HDIM, save_addon_type):
     from variance import compute_variance
     compute_variance(config['save_addon'], 'rule', rules)
     print('Computed variance')
+
+    from performance import psychometric_choice_varytime
+    psychometric_choice_varytime(config['save_addon'], savename_append=config['save_addon'])
 
 
 if __name__ == '__main__':

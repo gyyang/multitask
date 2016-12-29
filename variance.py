@@ -16,17 +16,28 @@ import seaborn.apionly as sns
 from task import *
 from run import Run
 
-def compute_variance(save_addon, data_type, rules):
+def compute_variance(save_addon, data_type, rules,
+                     random_rotation=False, fast_eval=False):
     ########################## Running the network ################################
     n_rules = len(rules)
 
     h_all_byrule  = OrderedDict()
     h_all_byepoch = OrderedDict()
-    with Run(save_addon, sigma_rec=0) as R:
+    with Run(save_addon, sigma_rec=0, fast_eval=fast_eval) as R:
         config = R.config
+        nx, nh, ny = config['shape']
+
+        if random_rotation:
+            # Generate random orthogonal matrix
+            from scipy.stats import ortho_group
+            random_ortho_matrix = ortho_group.rvs(dim=nh)
+
         for rule in rules:
             task = generate_onebatch(rule=rule, config=config, mode='test')
-            h_all_byrule[rule] = R.f_h(task.x)
+            h = R.f_h(task.x)
+            if random_rotation:
+                h = np.dot(h, random_ortho_matrix) # randomly rotate
+            h_all_byrule[rule] = h
             for e_name, e_time in task.epochs.iteritems():
                 if 'fix' not in e_name:
                     h_all_byepoch[(rule, e_name)] = h_all_byrule[rule][e_time[0]:e_time[1],:,:]
@@ -39,7 +50,6 @@ def compute_variance(save_addon, data_type, rules):
     ind_key_sort = np.lexsort(zip(*keys))
     h_all_byepoch = OrderedDict([(keys[i], h_all_byepoch[keys[i]]) for i in ind_key_sort])
 
-    nx, nh, ny = config['shape']
     n_ring = config['N_RING']
 
     if data_type == 'rule':
@@ -60,6 +70,9 @@ def compute_variance(save_addon, data_type, rules):
         h_var_all[:, i] = val[t_start:].var(axis=1).mean(axis=0)
 
     result = {'h_var_all' : h_var_all, 'keys' : h_all.keys()}
+    if random_rotation:
+        save_addon += '_rr'
+
     with open('data/variance'+data_type+save_addon+'.pkl','wb') as f:
         pickle.dump(result, f)
 
@@ -81,26 +94,64 @@ def plot_variance(save_addon, data_type):
     ax.spines["top"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-    plt.savefig('figure/hist_totalvar.pdf', transparent=True)
+    # plt.savefig('figure/hist_totalvar.pdf', transparent=True)
     plt.show()
+
+
+
+def get_random_rotation_variance(save_addon, data_type):
+    # save_addon = 'allrule_weaknoise_300'
+    # data_type = 'rule'
+
+    # If not computed, use variance.py
+    fname = 'data/variance'+data_type+save_addon+'_rr'
+    with open(fname+'.pkl','rb') as f:
+        res = pickle.load(f)
+    h_var_all = res['h_var_all']
+    keys      = res['keys']
+
+    # First only get active units. Total variance across tasks larger than 1e-3
+    ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
+    h_var_all  = h_var_all[ind_active, :]
+
+    # Normalize by the total variance across tasks
+    h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
+
+    p_low, p_high = 2.5, 97.5
+    normvar_low, normvar_high = np.percentile(h_normvar_all.flatten(), [p_low, p_high])
+
+    fig = plt.figure(figsize=(1.5,1.2))
+    ax = fig.add_axes([0.3,0.3,0.6,0.5])
+    hist, bins_edge = np.histogram(h_normvar_all.flatten(), bins=30)
+    ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
+           color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+    # ax.set_xlim([0,0.3])
+    ax.plot([normvar_low]*2,  [0, hist.max()], 'black')
+    ax.plot([normvar_high]*2, [0, hist.max()], 'black')
+    plt.locator_params(nbins=3)
+
+    print('{:0.1f} percentile: {:0.2f}'.format(p_low,  normvar_low))
+    print('{:0.1f} percentile: {:0.2f}'.format(p_high, normvar_high))
 
 
 if __name__ == '__main__':
     # save_addon = 'tf_withrecnoise_500'
-    save_addon = 'allrule_weaknoise_500'
+    save_addon = 'choiceonly_weaknoise_300'
     data_type = 'rule'
 
     # rules = [GO, INHGO, DELAYGO,\
     #     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    #     CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+    #     CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
     #     REMAP, INHREMAP, DELAYREMAP,\
     #     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
 
     # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
-    rules = [DELAYMATCHGO, DMCGO]
-
+    # rules = [DELAYMATCHGO, DMCGO]
+    rules = [CHOICE_MOD1, CHOICE_MOD2]
+    
     # start = time.time()
-    compute_variance(save_addon, data_type, rules)
-    plot_variance(save_addon, data_type)
+    # compute_variance(save_addon, data_type, rules, random_rotation=True)
+    # plot_variance(save_addon, data_type)
     # print('Time taken {:0.2f} s'.format(time.time()-start))
+    get_random_rotation_variance(save_addon, data_type)
 

@@ -114,9 +114,9 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 # Submit a job
 #=========================================================================================
 
-nunits = range(20,501,20)[::-1]
+nunits = range(20,1001,20)[::-1]
 for nunit in nunits:
-    for saveaddontype in [0, 1, 2, 12, 13, 14]:
+    for saveaddontype in [0, 1, 2]:
         jobname = 'job_{:d}_{:d}'.format(saveaddontype, nunit)
         cmd     = 'python -u main.py -n {:d} -s {:d}'.format(nunit, saveaddontype)
         pbspath = './pbs/'

@@ -44,8 +44,9 @@ def plot_trainingprogress(save_addon, rule_plot=None, save=True):
     cost_tests  = config['cost_tests']
     perf_tests  = config['perf_tests']
 
-    fig = plt.figure(figsize=(5,3))
-    d1, d2 = 0.01, 0.35
+    fs = 6 # fontsize
+    fig = plt.figure(figsize=(3.5,2.5))
+    d1, d2 = 0.015, 0.35
     ax1 = fig.add_axes([0.15,0.5+d1,   0.5,d2])
     ax2 = fig.add_axes([0.15,0.5-d1-d2,0.5,d2])
     lines = list()
@@ -61,25 +62,25 @@ def plot_trainingprogress(save_addon, rule_plot=None, save=True):
         lines.append(line[0])
         labels.append(rule_name[rule])
 
-    ax1.tick_params(axis='both', which='major', labelsize=7)
-    ax2.tick_params(axis='both', which='major', labelsize=7)
+    ax1.tick_params(axis='both', which='major', labelsize=fs)
+    ax2.tick_params(axis='both', which='major', labelsize=fs)
 
     ax2.set_ylim([-0.05, 1.05])
-    ax2.set_xlabel('Total trials (1,000)',fontsize=7)
-    ax2.set_ylabel('performance',fontsize=7)
-    ax1.set_ylabel('log(cost)',fontsize=7)
+    ax2.set_xlabel('Total trials (1,000)',fontsize=fs, labelpad=2)
+    ax2.set_ylabel('performance',fontsize=fs)
+    ax1.set_ylabel(r'$log_{10}$(cost)',fontsize=fs)
     ax1.set_xticklabels([])
-    ax1.set_title('Training time {:0.1f} hours'.format(times[-1]/3600.),fontsize=7)
-    lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.65,0.5),
-                    fontsize=7,labelspacing=0.3,loc=6)
-    plt.setp(lg.get_title(),fontsize=7)
+    ax1.set_title('Training time {:0.1f} hours'.format(times[-1]/3600.),fontsize=fs)
+    lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.7,0.5),
+                    fontsize=fs,labelspacing=0.3,loc=6)
+    plt.setp(lg.get_title(),fontsize=fs)
     if save:
         plt.savefig('figure/Training_Progress'+config['save_addon']+'.pdf', transparent=True)
     plt.show()
 
 def plot_finalperformance(save_type):
     # Initialization. Dictionary comprehension.
-    HDIM, N_RING = 500, 16
+    HDIM, N_RING = 200, 16
     save_addon = save_type+'_'+str(HDIM)
     with open('data/config'+save_addon+'.pkl','rb') as f:
         config = pickle.load(f)
@@ -485,8 +486,8 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 def psychometric_choice_varytime(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICE task...')
     with Run(save_addon, fast_eval=fast_eval) as R:
-        n_tar_loc = 300
-        n_tar = 5
+        n_tar_loc = 1000
+        n_tar = 4
         batch_size = n_tar_loc * n_tar
         batch_shape = (n_tar_loc,n_tar)
         ind_tar_loc, ind_tar = np.unravel_index(range(batch_size),batch_shape)
@@ -494,13 +495,14 @@ def psychometric_choice_varytime(save_addon, **kwargs):
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-        tar_str_range = 0.16
+        tar_str_range = 0.08
+        # tar_str_range = 0.04
         cohs = tar_str_range*(2**np.arange(n_tar))/(2**(n_tar-1))
         tar1_strengths = 1 + cohs[ind_tar]
         tar2_strengths = 2 - tar1_strengths
 
         ydatas = list()
-        tar_times = np.logspace(np.log10(100), np.log10(1500), 10, dtype=int)
+        tar_times = np.logspace(np.log10(200), np.log10(1500), 8, dtype=int)
         for tar_time in tar_times:
             params = {'tar1_locs' : tar1_locs,
                       'tar2_locs' : tar2_locs,
@@ -523,6 +525,7 @@ def psychometric_choice_varytime(save_addon, **kwargs):
         ydatas = np.array(ydatas).T
 
 
+    # Plot how the threshold varies with stimulus duration
     weibull = lambda x, a, b : 1 - 0.5*np.exp(-(x/a)**b)
     xdata = cohs
 
@@ -530,7 +533,7 @@ def psychometric_choice_varytime(save_addon, **kwargs):
     for i in range(len(tar_times)):
         ydata = ydatas[:, i]
         res = minimize(lambda param: np.sum((weibull(xdata, param[0], param[1])-ydata)**2),
-                       [0.1, 1], bounds=([0.01,1],[0.1,10]), method='L-BFGS-B')
+                       [0.1, 1], bounds=([1e-3,1],[1e-5,10]), method='L-BFGS-B')
         alpha, beta = res.x
         alpha_fits.append(alpha)
 
@@ -547,13 +550,13 @@ def psychometric_choice_varytime(save_addon, **kwargs):
     #==============================================================================
 
     perfect_int = lambda x, b: -0.5*x+b
-    b, _ = curve_fit(perfect_int, np.log(tar_times), np.log(alpha_fits))
+    b, _ = curve_fit(perfect_int, np.log10(tar_times), np.log10(alpha_fits))
 
     plt.figure()
-    plt.plot(np.log(tar_times), np.log(alpha_fits), 'o-')
-    plt.plot(np.log(tar_times), -0.5*np.log(tar_times)+b, color='red')
-    _ = plt.xticks(np.log(np.array([100,200,400,600,800])),
-                   ['100','200','400','600','800'])
+    plt.plot(np.log10(tar_times), np.log10(alpha_fits), 'o-')
+    plt.plot(np.log10(tar_times), -0.5*np.log10(tar_times)+b, color='red')
+    _ = plt.xticks(np.log10(np.array([200,400,600,800,1500])),
+                   ['200','400','600','800','1500'])
     #plt.xlim([80,1500])
     savename = 'figure/analyze_'+rule_name[CHOICE_MOD1].replace(' ','') + '_varytime2'
     if 'savename_append' in kwargs:
@@ -877,60 +880,22 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
 
     plt.savefig(savename+'.pdf', transparent=True)
     # plt.show()
-    
-plot_trainingprogress('allrule_weaknoise_320')
-# plot_finalperformance('allrule_weaknoise')
-
-# psychometric_choice('choiceonly_exp_weaknoise_300')
-# psychometric_choiceattend('tf_attendonly_500')
-# psychometric_choiceattend_varytime('tf_withrecnoise_400')
-# psychometric_choiceint('tf_withrecnoise_400')
-# psychometric_delaychoice('tf_withrecnoise_400')
-
-# save_addon = 'delaychoiceonly_weaknoise_140'
-# save_addon = 'allrule_weaknoise_320'
-# psychometric_choice_varytime(save_addon, savename_append=save_addon)
-# psychometric_choiceattend_varytime('attendonly_weaknoise_200')
-# psychometric_choiceint_varytime('allrule_weaknoise_200')
-# psychometric_delaychoice_varytime(save_addon, savename_append=save_addon)
-
-# psychometric_choice_varyloc(save_addon, savename_append=save_addon)
 
 
+if __name__ == '__main__':
+    pass
+    # plot_trainingprogress('allrule_weaknoise_400')
+    # plot_finalperformance('allrule_weaknoise')
 
-# Debug
-#==============================================================================
-# save_addon = 'delaychoiceonly_weaknoise_500'
-# perfs1 = list()
-# times1 = list()
-# for j in range(5):
-#     start = time.time()
-#     with Run(save_addon, fast_eval=fast_eval) as R:
-#         task  = generate_onebatch(CHOICE_MOD1, R.config, 'random', batch_size=200)
-#         y_sample = R.f_y_from_x(task.x)
-#         y_loc_sample = R.f_y_loc(y_sample)
-#         perf = get_perf(y_sample, task.y_loc)
-#     print('Performance {:0.3f}'.format(np.mean(perf)))
-#     print(time.time()-start)
-#     times1.append(time.time()-start)
-#     perfs1.append(np.mean(perf))
-#==============================================================================
+    # psychometric_choice('choiceonly_exp_weaknoise_300')
+    # psychometric_choiceattend('tf_attendonly_500')
+    # psychometric_choiceattend_varytime('tf_withrecnoise_400')
+    # psychometric_choiceint('tf_withrecnoise_400')
+    # psychometric_delaychoice('tf_withrecnoise_400')
 
-#==============================================================================
-# perfs2 = list()
-# times2 = list()
-# for j in range(20):
-#     start = time.time()
-#     perf = list()
-#     with Run(save_addon, fast_eval=fast_eval) as R:
-#         for i in range(20):
-#             task  = generate_onebatch(CHOICE_MOD1, R.config, 'random', batch_size=int(2000/20))
-#             y_sample = R.f_y_from_x(task.x)
-#             y_loc_sample = R.f_y_loc(y_sample)
-#             perf.append(get_perf(y_sample, task.y_loc))
-#     perf = np.array(perf)
-#     print('Performance {:0.3f}'.format(np.mean(perf)))
-#     print(time.time()-start)
-#     times2.append(time.time()-start)
-#     perfs2.append(np.mean(perf))
-#==============================================================================
+    # save_addon = 'delaychoiceonly_weaknoise_140'
+    save_addon = 'allrule_weaknoise_260'
+    psychometric_choice_varytime(save_addon, savename_append=save_addon)
+    # psychometric_choiceattend_varytime('attendonly_weaknoise_200')
+    # psychometric_choiceint_varytime('allrule_weaknoise_200')
+    # psychometric_delaychoice_varytime(save_addon, savename_append=save_addon)

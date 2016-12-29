@@ -57,7 +57,7 @@ class Task(object):
         :param info: TEMPORARILY info is provided here
         :return:
         '''
-        self.float_type = 'float32' # This should be the default theano.config.floatX
+        self.float_type = 'float32' # This should be the default
         self.config     = config
         self.dt         = self.config['dt']
         N_RING          = self.config['N_RING']
@@ -133,8 +133,8 @@ class Task(object):
         pre_offs = self.expand(pre_offs)
         post_ons = self.expand(post_ons)
 
-        if post_ons[0] is None:
-            ValueError('Post_on can no longer be None')
+        # if post_ons[0] is None:
+        #     ValueError('Post_on can no longer be None')
 
         for i in range(self.batch_size):
             # Post response periods usually have the same length across tasks
@@ -377,7 +377,8 @@ def choicego_(config, mode, tar_mod, **kwargs):
 
         # Target strengths
         tars_mean = np.random.uniform(0.8,1.2,(batch_size,))
-        tars_diff = np.random.uniform(0.01,0.2,(batch_size,))
+        # tars_diff = np.random.uniform(0.01,0.2,(batch_size,))
+        tars_diff = np.random.choice([0.02, 0.04, 0.08], (batch_size,)) # This helo
         tars_sign = np.random.choice([1,-1], (batch_size,))
 
         tar1_strengths = tars_mean + tars_diff*tars_sign/2
@@ -386,7 +387,8 @@ def choicego_(config, mode, tar_mod, **kwargs):
         # Time of targets on/off
         tar_on = int(np.random.uniform(100,400)/dt)
         tar_ons = (np.ones(batch_size)*tar_on).astype(int)
-        tar_dur = int(np.random.uniform(500,2100)/dt)
+        # tar_dur = int(np.random.uniform(300,1500)/dt)
+        tar_dur = int(np.random.uniform(900, 1500)/dt)
         fix_offs = (tar_ons+tar_dur).astype(int)
         # each batch consists of sequences of equal length
         tdim = tar_on+tar_dur+int(500/dt)

@@ -1,5 +1,6 @@
 """
 Clustering analysis
+Analyze how units are involved in various tasks
 """
 
 from __future__ import division
@@ -16,18 +17,20 @@ from task import *
 from run import Run
 
 ########################## Running the network ################################
-save_addon = 'allrule_strongnoise_500'
+save_addon = 'allrule_weaknoise_300'
 data_type = 'rule'
 
 rules = [GO, INHGO, DELAYGO,\
     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
+    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
     REMAP, INHREMAP, DELAYREMAP,\
     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
 
 # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
 
-with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
+# If not computed, use variance.py
+fname = 'data/variance'+data_type+save_addon
+with open(fname+'.pkl','rb') as f:
     res = pickle.load(f)
 h_var_all = res['h_var_all']
 keys      = res['keys']
@@ -47,6 +50,7 @@ elif data_type == 'epoch':
     n_cluster = 15
 else:
     raise ValueError
+
 # Clustering
 from sklearn.cluster import AgglomerativeClustering
 ac = AgglomerativeClustering(n_cluster, affinity='cosine', linkage='average')
