@@ -157,6 +157,86 @@ def plot_finalperformance(save_type):
     plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
     plt.show()
 
+def plot_finalperformance_lr():
+    # Specialized for varyign learning rate. Can be rewritten, but I'm lazy.
+    n_lr = 100
+    save_type = 'allrule_weaknoise'
+    save_addon = save_type+'_lr1'
+    with open('data/config'+save_addon+'.pkl','rb') as f:
+        config = pickle.load(f)
+    cost_tests  = config['cost_tests']
+    perf_tests  = config['perf_tests']
+
+    final_cost = {k: [] for k in cost_tests}
+    final_perf = {k: [] for k in cost_tests}
+    lr_plot = list()
+    training_time_plot = list()
+    # Recording performance and cost for networks
+    for i_lr in range(n_lr):
+        save_addon = save_type+'_lr'+str(i_lr)
+        fname = 'data/config'+save_addon+'.pkl'
+        if not os.path.isfile(fname):
+            continue
+        with open(fname,'rb') as f:
+            config = pickle.load(f)
+        cost_tests = config['cost_tests']
+        perf_tests = config['perf_tests']
+        # if perf_tests[DMCGO][-1] > 0.1:
+        for key in perf_tests.keys():
+            final_perf[key] += [float(perf_tests[key][-1])]
+            final_cost[key]        += [float(cost_tests[key][-1])]
+        # lr_plot.append(config['learning_rate'])
+        lr_plot.append(np.logspace(-2,-4,100)[i_lr]) # Temporary
+        training_time_plot.append(config['times'][-1])
+
+    n_trial = config['trials'][-1]
+    x_plot = np.log10(np.array(lr_plot))
+    rule_plot = None
+    if rule_plot == None:
+        rule_plot = perf_tests.keys()
+
+    fig = plt.figure(figsize=(5,3))
+    d1, d2 = 0.01, 0.35
+    ax1 = fig.add_axes([0.15,0.5+d1,   0.5,d2])
+    ax2 = fig.add_axes([0.15,0.5-d1-d2,0.5,d2])
+    lines = list()
+    labels = list()
+    for i, rule in enumerate(rule_plot):
+        line = ax1.plot(x_plot,np.log10(final_cost[rule]),color=color_rules[i%26])
+        ax2.plot(x_plot,final_perf[rule],color=color_rules[i%26])
+        lines.append(line[0])
+        labels.append(rule_name[rule])
+
+    ax1.tick_params(axis='both', which='major', labelsize=7)
+    ax2.tick_params(axis='both', which='major', labelsize=7)
+
+    ax2.set_ylim(top=1.05)
+    ax2.set_xlabel('Log (Learning rate)',fontsize=7)
+    ax2.set_ylabel('performance',fontsize=7)
+    ax1.set_ylabel(r'$log_{10}$(cost)',fontsize=7)
+    ax1.set_xticklabels([])
+    ax1.set_title('After {:.1E} trials'.format(n_trial),fontsize=7)
+    lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.65,0.5),
+                    fontsize=7,labelspacing=0.3,loc=6)
+    plt.setp(lg.get_title(),fontsize=7)
+    plt.savefig('figure/FinalCostPerformance_'+save_type+'_varylr.pdf', transparent=True)
+    plt.show()
+
+    # x_plot = np.array(HDIM_plot)/100.
+    # y_plot = np.array(training_time_plot)/3600.
+    # fig = plt.figure(figsize=(5,1.5))
+    # ax  = fig.add_axes([0.15, 0.25, 0.5, 0.7])
+    # p = np.polyfit(x_plot[x_plot<5], y_plot[x_plot<5], 2) # Temporary
+    # #p = np.polyfit(x_plot, y_plot, 2)
+    # ax.plot(x_plot, p[0]*x_plot**2+p[1]*x_plot+p[2], color='black')
+    # ax.plot(x_plot, y_plot, color=sns.xkcd_palette(['cerulean'])[0])
+    # ax.text(0.05, 0.7, 'Number of Hours = \n {:0.2f}$(N/100)^2$+{:0.2f}$(N/100)$+{:0.2f}'.format(*p), fontsize=7, transform=ax.transAxes)
+    # ax.set_xlabel('Number of Recurrent Units $N$ (100)',fontsize=7)
+    # ax.set_ylabel('Training time (hours)',fontsize=7)
+    # ax.tick_params(axis='both', which='major', labelsize=7)
+    # plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
+    # plt.show()
+
 
 ################ Psychometric - Varying Coherence #############################
 
@@ -904,9 +984,10 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
 
 if __name__ == '__main__':
     pass
-    # plot_trainingprogress('allrule_weaknoise_400')
+    plot_trainingprogress('allrule_weaknoise_lr50')
     # plot_finalperformance('allrule_weaknoise')
-
+    # plot_finalperformance_lr()
+    
     # psychometric_choice('choiceonly_exp_weaknoise_300')
     # psychometric_choiceattend('tf_attendonly_500')
     # psychometric_choiceattend_varytime('tf_withrecnoise_400')
@@ -915,8 +996,8 @@ if __name__ == '__main__':
 
     # save_addon = 'delaychoiceonly_weaknoise_140'
     save_addon = 'allrule_weaknoise_100'
-    compute_psychometric_choice_varytime(save_addon, savename_append=save_addon)
-    plot_psychometric_choice_varytime(savename_append=save_addon)
+    # compute_psychometric_choice_varytime(save_addon, savename_append=save_addon)
+    # plot_psychometric_choice_varytime(savename_append=save_addon)
     # psychometric_choiceattend_varytime('attendonly_weaknoise_200')
     # psychometric_choiceint_varytime('allrule_weaknoise_200')
     # psychometric_delaychoice_varytime(save_addon, savename_append=save_addon)

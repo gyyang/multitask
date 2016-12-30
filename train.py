@@ -20,6 +20,15 @@ from network import LeakyRNNCell, get_perf
 
 
 def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000, save_addon=None):
+    '''
+    Training the network
+    :param HDIM: Number of recurrent units
+    :param s: Type of training tasks
+    :param learning_rate: default 0.001. This is a good default value.
+    :param training_iters:
+    :param save_addon:
+    :return:
+    '''
     if s == 0:
         save_addon_type = 'allrule_nonoise'
     elif s == 1:
@@ -78,17 +87,6 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000, save_addon
     else:
         save_addon = save_addon_type + '_' + save_addon
 
-    config = {'h_type'      : 'leaky_rec',
-              'alpha'       : 0.2, # \Delta t/tau
-              'dt'          : 0.2*TAU,
-              'sigma_rec'   : sigma_rec,
-              'HDIM'        : HDIM,
-              'N_RING'      : N_RING,
-              'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : save_addon,
-              'rules'       : rules,
-              'rule_weights': rule_weights}
-
     # Parameters
     batch_size_train = 50
     batch_size_test = 2000
@@ -100,6 +98,20 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000, save_addon
     # batch_size_test = 200
     # display_step = 200
 
+    config = {'h_type'      : 'leaky_rec',
+              'alpha'       : 0.2, # \Delta t/tau
+              'dt'          : 0.2*TAU,
+              'sigma_rec'   : sigma_rec,
+              'HDIM'        : HDIM,
+              'N_RING'      : N_RING,
+              'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
+              'save_addon'  : save_addon,
+              'rules'       : rules,
+              'rule_weights': rule_weights,
+              'learning_rate': learning_rate,
+              'training_iters' : training_iters,
+              'batch_size_train' : batch_size_train,
+              'batch_size_test' : batch_size_test}
 
     # Network Parameters
     nx, nh, ny = config['shape']
