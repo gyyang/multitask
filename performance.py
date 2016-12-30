@@ -483,13 +483,13 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
 
 ################ Psychometric - Varying Stim Time #############################
 
-def psychometric_choice_varytime(save_addon, **kwargs):
+def compute_psychometric_choice_varytime(save_addon, **kwargs):
     print('Starting standard analysis of the CHOICE task...')
     with Run(save_addon, fast_eval=fast_eval) as R:
         n_tar_loc = 1000
-        n_tar = 4
-        batch_size = n_tar_loc * n_tar
-        batch_shape = (n_tar_loc,n_tar)
+        n_coh = 4
+        batch_size = n_tar_loc * n_coh
+        batch_shape = (n_tar_loc,n_coh)
         ind_tar_loc, ind_tar = np.unravel_index(range(batch_size),batch_shape)
 
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
@@ -497,7 +497,7 @@ def psychometric_choice_varytime(save_addon, **kwargs):
 
         tar_str_range = 0.08
         # tar_str_range = 0.04
-        cohs = tar_str_range*(2**np.arange(n_tar))/(2**(n_tar-1))
+        cohs = tar_str_range*(2**np.arange(n_coh))/(2**(n_coh-1))
         tar1_strengths = 1 + cohs[ind_tar]
         tar2_strengths = 2 - tar1_strengths
 
@@ -521,9 +521,30 @@ def psychometric_choice_varytime(save_addon, **kwargs):
             choose2 = (get_dist(y_loc_sample - tar2_locs_) < 0.3*np.pi).sum(axis=0)
             ydatas.append(choose1/(choose1 + choose2))
 
-        xdatas = [tar_times] * n_tar
+        xdatas = [tar_times] * n_coh
         ydatas = np.array(ydatas).T
 
+    result = {'xdatas' : xdatas, 'ydatas' : ydatas, 'cohs' : cohs}
+
+    savename = 'data/analyze_'+rule_name[CHOICE_MOD1].replace(' ','') + '_varytime'
+    if 'savename_append' in kwargs:
+        savename += kwargs['savename_append']
+    with open(savename+'.pkl','wb') as f:
+        pickle.dump(result, f)
+
+def plot_psychometric_choice_varytime(**kwargs):
+    savename = 'data/analyze_'+rule_name[CHOICE_MOD1].replace(' ','') + '_varytime'
+    if 'savename_append' in kwargs:
+        savename += kwargs['savename_append']
+
+    with open(savename+'.pkl','rb') as f:
+        result = pickle.load(f)
+
+    xdatas = result['xdatas']
+    ydatas = result['ydatas']
+    cohs   = result['cohs']
+    tar_times = xdatas[0]
+    n_coh  = len(xdatas)
 
     # Plot how the threshold varies with stimulus duration
     weibull = lambda x, a, b : 1 - 0.5*np.exp(-(x/a)**b)
@@ -563,10 +584,9 @@ def psychometric_choice_varytime(save_addon, **kwargs):
         savename += kwargs['savename_append']
     plt.savefig(savename+'.pdf', transparent=True)
 
-
     plot_psychometric_varytime(xdatas, ydatas,
                                   labels=['{:0.3f}'.format(t) for t in 2*cohs],
-                                  colors=sns.dark_palette("light blue", n_tar, input="xkcd"),
+                                  colors=sns.dark_palette("light blue", n_coh, input="xkcd"),
                                   legtitle='Tar1 - Tar2',rule=CHOICE_MOD1, **kwargs)
 
 def psychometric_choiceattend_varytime(save_addon, **kwargs):
@@ -894,8 +914,9 @@ if __name__ == '__main__':
     # psychometric_delaychoice('tf_withrecnoise_400')
 
     # save_addon = 'delaychoiceonly_weaknoise_140'
-    save_addon = 'allrule_weaknoise_260'
-    psychometric_choice_varytime(save_addon, savename_append=save_addon)
+    save_addon = 'allrule_weaknoise_100'
+    compute_psychometric_choice_varytime(save_addon, savename_append=save_addon)
+    plot_psychometric_choice_varytime(savename_append=save_addon)
     # psychometric_choiceattend_varytime('attendonly_weaknoise_200')
     # psychometric_choiceint_varytime('allrule_weaknoise_200')
     # psychometric_delaychoice_varytime(save_addon, savename_append=save_addon)
