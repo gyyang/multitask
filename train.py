@@ -19,7 +19,7 @@ from task import *
 from network import LeakyRNNCell, get_perf
 
 
-def train(HDIM, s):
+def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000, save_addon=None):
     if s == 0:
         save_addon_type = 'allrule_nonoise'
     elif s == 1:
@@ -73,6 +73,11 @@ def train(HDIM, s):
 
     rule_weights = np.ones(len(rules))
 
+    if save_addon is None:
+        save_addon = save_addon_type
+    else:
+        save_addon = save_addon_type + '_' + save_addon
+
     config = {'h_type'      : 'leaky_rec',
               'alpha'       : 0.2, # \Delta t/tau
               'dt'          : 0.2*TAU,
@@ -80,13 +85,11 @@ def train(HDIM, s):
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
-              'save_addon'  : save_addon_type + '_' + str(HDIM),
+              'save_addon'  : save_addon,
               'rules'       : rules,
               'rule_weights': rule_weights}
 
     # Parameters
-    learning_rate = 0.001
-    training_iters = 3000000
     batch_size_train = 50
     batch_size_test = 2000
     display_step = 1000
@@ -99,27 +102,27 @@ def train(HDIM, s):
 
 
     # Network Parameters
-    n_input, n_hidden, n_output = config['shape']
+    nx, nh, ny = config['shape']
 
     # tf Graph input
-    x = tf.placeholder("float", [None, None, n_input]) # (time, batch, n_input)
-    y = tf.placeholder("float", [None, n_output])
-    c_mask = tf.placeholder("float", [None, n_output])
+    x = tf.placeholder("float", [None, None, nx]) # (time, batch, nx)
+    y = tf.placeholder("float", [None, ny])
+    c_mask = tf.placeholder("float", [None, ny])
 
     # Define weights
-    w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)))
-    b_out = tf.Variable(tf.zeros([n_output]))
+    wy = tf.Variable(tf.random_normal([nh, ny], stddev=0.4/np.sqrt(nh)))
+    by = tf.Variable(tf.zeros([ny]))
 
     # Initial state (requires tensorflow later than 0.10)
-    h_init = tf.Variable(0.3*tf.ones([1, n_hidden]))
+    h_init = tf.Variable(0.3*tf.ones([1, nh]))
     h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
 
     # Recurrent activity
-    cell = LeakyRNNCell(n_hidden, config['alpha'], sigma_rec=config['sigma_rec'])
+    cell = LeakyRNNCell(nh, config['alpha'], sigma_rec=config['sigma_rec'])
     h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc), dtype=tf.float32, time_major=True) # time_major is important
 
     # Output
-    y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, n_hidden)), w_out) + b_out)
+    y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, nh)), wy) + by)
 
     # Loss
     cost = tf.reduce_mean(tf.square((y-y_hat)*c_mask))
@@ -149,8 +152,8 @@ def train(HDIM, s):
                 rule = np.random.choice(rules, p=rule_weights/rule_weights.sum())
                 task = generate_onebatch(rule, config, 'random', batch_size=batch_size_train)
                 sess.run(optimizer, feed_dict={x: task.x,
-                                               y: task.y.reshape((-1,n_output)),
-                                               c_mask: task.c_mask.reshape((-1,n_output))})
+                                               y: task.y.reshape((-1,ny)),
+                                               c_mask: task.c_mask.reshape((-1,ny))})
 
                 # Validation
                 if step % display_step == 0:
@@ -166,7 +169,7 @@ def train(HDIM, s):
                         for i_rep in range(n_rep):
                             task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep)
                             y_hat_test = sess.run(y_hat, feed_dict={x: task.x})
-                            y_hat_test = y_hat_test.reshape((-1,batch_size_test_rep,n_output))
+                            y_hat_test = y_hat_test.reshape((-1,batch_size_test_rep,ny))
 
                             # Cost is first summed over time, and averaged across batch and units
                             # We did the averaging over time through c_mask
@@ -202,8 +205,8 @@ def train(HDIM, s):
     compute_variance(config['save_addon'], 'rule', rules)
     print('Computed variance')
 
-    from performance import psychometric_choice_varytime
-    psychometric_choice_varytime(config['save_addon'], savename_append=config['save_addon'])
+    from performance import compute_psychometric_choice_varytime
+    compute_psychometric_choice_varytime(config['save_addon'], savename_append=config['save_addon'])
 
 
 if __name__ == '__main__':

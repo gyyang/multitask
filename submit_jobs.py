@@ -12,6 +12,7 @@ from __future__ import absolute_import
 import os
 import errno
 import subprocess
+import numpy as np
 
 def mkdir_p(path):
     """
@@ -114,14 +115,28 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 # Submit a job
 #=========================================================================================
 
-nunits = range(20,501,20)[::-1]
-s_list = [0, 1, 2]
+if False:
+    nunits = range(20,501,20)[::-1]
+    s_list = [0, 1, 2]
+    for nunit in nunits:
+        for s in s_list:
+            jobname = 'job_{:d}_{:d}'.format(s, nunit)
+            train_arg = 'HDIM={:d}, s={:d}'.format(nunit, s)
+            cmd     = r'''python -c "import train as t;t.train('''+train_arg+''')"'''
 
-for nunit in nunits:
-    for s in s_list:
+            pbspath = './pbs/'
+            scratchpath = '/scratch/gy441/multitask/'
 
-        jobname = 'job_{:d}_{:d}'.format(s, nunit)
-        train_arg = 'HDIM={:d}, s={:d}'.format(nunit, s)
+            jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
+                                             ppn=1, gpus=0)
+            subprocess.call(['qsub', jobfile])
+
+if True:
+    lrs = np.logspace(-2,-4,30)
+    for i, lr in enumerate(lrs):
+        jobname = 'job_lr{:d}'.format(i)
+        train_arg = 'learning_rate={:0.7f}'.format(lr)
+        train_arg+= r",save_addon='"+'lr{:d}'.format(i)+r"'"
         cmd     = r'''python -c "import train as t;t.train('''+train_arg+''')"'''
 
         pbspath = './pbs/'
@@ -129,8 +144,7 @@ for nunit in nunits:
 
         jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
                                          ppn=1, gpus=0)
-        # subprocess.call(['qsub', jobfile])
-
+        subprocess.call(['qsub', jobfile])
 
 
 
