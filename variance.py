@@ -126,7 +126,6 @@ def plot_hist_varprop(save_addon, rules):
 
 
 def plot_hist_varprop_all(save_addon):
-    ## TODO: Finish this. This is exciting!
     '''
     Plot histogram of proportion of variance for some tasks across units
     :param save_addon:
@@ -140,7 +139,11 @@ def plot_hist_varprop_all(save_addon):
         CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
         REMAP, INHREMAP, DELAYREMAP,\
         DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+    figsize = (8, 8)
+
     # rules = [GO, INHGO, DELAYGO]
+    # figsize = (4, 4)
+
 
     assert data_type == 'rule'
     # If not computed, use variance.py
@@ -151,12 +154,20 @@ def plot_hist_varprop_all(save_addon):
     h_var_all = res['h_var_all']
     keys      = res['keys']
 
-    f, axarr = plt.subplots(len(rules), len(rules), figsize=(8, 8))
+    fs = 6 # fontsize
+
+    f, axarr = plt.subplots(len(rules), len(rules), figsize=figsize)
     for i in range(len(rules)):
         for j in range(len(rules)):
-            if j>=i:
-                axarr[i,j].axis('off')
-                continue
+            ax = axarr[i, j]
+            if i == 0:
+                ax.set_title(rule_name[rules[j]], fontsize=fs, rotation=45, va='bottom')
+            if j == 0:
+                ax.set_ylabel(rule_name[rules[i]], fontsize=fs, rotation=45, ha='right')
+
+            # if j == i:
+            #     ax.axis('off')
+            #     continue
 
             rules_tmp = [rules[i], rules[j]]
             ind_rules = [keys.index(rule) for rule in rules_tmp]
@@ -172,31 +183,26 @@ def plot_hist_varprop_all(save_addon):
             # Plot the proportion of variance for the first rule
             data_plot = h_normvar_all[:, 1]
 
-            fs = 5
-            ax = axarr[i, j]
-            hist, bins_edge = np.histogram(data_plot, bins=25, range=(0,1))
+            hist, bins_edge = np.histogram(data_plot, bins=20, range=(0,1))
             ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
                    color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
             plt.locator_params(nbins=3)
             # xlabel = r'$\frac{Var({:s})}{[Var({:s})+Var({:s})]}$'.format(rule_name[rules[0]],rule_name[rules[0]],rule_name[rules[1]])
             xlabel = 'VarRatio({:s},{:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
             # ax.set_xlabel(xlabel, fontsize=fs)
-            ax.set_ylim(bottom=-1)
+            ax.set_ylim(bottom=-0.02*hist.max())
             ax.set_xticks([0,1])
             ax.set_xticklabels([])
             ax.set_yticks([])
-            ax.set_xlim([-0.1,1.1])
+            ax.set_xlim([0,1])
             ax.xaxis.set_ticks_position('bottom')
             ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
             ax.spines["right"].set_visible(False)
             ax.spines["left"].set_visible(False)
             ax.spines["top"].set_visible(False)
-            if i == len(rules)-1:
-                ax.set_xlabel(rule_name[rules[j]], fontsize=fs)
-            if j == 0:
-                ax.set_ylabel(rule_name[rules[i]], fontsize=fs)
 
-    plt.savefig('figure/temp.pdf', transparent=True)
+    # plt.tight_layout()
+    plt.savefig('figure/plot_hist_varprop_all'+save_addon+'.pdf', transparent=True)
 
 
 
