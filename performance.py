@@ -576,8 +576,11 @@ def compute_choicefamily_varytime(save_addon, rule):
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-        tar_str_range = 0.08
-        # tar_str_range = 0.04
+        if rule == CHOICE_INT:
+            tar_str_range = 0.04
+        else:
+            tar_str_range = 0.08
+
         cohs = tar_str_range*(2**np.arange(n_coh))/(2**(n_coh-1))
         tar1_strengths = 1 + cohs[ind_tar]
         tar2_strengths = 2 - tar1_strengths
@@ -897,9 +900,9 @@ if __name__ == '__main__':
     # psychometric_delaychoice('tf_withrecnoise_400')
 
     # save_addon = 'delaychoiceonly_weaknoise_140'
-    save_addon = 'allrule_weaknoise_100'
+    save_addon = 'allrule_weaknoise_300'
     for rule in [CHOICE_MOD1, CHOICEATTEND_MOD1, CHOICE_INT]:
-        # compute_choicefamily_varytime(save_addon, rule)
+        compute_choicefamily_varytime(save_addon, rule)
         plot_choicefamily_varytime(save_addon, rule)
 
     # compute_psychometric_choice_varytime(save_addon, savename_append=save_addon)

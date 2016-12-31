@@ -115,9 +115,9 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 # Submit a job
 #=========================================================================================
 
-if False:
+if True:
     nunits = range(20,501,20)[::-1]
-    s_list = [0, 1, 2]
+    s_list = [1, 2, 4, 5, 7, 8]
     for nunit in nunits:
         for s in s_list:
             jobname = 'job_{:d}_{:d}'.format(s, nunit)
@@ -131,7 +131,7 @@ if False:
                                              ppn=1, gpus=0)
             subprocess.call(['qsub', jobfile])
 
-if True:
+if False:
     lrs = np.logspace(-2,-4,30)
     for i, lr in enumerate(lrs):
         jobname = 'job_lr{:d}'.format(i)

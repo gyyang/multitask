@@ -217,9 +217,9 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000, save_addon
     compute_variance(config['save_addon'], 'rule', rules)
     print('Computed variance')
 
-    from performance import compute_psychometric_choice_varytime
-    compute_psychometric_choice_varytime(config['save_addon'], savename_append=config['save_addon'])
-
+    from performance import compute_choicefamily_varytime
+    for rule in [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]:
+        compute_choicefamily_varytime(save_addon, rule)
 
 if __name__ == '__main__':
     train(HDIM=40, s=1)

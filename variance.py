@@ -78,7 +78,6 @@ def compute_variance(save_addon, data_type, rules,
 
 
 def plot_hist_varprop(save_addon, rules):
-    ## TODO: Finish this. This is exciting!
     '''
     Plot histogram of proportion of variance for some tasks across units
     :param save_addon:
@@ -112,17 +111,33 @@ def plot_hist_varprop(save_addon, rules):
 
     fs = 6
     fig = plt.figure(figsize=(1.5,1.2))
-    ax = fig.add_axes([0.3,0.3,0.6,0.5])
+    ax = fig.add_axes([0.2,0.3,0.6,0.5])
     hist, bins_edge = np.histogram(data_plot, bins=30)
     ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
            color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
     plt.locator_params(nbins=3)
-    # xlabel = r'$\frac{Var({:s})}{[Var({:s})+Var({:s})]}$'.format(rule_name[rules[0]],rule_name[rules[0]],rule_name[rules[1]])
-    xlabel = 'VarRatio({:s},{:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
+    xlabel = 'VarRatio({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
     ax.set_xlabel(xlabel, fontsize=fs)
-    ax.set_ylim(bottom=-1)
+    ax.set_ylim(bottom=-0.02*hist.max())
     ax.set_xlim([-0.1,1.1])
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
     ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
+    plt.savefig('figure/plot_hist_varprop'+
+                rule_name[rules[0]].replace(' ','')+
+                rule_name[rules[1]].replace(' ','')+
+                save_addon+'.pdf', transparent=True)
+
+def plot_hist_varprop_selection():
+    rules_list = [(CHOICE_MOD1, CHOICE_MOD2),
+                  (CHOICEATTEND_MOD1, CHOICEATTEND_MOD2),
+                  (CHOICE_MOD1, REMAP),
+                  (DELAYMATCHGO, DMCGO),
+                  (INHGO, GO)]
+    for rules in rules_list:
+        plot_hist_varprop(save_addon='allrule_weaknoise_300', rules=rules)
 
 
 def plot_hist_varprop_all(save_addon):
@@ -266,26 +281,7 @@ if __name__ == '__main__':
     # plot_hist_totalvar(save_addon, data_type)
     # print('Time taken {:0.2f} s'.format(time.time()-start))
     # get_random_rotation_variance(save_addon, data_type)
-    # plot_hist_varprop(save_addon='choiceonly_weaknoise_300', rules=[CHOICE_MOD1, CHOICE_MOD2])
-    plot_hist_varprop_all('allrule_weaknoise_300')
 
-    # rule_hist = CHOICEATTEND_MOD1
-    # fig = plt.figure(figsize=(1.5,1.2))
-    # ax = fig.add_axes([0.3,0.3,0.6,0.5])
-    # hist, bins_edge = np.histogram(h_normvar_all[:, keys.index(rule_hist)], bins=30, range=(0,1))
-    # ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-    #        color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
-    # plt.xlim([-0.05, 1.05])
-    # plt.ylim([hist.max()*-0.05, hist.max()*1.1])
-    # plt.xlabel(r'Variance ratio', fontsize=7, labelpad=1)
-    # plt.ylabel('counts', fontsize=7)
-    # plt.title(rule_name[rule_hist], fontsize=7)
-    # plt.locator_params(nbins=3)
-    # ax.tick_params(axis='both', which='major', labelsize=7)
-    # ax.spines["right"].set_visible(False)
-    # ax.spines["top"].set_visible(False)
-    # ax.xaxis.set_ticks_position('bottom')
-    # ax.yaxis.set_ticks_position('left')
-    # # plt.savefig('figure/hist_totalvar.pdf', transparent=True)
-    # plt.show()
+    # plot_hist_varprop(save_addon='choiceonly_weaknoise_300', rules=[CHOICE_MOD1, CHOICE_MOD2])
+    # plot_hist_varprop_all('allrule_weaknoise_300')
 

@@ -485,11 +485,6 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
     dt = config['dt']
     if mode == 'random': # Randomly generate parameters
         batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1500,3000)/dt)
-
-        # A list of locations of fixation points and fixation off time
-        fix_offs = tdim - (np.ones(batch_size)*500/dt).astype(int)
 
         # A list of locations of targets, same locations for both modalities
         tar_dist = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
@@ -511,7 +506,13 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
         tar2_mod2_strengths = tars_mod2_mean - tars_mod2_diff*tars_mod2_sign/2
 
         # Time of targets on/off
-        tar_ons = (np.ones(batch_size)*np.random.uniform(100,400)/dt).astype(int)
+        tar_on = int(np.random.uniform(100,400)/dt)
+        tar_ons = (np.ones(batch_size)*tar_on).astype(int)
+        # tar_dur = int(np.random.uniform(300,1500)/dt)
+        tar_dur = int(np.random.uniform(900, 1500)/dt)
+        fix_offs = (tar_ons+tar_dur).astype(int)
+        # each batch consists of sequences of equal length
+        tdim = tar_on+tar_dur+int(500/dt)
 
     elif mode == 'sample':
         tdim = int(kwargs['t_tot']/dt)
@@ -590,7 +591,7 @@ def choicego_attend_mod2(config, mode, **kwargs):
     return choicego_attend_(config, mode, 2, **kwargs)
 
 
-def choicego_int(config, mode, **kwargs):  ##TODO: Finish this
+def choicego_int(config, mode, **kwargs):
     '''
     Fixate whenever fixation point is shown.
     Two targets are shown in each ring, pointing to the same direction
@@ -613,11 +614,6 @@ def choicego_int(config, mode, **kwargs):  ##TODO: Finish this
     dt = config['dt']
     if mode == 'random': # Randomly generate parameters
         batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1500,3000)/dt)
-
-        # A list of locations of fixation points and fixation off time
-        fix_offs = tdim - (np.ones(batch_size)*500/dt).astype(int)
 
         # A list of locations of targets, same locations for both modalities
         tar_dist = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
@@ -635,7 +631,13 @@ def choicego_int(config, mode, **kwargs):  ##TODO: Finish this
         tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
 
         # Time of targets on/off
-        tar_ons = (np.ones(batch_size)*np.random.uniform(100,400)/dt).astype(int)
+        tar_on = int(np.random.uniform(100,400)/dt)
+        tar_ons = (np.ones(batch_size)*tar_on).astype(int)
+        # tar_dur = int(np.random.uniform(300,1500)/dt)
+        tar_dur = int(np.random.uniform(900, 1500)/dt)
+        fix_offs = (tar_ons+tar_dur).astype(int)
+        # each batch consists of sequences of equal length
+        tdim = tar_on+tar_dur+int(500/dt)
 
     elif mode == 'sample':
         tdim = int(kwargs['t_tot']/dt)
