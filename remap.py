@@ -20,35 +20,42 @@ from task import *
 from run import Run, plot_singleneuron_intime
 from network import get_perf
 
+save = False
+fast_eval = True
 
-save_addon = 'tf_latest_500'
-with open('data/clustering'+save_addon+'.pkl','rb') as f:
-    result = pickle.load(f)
-labels          = result['labels']
-label_prefs     = result['label_prefs'] # Map the label to its preferred rule
-h_normvar_all   = result['h_normvar_all']
-ind_orig        = result['ind_orig']
-rules           = result['rules']
+data_type  = 'rule'
+save_addon = 'allrule_weaknoise_300'
+with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
+    res = pickle.load(f)
+h_var_all = res['h_var_all']
+rules     = res['keys']
+
+# First only get active units. Total variance across tasks larger than 1e-3
+ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
+h_var_all  = h_var_all[ind_active, :]
+
+# Normalize by the total variance across tasks
+h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
 ########################## Get Remap Units ####################################
 # Directly search
 # This will be a stricter subset of the remap modules found in clustering results
-rules_remap = np.array([REMAP, INHREMAP, DELAYREMAP])
-rules_nonremap = np.array([r for r in rules if r not in rules_remap])
-ind_rules_remap = [rules.index(r) for r in rules_remap]
-ind_rules_nonremap = [rules.index(r) for r in rules_nonremap]
-h_normvar_all_remap = h_normvar_all[:, ind_rules_remap].sum(axis=1)
-h_normvar_all_nonremap = h_normvar_all[:, ind_rules_nonremap].sum(axis=1)
+rules_remap         = np.array([REMAP, INHREMAP, DELAYREMAP])
+rules_nonremap      = np.array([r for r in rules if r not in rules_remap])
 
-#==============================================================================
-# plt.figure()
-# _ = plt.hist(h_normvar_all_remap, bins=50)
-# plt.xlabel('Proportion of variance in remap tasks')
-# plt.show()
-#==============================================================================
+ind_rules_remap     = [rules.index(r) for r in rules_remap]
+ind_rules_nonremap  = [rules.index(r) for r in rules_nonremap]
 
-ind_remap = np.where(h_normvar_all_remap>0.9)[0]
-ind_remap_orig = ind_orig[ind_remap] # Indices of remap units in the original matrix
+h_normvar_all_remap     = h_normvar_all[:, ind_rules_remap].sum(axis=1)
+h_normvar_all_nonremap  = h_normvar_all[:, ind_rules_nonremap].sum(axis=1)
+
+plt.figure()
+_ = plt.hist(h_normvar_all_remap, bins=50)
+plt.xlabel('Proportion of variance in remap tasks')
+plt.show()
+
+ind_remap = np.where(h_normvar_all_remap>0.5)[0]
+ind_remap_orig = ind_active[ind_remap] # Indices of remap units in the original matrix
 
 # Use clustering results (tend to be loose)
 # label_remap    = np.where(label_prefs==INHREMAP)[0][0]
@@ -68,7 +75,7 @@ N_RING = config['N_RING']
 
 neuron = ind_remap_orig[-2] # Example unit
 
-if False:
+if True:
     # Connection with ring input and output
     w_in0 = w_in[neuron, 1:1+N_RING]
     w_out0 = w_out[:,neuron][1:]
@@ -94,7 +101,8 @@ if False:
     plt.locator_params(axis='y',nbins=5)
     lg = plt.legend(ncol=1,bbox_to_anchor=(1.0,1.15),frameon=False,
                     fontsize=fs,labelspacing=0.3,loc=1)
-    plt.savefig('figure/connweight_remap_unit'+str(neuron)+save_addon+'.pdf', transparent=True)
+    if save:
+        plt.savefig('figure/connweight_remap_unit'+str(neuron)+save_addon+'.pdf', transparent=True)
     plt.show()
 
 
@@ -115,16 +123,17 @@ if True:
     ax.spines["top"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-    plt.savefig('figure/connweightrule_remap_unit'+str(neuron)+save_addon+'.pdf', transparent=True)
+    if save:
+        plt.savefig('figure/connweightrule_remap_unit'+str(neuron)+save_addon+'.pdf', transparent=True)
     plt.show()
 
 
 # ########### Plot Causal Manipulation Results  #############################
-if False:
+if True:
     perfs, perfs_lesion_remap = list(), list()
     for lesion_units, perfs_store in zip([None, ind_remap_orig],
                                          [perfs, perfs_lesion_remap]):
-        with Run(save_addon, lesion_units=lesion_units) as R:
+        with Run(save_addon, lesion_units=lesion_units, fast_eval=fast_eval) as R:
             config = R.config
             for rule in rules:
                 task = generate_onebatch(rule=rule, config=config, mode='test')
@@ -148,9 +157,13 @@ if False:
            width=width, color=sns.xkcd_palette(['orange'])[0], edgecolor='none')
     b1 = ax.bar(np.arange(2), [np.mean(perfs_lesion_remap[ind_rules_nonremap]), np.mean(perfs_lesion_remap[ind_rules_remap])],
            width=width, color=sns.xkcd_palette(['green'])[0], edgecolor='none')
+    ax.plot([-width/2, width/2], [np.mean(perfs[ind_rules_nonremap]), np.mean(perfs_lesion_remap[ind_rules_nonremap])],
+           '-', color='gray')
+    ax.plot([1-width/2, 1+width/2], [np.mean(perfs[ind_rules_remap]), np.mean(perfs_lesion_remap[ind_rules_remap])],
+            '-', color='gray')
     ax.set_xticks(np.arange(2))
     ax.set_xticklabels(['Non-remap', 'Remap'])
-    ax.set_xlabel('Rules', fontsize=fs, labelpad=3)
+    ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
     ax.set_ylabel('performance', fontsize=fs)
     lg = ax.legend((b0, b1), ('Control', 'Remap units lesioned'),
                    fontsize=fs, ncol=1, bbox_to_anchor=(1,1.7),
@@ -163,7 +176,8 @@ if False:
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
     #    ax.set_xlim([-0.5, 1.5])
-    plt.savefig('figure/perflesion_remap_units'+save_addon+'.pdf', transparent=True)
+    if save:
+        plt.savefig('figure/perflesion_remap_units'+save_addon+'.pdf', transparent=True)
     plt.show()
 
 
