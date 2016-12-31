@@ -446,7 +446,6 @@ class ChoiceAttAnalysis(object):
         plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
         plt.show()
 
-
     def plot_betaweights(self):
         ############################## Plot beta weights ##############################
         # Plot beta weights
@@ -590,8 +589,80 @@ class ChoiceAttAnalysis(object):
         plt.show()
 
 
-save_addon = 'attendonly_strongnoise_500'
-caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False,
-                        analyze_allunits=False, fast_eval=True, redefine_choice=False)
-caa.plot_betaweights()
-caa.plot_statespace(plot_slowpoints=True)
+# save_addon = 'allrule_weaknoise_300'
+# caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False,
+#                         analyze_allunits=False, fast_eval=True, redefine_choice=False)
+# caa.plot_betaweights()
+# caa.plot_statespace(plot_slowpoints=True)
+
+
+fast_eval = True
+data_type  = 'rule'
+save_addon = 'allrule_weaknoise_300'
+fname = 'data/variance'+data_type+save_addon
+with open(fname+'.pkl','rb') as f:
+    res = pickle.load(f)
+h_var_all = res['h_var_all']
+keys      = res['keys']
+
+rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+ind_rules = [keys.index(rule) for rule in rules]
+h_var_all = h_var_all[:, ind_rules]
+
+# First only get active units. Total variance across tasks larger than 1e-3
+ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
+h_var_all  = h_var_all[ind_active, :]
+
+# Normalize by the total variance across tasks
+h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
+
+
+ind_1  = np.where(h_normvar_all[:,0]>0.8)[0]
+ind_12 = np.where((h_normvar_all[:,0]>0.4)*(h_normvar_all[:,0]<0.6))[0]
+ind_2  = np.where(h_normvar_all[:,0]<0.2)[0]
+
+ind_1_orig  = ind_active[ind_1]
+ind_12_orig = ind_active[ind_12]
+ind_2_orig  = ind_active[ind_2]
+
+
+perfs, perfs_lesion = list(), list()
+for lesion_units, perfs_store in zip([None, ind_2_orig],
+                                     [perfs, perfs_lesion]):
+    with Run(save_addon, lesion_units=lesion_units, fast_eval=fast_eval) as R:
+        config = R.config
+        for rule in rules:
+            task = generate_onebatch(rule=rule, config=config, mode='test')
+            y_hat = R.f_y_from_x(task.x)
+            perf = get_perf(y_hat, task.y_loc)
+            perfs_store.append(perf.mean())
+
+
+perfs, perfs_lesion = np.array(perfs), np.array(perfs_lesion)
+
+fs = 6
+width = 0.3
+fig = plt.figure(figsize=(1.5,1.2))
+ax = fig.add_axes([0.3,0.3,0.6,0.4])
+b0 = ax.bar(np.arange(2)-width, [perfs[0], perfs[1]],
+       width=width, color=sns.xkcd_palette(['orange'])[0], edgecolor='none')
+b1 = ax.bar(np.arange(2), [perfs_lesion[0], perfs_lesion[1]],
+       width=width, color=sns.xkcd_palette(['green'])[0], edgecolor='none')
+ax.set_xticks(np.arange(2))
+ax.set_xticklabels([rule_name[r] for r in rules])
+ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
+ax.set_ylabel('performance', fontsize=fs)
+lg = ax.legend((b0, b1), ('Control', 'Remap units lesioned'),
+               fontsize=fs, ncol=1, bbox_to_anchor=(1,1.7),
+               labelspacing=0.2, loc=1, frameon=False)
+plt.setp(lg.get_title(),fontsize=fs)
+ax.tick_params(axis='both', which='major', labelsize=fs)
+plt.locator_params(axis='y',nbins=2)
+ax.spines["right"].set_visible(False)
+ax.spines["top"].set_visible(False)
+ax.xaxis.set_ticks_position('bottom')
+ax.yaxis.set_ticks_position('left')
+#    ax.set_xlim([-0.5, 1.5])
+# if save:
+#     plt.savefig('figure/perflesion_remap_units'+save_addon+'.pdf', transparent=True)
+plt.show()
