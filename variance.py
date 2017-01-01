@@ -284,4 +284,5 @@ if __name__ == '__main__':
 
     # plot_hist_varprop(save_addon='choiceonly_weaknoise_300', rules=[CHOICE_MOD1, CHOICE_MOD2])
     # plot_hist_varprop_all('allrule_weaknoise_300')
+    plot_hist_varprop_selection()
 

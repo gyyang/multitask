@@ -358,12 +358,8 @@ def psychometric_choiceattend_(save_addon, rule, **kwargs):
         ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
 
         # Looping target location
-        # tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-        # tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-
-        # Constant location
-        tar1_locs = np.ones(len(ind_tar_loc)) * np.pi/2
-        tar2_locs = (tar1_locs + np.pi) % (2*np.pi)
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
         tar_mod1_cohs = tar_cohs[ind_tar_mod1]
         tar_mod2_cohs = tar_cohs[ind_tar_mod2]

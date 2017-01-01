@@ -44,7 +44,7 @@ def gen_taskparams(tar1_loc, n_tar, n_rep):
               # If tar_time is long (~1600), we can reproduce the curving trajectories
     return params, batch_size
 
-class ChoiceAttAnalysis(object):
+class StateSpacaeAnalysis(object):
     def __init__(self, save_addon, **kwargs):
         default_setting = {
             'save_addon'         : save_addon,
@@ -588,81 +588,230 @@ class ChoiceAttAnalysis(object):
         # plt.savefig('figure/hist_totalvar.pdf', transparent=True)
         plt.show()
 
+class LesionAnalysis(object):
+    def __init__(self, save_addon, fast_eval=True):
+        data_type  = 'rule'
+        fname = 'data/variance'+data_type+save_addon
+        with open(fname+'.pkl','rb') as f:
+            res = pickle.load(f)
+        h_var_all = res['h_var_all']
+        keys      = res['keys']
+
+        rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+        ind_rules = [keys.index(rule) for rule in rules]
+        h_var_all = h_var_all[:, ind_rules]
+
+        # First only get active units. Total variance across tasks larger than 1e-3
+        ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
+        h_var_all  = h_var_all[ind_active, :]
+
+        # Normalize by the total variance across tasks
+        h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
+
+        ind_lesions = dict()
+
+        ind_lesions['1']  = np.where(h_normvar_all[:,0]>0.8)[0]
+        ind_lesions['12'] = np.where(np.logical_and(h_normvar_all[:,0]>0.4, h_normvar_all[:,0]<0.6))[0]
+        ind_lesions['2']  = np.where(h_normvar_all[:,0]<0.2)[0]
+
+        ind_lesions_orig = {key: ind_active[val] for key, val in ind_lesions.iteritems()}
+
+        self.save_addon         = save_addon
+        self.ind_lesions        = ind_lesions
+        self.ind_lesions_orig   = ind_lesions_orig
+        self.fast_eval          = fast_eval
+        self.h_normvar_all      = h_normvar_all
+        self.rules              = rules
+
+    def prettyplot_hist_varprop(self):
+        # Similar to the function from variance.py, but prettier
+        # Plot the proportion of variance for the first rule
+        rules = self.rules
+
+        fs = 6
+        fig = plt.figure(figsize=(2.0,1.2))
+        ax = fig.add_axes([0.2,0.3,0.5,0.5])
+        data_plot = self.h_normvar_all[:, 0]
+        hist, bins_edge = np.histogram(data_plot, bins=30, range=(0,1))
+        ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
+               color='gray', edgecolor='none')
+        colors = sns.xkcd_palette(['green', 'pink', 'sky blue'])
+        bs = list()
+        for i, group in enumerate(['1', '2', '12']):
+            data_plot = self.h_normvar_all[self.ind_lesions[group], 0]
+            hist, bins_edge = np.histogram(data_plot, bins=30, range=(0,1))
+            b_tmp = ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
+                   color=colors[i], edgecolor='none', label=group)
+            bs.append(b_tmp)
+        plt.locator_params(nbins=3)
+        xlabel = 'VarRatio({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
+        ax.set_xlabel(xlabel, fontsize=fs)
+        ax.set_ylim(bottom=-0.02*hist.max())
+        ax.set_xlim([-0.1,1.1])
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+        ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
+        lg = ax.legend(bs, ['1','2','12'], title='Group',
+                       fontsize=fs, ncol=1, bbox_to_anchor=(1.5,1.0),
+                       loc=1, frameon=False)
+        plt.setp(lg.get_title(),fontsize=fs)
+        plt.savefig('figure/prettyplot_hist_varprop'+
+                rule_name[rules[0]].replace(' ','')+
+                rule_name[rules[1]].replace(' ','')+
+                save_addon+'.pdf', transparent=True)
+
+    def plot_performance_choicetasks(self):
+        # Rules for performance
+        rules_perf = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
+        perf_stores = OrderedDict()
+        for key in ['intact', '1', '2', '12']:
+            perf_stores[key] = list()
+        lesion_units_list = [None] + [self.ind_lesions_orig[lesion_group] for lesion_group in ['1', '2', '12']]
+
+        for lesion_units, perfs_store in zip(lesion_units_list, perf_stores.values()):
+            with Run(self.save_addon, lesion_units=lesion_units, fast_eval=self.fast_eval) as R:
+                config = R.config
+                for rule in rules_perf:
+                    task = generate_onebatch(rule=rule, config=config, mode='test')
+                    y_hat = R.f_y_from_x(task.x)
+                    perf = get_perf(y_hat, task.y_loc)
+                    perfs_store.append(perf.mean())
+
+
+        for key in perf_stores:
+            perf_stores[key] = np.array(perf_stores[key])
+
+        fs = 6
+        width = 0.15
+        fig = plt.figure(figsize=(3,1.5))
+        ax = fig.add_axes([0.17,0.35,0.8,0.4])
+        colors = sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])
+        for i, key in enumerate(perf_stores.keys()):
+            b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width, perf_stores[key],
+                   width=width, color=colors[i], edgecolor='none')
+        ax.set_xticks(np.arange(len(rules_perf)))
+        ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
+        ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
+        ax.set_ylabel('performance', fontsize=fs)
+        lg = ax.legend(['Intact']+['Lesion group {:s}'.format(l) for l in ['1','2','12']],
+                       fontsize=fs, ncol=2, bbox_to_anchor=(1,1.4),
+                       labelspacing=0.2, loc=1, frameon=False)
+        plt.setp(lg.get_title(),fontsize=fs)
+        ax.tick_params(axis='both', which='major', labelsize=fs)
+        plt.locator_params(axis='y',nbins=2)
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+        ax.set_xlim([-0.8, len(rules_perf)-0.2])
+        plt.savefig('figure/perf_choiceattend_lesion'+save_addon+'.pdf', transparent=True)
+        plt.show()
+
+
+    def plot_performance_2D(self, rule, lesion_group=None, **kwargs):
+        if lesion_group is None:
+            lesion_units = None
+            lesion_group_name = 'intact'
+        elif lesion_group == '1+2':
+            lesion_units = np.concatenate((self.ind_lesions_orig['1'],self.ind_lesions_orig['2']))
+            lesion_group_name = 'lesion groups 1 & 2'
+        else:
+            lesion_units = self.ind_lesions_orig[lesion_group]
+            lesion_group_name = 'lesion group ' + lesion_group
+
+        # tar_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.5
+
+        n_coh = 8
+        coh_range = 0.2
+        cohs = np.linspace(-coh_range, coh_range, n_coh)
+
+        n_tar_loc = 20 # increase repeat by increasing this
+        batch_size = n_tar_loc * n_coh**2
+        batch_shape = (n_tar_loc,n_coh,n_coh)
+        ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
+
+        # Looping target location
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
+
+        tar_mod1_cohs = cohs[ind_tar_mod1]
+        tar_mod2_cohs = cohs[ind_tar_mod2]
+
+        params = {'tar1_locs' : tar1_locs,
+                  'tar2_locs' : tar2_locs,
+                  'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+                  'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+                  'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
+                  'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
+                  'tar_time'    : 800}
+
+        with Run(self.save_addon, lesion_units=lesion_units, fast_eval=self.fast_eval) as R:
+            task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+            y_sample = R.f_y_from_x(task.x)
+            y_sample_loc = R.f_y_loc(y_sample)
+
+        perf = get_perf(y_sample, task.y_loc)
+        print('Performance {:0.3f}'.format(np.mean(perf)))
+
+        tar1_locs_ = np.reshape(tar1_locs, batch_shape)
+        tar2_locs_ = np.reshape(tar2_locs, batch_shape)
+
+        y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
+        choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
+        choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
+        prop1s = choose1/(choose1 + choose2)
+
+
+        fs = 6
+        fig = plt.figure(figsize=(1.5,1.5))
+        ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
+        im = ax.imshow(prop1s, cmap='BrBG', origin='lower',
+                       aspect='auto', interpolation='nearest', vmin=0, vmax=1)
+        ax.set_xlabel('Mod 2 coh.', fontsize=fs, labelpad=-3)
+        plt.xticks([0, n_coh-1], [cohs[0], cohs[-1]],
+                   rotation=0, va='center', fontsize=fs)
+        if 'ylabel' in kwargs and kwargs['ylabel']==False:
+            plt.yticks([])
+        else:
+            ax.set_ylabel('Mod 1 coh.', fontsize=fs, labelpad=-3)
+            plt.yticks([0, n_coh-1], [cohs[0], cohs[-1]],
+                       rotation=0, va='center', fontsize=fs)
+        plt.title(rule_name[rule] + '\n' + lesion_group_name, fontsize=fs)
+        ax.tick_params('both', length=0)
+        for loc in ['bottom','top','left','right']:
+            ax.spines[loc].set_visible(False)
+
+        if 'colorbar' in kwargs and kwargs['colorbar']==False:
+            pass
+        else:
+            ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
+            cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
+            cb.outline.set_linewidth(0.5)
+            cb.set_label('Prop. of choice 1', fontsize=fs, labelpad=-3)
+            plt.tick_params(axis='both', which='major', labelsize=fs)
+
+        plt.savefig('figure/'+rule_name[rule].replace(' ','')+
+                    '_perf2D_lesion'+str(lesion_group)+
+                    self.save_addon+'.pdf', transparent=True)
+        plt.show()
+
 
 # save_addon = 'allrule_weaknoise_300'
-# caa = ChoiceAttAnalysis(save_addon, analyze_threerules=False,
+# ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
 #                         analyze_allunits=False, fast_eval=True, redefine_choice=False)
-# caa.plot_betaweights()
-# caa.plot_statespace(plot_slowpoints=True)
+# ssa.plot_betaweights()
+# ssa.plot_statespace(plot_slowpoints=True)
 
 
-fast_eval = True
-data_type  = 'rule'
 save_addon = 'allrule_weaknoise_300'
-fname = 'data/variance'+data_type+save_addon
-with open(fname+'.pkl','rb') as f:
-    res = pickle.load(f)
-h_var_all = res['h_var_all']
-keys      = res['keys']
+la = LesionAnalysis(save_addon)
+la.prettyplot_hist_varprop()
 
-rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
-ind_rules = [keys.index(rule) for rule in rules]
-h_var_all = h_var_all[:, ind_rules]
+# la.plot_performance_choicetasks()
 
-# First only get active units. Total variance across tasks larger than 1e-3
-ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
-h_var_all  = h_var_all[ind_active, :]
-
-# Normalize by the total variance across tasks
-h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
-
-
-ind_1  = np.where(h_normvar_all[:,0]>0.8)[0]
-ind_12 = np.where((h_normvar_all[:,0]>0.4)*(h_normvar_all[:,0]<0.6))[0]
-ind_2  = np.where(h_normvar_all[:,0]<0.2)[0]
-
-ind_1_orig  = ind_active[ind_1]
-ind_12_orig = ind_active[ind_12]
-ind_2_orig  = ind_active[ind_2]
-
-
-perfs, perfs_lesion = list(), list()
-for lesion_units, perfs_store in zip([None, ind_2_orig],
-                                     [perfs, perfs_lesion]):
-    with Run(save_addon, lesion_units=lesion_units, fast_eval=fast_eval) as R:
-        config = R.config
-        for rule in rules:
-            task = generate_onebatch(rule=rule, config=config, mode='test')
-            y_hat = R.f_y_from_x(task.x)
-            perf = get_perf(y_hat, task.y_loc)
-            perfs_store.append(perf.mean())
-
-
-perfs, perfs_lesion = np.array(perfs), np.array(perfs_lesion)
-
-fs = 6
-width = 0.3
-fig = plt.figure(figsize=(1.5,1.2))
-ax = fig.add_axes([0.3,0.3,0.6,0.4])
-b0 = ax.bar(np.arange(2)-width, [perfs[0], perfs[1]],
-       width=width, color=sns.xkcd_palette(['orange'])[0], edgecolor='none')
-b1 = ax.bar(np.arange(2), [perfs_lesion[0], perfs_lesion[1]],
-       width=width, color=sns.xkcd_palette(['green'])[0], edgecolor='none')
-ax.set_xticks(np.arange(2))
-ax.set_xticklabels([rule_name[r] for r in rules])
-ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
-ax.set_ylabel('performance', fontsize=fs)
-lg = ax.legend((b0, b1), ('Control', 'Remap units lesioned'),
-               fontsize=fs, ncol=1, bbox_to_anchor=(1,1.7),
-               labelspacing=0.2, loc=1, frameon=False)
-plt.setp(lg.get_title(),fontsize=fs)
-ax.tick_params(axis='both', which='major', labelsize=fs)
-plt.locator_params(axis='y',nbins=2)
-ax.spines["right"].set_visible(False)
-ax.spines["top"].set_visible(False)
-ax.xaxis.set_ticks_position('bottom')
-ax.yaxis.set_ticks_position('left')
-#    ax.set_xlim([-0.5, 1.5])
-# if save:
-#     plt.savefig('figure/perflesion_remap_units'+save_addon+'.pdf', transparent=True)
-plt.show()
+# rule = CHOICEATTEND_MOD1
+# la.plot_performance_2D(rule=rule)
+# for lesion_group in ['1', '2', '12', '1+2']:
+#     la.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
