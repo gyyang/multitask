@@ -216,31 +216,31 @@ plt.show()
 #     plt.show()
 
 ######################### Plotting Connectivity ###############################
-with Run(save_addon) as R:
-    params = R.params
-    w_rec  = R.w_rec
-    w_in   = R.w_in
-    w_out  = R.w_out
-    b_rec  = R.b_rec
-    b_out  = R.b_out
-
 nh = len(ind_active)
 nr = n_ring
 nrule = (nx-2*nr-1)
 ind = ind_active
 
+with Run(save_addon) as R:
+    params = R.params
+    w_rec  = R.w_rec[ind,:][:,ind]
+    w_in   = R.w_in[ind,:]
+    w_out  = R.w_out[:,ind]
+    b_rec  = R.b_rec[ind, np.newaxis]
+    b_out  = R.b_out[:, np.newaxis]
+
 l = 0.35
 l0 = (1-1.5*l)/nh
 
-plot_infos = [(w_rec[ind,:][:,ind]     , [l               ,l          ,nh*l0    ,nh*l0]),
-              (w_in[ind,0,np.newaxis]  , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
-              (w_in[ind,1:nr+1]        , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
-              (w_in[ind,nr+1:2*nr+1]   , [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
-              (w_in[ind,2*nr+1:]       , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
-              (w_out[np.newaxis,0,ind] , [l               ,l-(4)*l0,nh*l0    ,1*l0]),
-              (w_out[1:, ind]          , [l               ,l-(ny+6)*l0,nh*l0    ,(ny-1)*l0]),
-              (b_rec[ind, np.newaxis]  , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
-              (b_out[:, np.newaxis]    , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
+plot_infos = [(w_rec              , [l               ,l          ,nh*l0    ,nh*l0]),
+              (w_in[:,[0]]        , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
+              (w_in[:,1:nr+1]     , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
+              (w_in[:,nr+1:2*nr+1], [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
+              (w_in[:,2*nr+1:]    , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
+              (w_out[[0],:]       , [l               ,l-(4)*l0   ,nh*l0    ,1*l0]),
+              (w_out[1:,:]        , [l               ,l-(ny+6)*l0,nh*l0    ,(ny-1)*l0]),
+              (b_rec              , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
+              (b_out              , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
 
 cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
 fig = plt.figure(figsize=(6,6))
