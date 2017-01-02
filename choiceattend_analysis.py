@@ -92,6 +92,8 @@ class StateSpaceAnalysis(object):
             random_ortho_matrix = ortho_group.rvs(dim=nh)
 
 
+        #################### Computing Neural Activity #########################
+
         # Start computing the neural activity
         with Run(save_addon, sigma_rec=0, fast_eval=self.setting['fast_eval']) as R:
             self.config = R.config
@@ -217,23 +219,30 @@ class StateSpaceAnalysis(object):
             h = h - self.meanh
             h = h/self.stdh
 
-        h = h.reshape((nt, nb, h.shape[-1]))
+        h = h.reshape((nt, nb, nh))
 
         ################################### Regression ################################
         from sklearn import linear_model
+
+
+
+        # Time-independent coefficient vectors (n_unit, n_regress)
+        coef_maxt = np.zeros((nh, n_regr))
+
         # Looping over units
         # Although this is slower, it's still quite fast, and more flexible
-        coef_maxt = np.zeros((h.shape[2], X.shape[1])) # Units, Coefs
-        for i in range(h.shape[-1]):
-            # For each unit, relabel choice, mod 1,2 such that preferred choice is 1
+        for i in range(nh):
+
             Xi = X.copy() # slicing method doesn't work for numpy array
+
+            # For each unit, relabel choice, mod 1,2 such that preferred choice is 1
             if self.setting['redefine_choice']:
+                # Flip the signs of choice, mod1, and mod2 stimuli
                 Xi[:, :3] = Xi[:, :3]*preferences[i]
             # Notice this also has to be taken care of when plotting state-space
 
-            Y = np.swapaxes(h[:,:,i], 0, 1)
-            regr = linear_model.LinearRegression() # Create linear regression object
 
+            # Include product terms in regression or not
             if self.setting['regress_product']:
                 Xi_ = np.zeros((Xi.shape[0], n_regr + n_regr*(n_regr-1)/2))
                 Xi_[:, :n_regr] = Xi
@@ -245,23 +254,30 @@ class StateSpaceAnalysis(object):
             else:
                 Xi_ = Xi
 
+            # To satisfy sklearn standard
+            Y = np.swapaxes(h[:,:,i], 0, 1)
+
+            # Linear regression
+            regr = linear_model.LinearRegression()
             regr.fit(Xi_, Y)
 
+            # Get time-independent coefficient vector
             coef = regr.coef_
-            ind = np.argmax(np.sum(coef**2,axis=1))
+            ind = np.argmax(np.sum(coef**2, axis=1))
             coef_maxt[i, :] = coef[ind,:]
 
 
-
-        # Orthogonalize
+        # Orthogonalize with QR decomposition
+        # Matrix q represents the orthogonalized task-related axes
         q, r = np.linalg.qr(coef_maxt)
 
-        self.ind_active = ind_active
-        self.h = h
-        self.preferences = preferences
-        self.coef_maxt = coef_maxt
-        self.q = q
-        self.h_tran = np.dot(h, q) # Transform
+
+        self.ind_active     = ind_active
+        self.h              = h
+        self.preferences    = preferences
+        self.coef_maxt      = coef_maxt
+        self.q              = q
+        self.h_tran         = np.dot(h, q) # Transform
 
     def find_slowpoints(self):
     ####################### Find Fixed & Slow Points ##############################
