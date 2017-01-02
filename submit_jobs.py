@@ -122,6 +122,7 @@ if True:
         for s in s_list:
             jobname = 'job_{:d}_{:d}'.format(s, nunit)
             train_arg = 'HDIM={:d}, s={:d}'.format(nunit, s)
+            train_arg+= r",save_addon='"+'{:d}'.format(nunit)+r"'"
             cmd     = r'''python -c "import train as t;t.train('''+train_arg+''')"'''
 
             pbspath = './pbs/'
