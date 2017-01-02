@@ -622,6 +622,7 @@ class LesionAnalysis(object):
         self.fast_eval          = fast_eval
         self.h_normvar_all      = h_normvar_all
         self.rules              = rules
+        self.ind_active         = ind_active
 
     def prettyplot_hist_varprop(self):
         # Similar to the function from variance.py, but prettier
@@ -708,7 +709,6 @@ class LesionAnalysis(object):
         ax.set_xlim([-0.8, len(rules_perf)-0.2])
         plt.savefig('figure/perf_choiceattend_lesion'+save_addon+'.pdf', transparent=True)
         plt.show()
-
 
     def plot_performance_2D(self, rule, lesion_group=None, **kwargs):
         if lesion_group is None:
@@ -797,6 +797,129 @@ class LesionAnalysis(object):
                     self.save_addon+'.pdf', transparent=True)
         plt.show()
 
+    def plot_connectivity(self):
+        # Plot connectivity
+        ind_active = self.ind_active
+        h_normvar_all = self.h_normvar_all
+        # Sort data by labels and by input connectivity
+        with Run(save_addon, sigma_rec=0) as R:
+            w_in  = R.w_in # for later sorting
+            w_out = R.w_out
+            config = R.config
+        nx, nh, ny = config['shape']
+        n_ring = config['N_RING']
+
+        ind_active_new = list()
+        labels = list()
+        for i in range(len(ind_active)):
+            ind_active_addnew = True
+            if h_normvar_all[i,0]>0.85:
+                labels.append(0)
+            elif h_normvar_all[i,0]<0.15:
+                labels.append(1)
+            elif (h_normvar_all[i,0]>0.15) and (h_normvar_all[i,0]<0.85):
+                # labels.append(2)
+                # Further divide
+                # This condition works especially for networks trained only for choiceattend
+                if np.max(w_in[ind_active[i],1:2*n_ring+1]) > 1.0:
+                    labels.append(2)
+                else:
+                    labels.append(3)
+                    # if np.var(w_out[1:, ind_active[i]])>0.005:
+                    #     labels.append(3)
+                    # else:
+                    #     labels.append(4)
+            else:
+                ind_active_addnew = False
+
+            if ind_active_addnew:
+                ind_active_new.append(ind_active[i])
+
+        labels = np.array(labels)
+        ind_active = np.array(ind_active_new)
+
+        # Preferences
+        # w_in preferences
+        w_in = w_in[ind_active, :]
+        w_in_mod1 = w_in[:, 1:n_ring+1]
+        w_in_mod2 = w_in[:, n_ring+1:2*n_ring+1]
+        w_in_modboth = w_in_mod1 + w_in_mod2
+        w_in_prefs = np.argmax(w_in_modboth, axis=1)
+        # w_out preferences
+        w_out = w_out[1:, ind_active]
+        w_out_prefs = np.argmax(w_out, axis=0)
+
+        label_sort_by_w_in = [0,1,2]
+        sort_by_w_in = np.array([(label in label_sort_by_w_in) for label in labels])
+
+        w_prefs = (1-sort_by_w_in)*w_out_prefs + sort_by_w_in*w_in_prefs
+
+        ind_sort        = np.lexsort((w_prefs, labels)) # sort by labels then by prefs
+        labels          = labels[ind_sort]
+        ind_active      = ind_active[ind_sort]
+
+
+
+
+        nh = len(ind_active)
+        nr = n_ring
+        nrule = 2
+        nx = 2*nr+1+nrule
+        ind = ind_active
+
+        with Run(save_addon) as R:
+            params = R.params
+            w_rec  = R.w_rec[ind,:][:,ind]
+            w_in   = R.w_in[ind,:]
+            w_out  = R.w_out[:,ind]
+            b_rec  = R.b_rec[ind, np.newaxis]
+            b_out  = R.b_out[:, np.newaxis]
+
+        l = 0.35
+        l0 = (1-1.5*l)/nh
+
+        w_in_rule = w_in[:,2*nr+1+np.array([CHOICEATTEND_MOD1,CHOICEATTEND_MOD2])]
+
+        plot_infos = [(w_rec              , [l               ,l          ,nh*l0    ,nh*l0]),
+                      (w_in[:,[0]]        , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
+                      (w_in[:,1:nr+1]     , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
+                      (w_in[:,nr+1:2*nr+1], [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
+                      (w_in_rule          , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
+                      (w_out[[0],:]       , [l               ,l-(4)*l0   ,nh*l0    ,1*l0]),
+                      (w_out[1:, :]       , [l               ,l-(ny+6)*l0,nh*l0    ,(ny-1)*l0]),
+                      (b_rec              , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
+                      (b_out              , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
+
+        cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
+        fig = plt.figure(figsize=(6,6))
+        for plot_info in plot_infos:
+            ax = fig.add_axes(plot_info[1])
+            # vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [5,50,95])
+            vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [2,50,98])
+            vmid = 0
+            _ = ax.imshow(plot_info[0], interpolation='nearest', cmap=cmap, aspect='auto',
+                          vmin=vmid-(vmax-vmin)/2, vmax=vmid+(vmax-vmin)/2)
+
+            # vabs = np.max(abs(plot_info[0]))*0.3
+            # _ = ax.imshow(plot_info[0], interpolation='nearest', cmap=cmap, aspect='auto', vmin=-vabs, vmax=vabs)
+            ax.axis('off')
+
+        # colors = sns.xkcd_palette(['green', 'sky blue', 'pink'])
+        colors = sns.color_palette('deep', len(np.unique(labels)))
+        ax1 = fig.add_axes([l     , l+nh*l0, nh*l0, 6*l0])
+        ax2 = fig.add_axes([l-6*l0, l      , 6*l0 , nh*l0])
+        for l in np.unique(labels):
+            ind_l = np.where(labels==l)[0][[0, -1]]+np.array([0,1])
+            ax1.plot(ind_l, [0,0], linewidth=2, solid_capstyle='butt',
+                    color=colors[l])
+            ax2.plot([0,0], len(labels)-ind_l, linewidth=2, solid_capstyle='butt',
+                    color=colors[l])
+        ax1.set_xlim([0, len(labels)])
+        ax2.set_ylim([0, len(labels)])
+        ax1.axis('off')
+        ax2.axis('off')
+        plt.savefig('figure/choiceattend_connectivity'+save_addon+'.pdf', transparent=True)
+        plt.show()
 
 # save_addon = 'allrule_weaknoise_300'
 # ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
@@ -804,10 +927,10 @@ class LesionAnalysis(object):
 # ssa.plot_betaweights()
 # ssa.plot_statespace(plot_slowpoints=True)
 
-
 save_addon = 'allrule_weaknoise_300'
+# save_addon = 'attendonly_weaknoise_300'
 la = LesionAnalysis(save_addon)
-la.prettyplot_hist_varprop()
+# la.prettyplot_hist_varprop()
 
 # la.plot_performance_choicetasks()
 
@@ -815,3 +938,5 @@ la.prettyplot_hist_varprop()
 # la.plot_performance_2D(rule=rule)
 # for lesion_group in ['1', '2', '12', '1+2']:
 #     la.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
+
+la.plot_connectivity()
