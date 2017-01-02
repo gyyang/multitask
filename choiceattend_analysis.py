@@ -48,6 +48,8 @@ def gen_taskparams(tar1_loc, n_tar, n_rep):
 
 class StateSpaceAnalysis(object):
     def __init__(self, save_addon, **kwargs):
+
+        # Default settings
         default_setting = {
             'save_addon'         : save_addon,
             'analyze_threerules' : False,
@@ -58,83 +60,99 @@ class StateSpaceAnalysis(object):
             'fast_eval'          : False,
             'surrogate_data'     : False}
 
+        # Update settings with kwargs
         self.setting = default_setting
         for key, val in kwargs.iteritems():
             self.setting[key] = val
+
         print('Current analysis setting:')
         for key, val in default_setting.iteritems():
-            print(key + ' : ' + str(val))
+            print('{:20s} : {:s}'.format(key, str(val)))
 
+        # Get rules and regressors
         if self.setting['analyze_threerules']:
             self.rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
-            # Regressors
             self.regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule attend 1', 'Rule attend 2', 'Rule int']
         else:
             self.rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
-            # Regressors
             self.regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
         n_rule = len(self.rules)
         n_regr = len(self.regr_names)
 
+        # Target location
         tar1_loc  = 0
 
-        with Run(save_addon, fast_eval=True) as R:
-            w_out  = R.w_out
-            w_in   = R.w_in
-            w_rec  = R.w_rec
 
+        # If using surrogate data, create random matrix for later use
         if self.setting['surrogate_data']:
-            # Create random matrix for later use
             from scipy.stats import ortho_group
+            with Run(save_addon, fast_eval=True) as R:
+                w_rec  = R.w_rec
             nh = w_rec.shape[0]
             random_ortho_matrix = ortho_group.rvs(dim=nh)
 
+
+        # Start computing the neural activity
         with Run(save_addon, sigma_rec=0, fast_eval=self.setting['fast_eval']) as R:
             self.config = R.config
 
+            # Generate task parameters used
             params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=1)
             self.params = params
 
+            # Regressors, Rules, Recurrent activity, and Performance
             X = np.zeros((n_rule*batch_size, n_regr)) # regressors
             trial_rules = np.zeros(n_rule*batch_size)
             H = np.array([])
             Perfs = np.array([]) # Performance
 
+            # Looping over rules
             for i, rule in enumerate(self.rules):
+
                 print('Starting standard analysis of the '+rule_name[rule]+' task...')
+
                 if not self.setting['surrogate_data']:
+                    # Generating task information
                     task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=True)
 
-                    # Only study target epoch
+                    # Only analyze the target epoch
                     epoch = task.epochs['tar1']
+
+                    # Get neural activity
                     h_sample = R.f_h(task.x)
                     y_sample = R.f_y(h_sample)
                     y_sample_loc = R.f_y_loc(y_sample)
 
+                    # Get performance and choices
                     perfs = get_perf(y_sample, task.y_loc)
                     # y_choice is 1 for choosing tar1_loc, otherwise -1
                     y_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
 
+                    # Take activity every 50 ms
                     every_t = int(50/self.config['dt'])
-
-                    h_sample = h_sample[epoch[0]:epoch[1],...][::every_t,...] # every 50 ms
+                    h_sample = h_sample[epoch[0]:epoch[1],...][::every_t,...]
 
                 else:
                     # Generate surrogate data
-                    nt = 20
 
+                    # Number of time points
+                    nt = 20
+                    t_plot = np.linspace(0, 1, nt)
+
+                    # Performance
                     perfs = np.ones(batch_size)
 
+                    # Generate choice
                     rel_mod = '1' if rule == CHOICEATTEND_MOD1 else '2' # relevant modality
                     rel_coh = params['tar1_mod'+rel_mod+'_strengths']-params['tar2_mod'+rel_mod+'_strengths']
                     y_choice = (rel_coh>0)*2-1
 
-                    t_plot = np.linspace(0, 1, nt)
-                    # The data is generated from a three dimensional representation
+                    # Generate underlying low-dimensional representation
                     mod1_plot = np.ones((nt, batch_size)) * (params['tar1_mod1_strengths']-params['tar2_mod1_strengths'])
                     mod2_plot = np.ones((nt, batch_size)) * (params['tar1_mod2_strengths']-params['tar2_mod2_strengths'])
                     choice_plot = (np.ones((nt, batch_size)).T * t_plot).T  * y_choice
 
+                    # Generate surrogate neural activity
                     h_sur = np.zeros((nt, batch_size, 3))
                     h_sur[:, :, 0] = mod1_plot
                     h_sur[:, :, 1] = mod2_plot
@@ -144,6 +162,7 @@ class StateSpaceAnalysis(object):
                     h_sample = np.dot(h_sur, random_ortho_matrix[:3, :])
 
 
+                # Storing neural activity and performance
                 if i == 0:
                     H = h_sample
                     Perfs = perfs
@@ -151,14 +170,19 @@ class StateSpaceAnalysis(object):
                     H = np.concatenate((H, h_sample), axis=1)
                     Perfs = np.concatenate((Perfs, perfs))
 
+                # Storing stimulus coherence as regressors
                 tar_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
                 tar_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
                 X[i*batch_size:(i+1)*batch_size, :3] = \
                     np.array([y_choice, tar_mod1_cohs/tar_mod1_cohs.max(), tar_mod2_cohs/tar_mod2_cohs.max()]).T
+
+                # Storing current rule as regressors
                 if self.setting['analyze_threerules']:
                     X[i*batch_size:(i+1)*batch_size, 3+i] = 1
                 else:
                     X[i*batch_size:(i+1)*batch_size, 3] = 1-i*2
+
+                # Storing current rule
                 trial_rules[i*batch_size:(i+1)*batch_size] = rule
 
         self.X = X
@@ -166,65 +190,34 @@ class StateSpaceAnalysis(object):
         self.performances = Perfs
         self.trial_rules = trial_rules
 
-        # Get preferences (+1 if activity is higher for choice=+1)
+        nt, nb, nh = H.shape # time, batch, hidden units
+
+
+        # Get neuronal preferences (+1 if activity is higher for choice=+1)
         preferences = (H[:, X[:,0]== 1, :].mean(axis=(0,1)) >
                        H[:, X[:,0]==-1, :].mean(axis=(0,1)))*2-1
 
-        # Include only active units
-        nt, nb, nh = H.shape # time, batch, hidden units
+
+        # Transforming the neural activity
         h = H.reshape((-1, nh))
 
+        # Analyze all units or only active units
         if self.setting['analyze_allunits']:
             ind_active = range(nh)
         else:
             ind_active = np.where(h.var(axis=0) > 1e-4)[0]
 
-
         h = h[:, ind_active]
         preferences = preferences[ind_active]
 
-        w_in  = w_in[ind_active, :]
-        w_rec = w_rec[ind_active, :][:, ind_active]
-        w_out = w_out[:, ind_active]
-
-        # Z-score response (will have a strong impact on results)
         if self.setting['z_score']:
+            # Z-score response (can have a strong impact on results)
             self.meanh = h.mean(axis=0)
             self.stdh = h.std(axis=0)
             h = h - self.meanh
             h = h/self.stdh
 
         h = h.reshape((nt, nb, h.shape[-1]))
-
-
-        # Temporarily disabled
-        # Load clustering results
-        # Get task-specific units for Att1 and Att2
-        # data_type = 'rule'
-        # with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
-        #     res = pickle.load(f)
-        # # Normalize by the total variance across tasks
-        # res['h_normvar_all'] = (res['h_var_all'].T/np.sum(res['h_var_all'], axis=1)).T
-        # res['ind_active'] = ind_active # temp
-        # self.res = res
-
-        # thre = 0.5 # threshold for variance ratio
-        # thre = 0.8
-        # ind_specifics = dict()
-        # ind_specifics[-1] = range(self.h.shape[-1]) # The rest
-        # for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
-        #     h_normvar_all = res['h_normvar_all'][:, res['keys'].index(rule)]
-        #     # Find indices and convert them
-        #     ind_tmp = np.where(h_normvar_all>thre)[0]
-        #     ind_tmp_active = res['ind_active'][ind_tmp]
-        #     ind_specifics[rule] = list()
-        #     for i in ind_tmp_active:
-        #         j = np.where(ind_active==i)[0]
-        #         if len(j) > 0:
-        #             ind_specifics[rule].append(j[0])
-        #             ind_specifics[-1].pop(ind_specifics[-1].index(j[0]))
-
-
 
         ################################### Regression ################################
         from sklearn import linear_model
@@ -1001,7 +994,7 @@ def plot_groupsize(save_type):
 save_addon = 'allrule_weaknoise_140'
 ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
                         analyze_allunits=False, fast_eval=True, redefine_choice=False,
-                         surrogate_data=True)
+                         surrogate_data=False)
 ssa.plot_betaweights()
 ssa.plot_statespace(plot_slowpoints=False)
 
