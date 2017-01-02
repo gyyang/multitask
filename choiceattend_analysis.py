@@ -21,6 +21,8 @@ from run import Run
 from network import get_perf
 from slowpoints import find_slowpoints
 
+save = False # TEMP
+
 def gen_taskparams(tar1_loc, n_tar, n_rep):
     batch_size = n_rep * n_tar**2
     batch_shape = (n_rep, n_tar, n_tar)
@@ -40,11 +42,11 @@ def gen_taskparams(tar1_loc, n_tar, n_rep):
               'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
               'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
               'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-              'tar_time'    : 1600}
+              'tar_time'    : 1000}
               # If tar_time is long (~1600), we can reproduce the curving trajectories
     return params, batch_size
 
-class StateSpacaeAnalysis(object):
+class StateSpaceAnalysis(object):
     def __init__(self, save_addon, **kwargs):
         default_setting = {
             'save_addon'         : save_addon,
@@ -53,7 +55,8 @@ class StateSpacaeAnalysis(object):
             'redefine_choice'    : True,
             'regress_product'    : False, # regression of interaction terms
             'z_score'            : True,
-            'fast_eval'          : False}
+            'fast_eval'          : False,
+            'surrogate_data'     : False}
 
         self.setting = default_setting
         for key, val in kwargs.iteritems():
@@ -75,13 +78,19 @@ class StateSpacaeAnalysis(object):
 
         tar1_loc  = 0
 
-
-        with Run(save_addon, sigma_rec=0, fast_eval=self.setting['fast_eval']) as R:
-        # with Run(save_addon) as R:
-            self.config = R.config
+        with Run(save_addon, fast_eval=True) as R:
             w_out  = R.w_out
             w_in   = R.w_in
             w_rec  = R.w_rec
+
+        if self.setting['surrogate_data']:
+            # Create random matrix for later use
+            from scipy.stats import ortho_group
+            nh = w_rec.shape[0]
+            random_ortho_matrix = ortho_group.rvs(dim=nh)
+
+        with Run(save_addon, sigma_rec=0, fast_eval=self.setting['fast_eval']) as R:
+            self.config = R.config
 
             params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=1)
             self.params = params
@@ -93,20 +102,48 @@ class StateSpacaeAnalysis(object):
 
             for i, rule in enumerate(self.rules):
                 print('Starting standard analysis of the '+rule_name[rule]+' task...')
-                task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=True)
-                # Only study target epoch
-                epoch = task.epochs['tar1']
-                h_sample = R.f_h(task.x)
-                y_sample = R.f_y(h_sample)
-                y_sample_loc = R.f_y_loc(y_sample)
+                if not self.setting['surrogate_data']:
+                    task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=True)
 
-                perfs = get_perf(y_sample, task.y_loc)
-                # y_choice is 1 for choosing tar1_loc, otherwise -1
-                y_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
+                    # Only study target epoch
+                    epoch = task.epochs['tar1']
+                    h_sample = R.f_h(task.x)
+                    y_sample = R.f_y(h_sample)
+                    y_sample_loc = R.f_y_loc(y_sample)
 
-                every_t = int(50/self.config['dt'])
+                    perfs = get_perf(y_sample, task.y_loc)
+                    # y_choice is 1 for choosing tar1_loc, otherwise -1
+                    y_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
 
-                h_sample = h_sample[epoch[0]:epoch[1],...][::every_t,...] # every 50 ms
+                    every_t = int(50/self.config['dt'])
+
+                    h_sample = h_sample[epoch[0]:epoch[1],...][::every_t,...] # every 50 ms
+
+                else:
+                    # Generate surrogate data
+                    nt = 20
+
+                    perfs = np.ones(batch_size)
+
+                    rel_mod = '1' if rule == CHOICEATTEND_MOD1 else '2' # relevant modality
+                    rel_coh = params['tar1_mod'+rel_mod+'_strengths']-params['tar2_mod'+rel_mod+'_strengths']
+                    y_choice = (rel_coh>0)*2-1
+
+                    t_plot = np.linspace(0, 1, nt)
+                    # The data is generated from a three dimensional representation
+                    mod1_plot = np.ones((nt, batch_size)) * (params['tar1_mod1_strengths']-params['tar2_mod1_strengths'])
+                    mod2_plot = np.ones((nt, batch_size)) * (params['tar1_mod2_strengths']-params['tar2_mod2_strengths'])
+                    choice_plot = (np.ones((nt, batch_size)).T * t_plot).T  * y_choice
+
+                    h_sur = np.zeros((nt, batch_size, 3))
+                    h_sur[:, :, 0] = mod1_plot
+                    h_sur[:, :, 1] = mod2_plot
+                    h_sur[:, :, 2] = choice_plot
+
+                    # Random orthogonal projection
+                    h_sample = np.dot(h_sur, random_ortho_matrix[:3, :])
+
+
                 if i == 0:
                     H = h_sample
                     Perfs = perfs
@@ -443,7 +480,8 @@ class StateSpacaeAnalysis(object):
             ax.set_xlim([-1,6])
             ax.set_ylim([-3,3])
 
-        plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
+        if save:
+            plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
         plt.show()
 
     def plot_betaweights(self):
@@ -527,7 +565,8 @@ class StateSpacaeAnalysis(object):
 
         plt.tight_layout()
 
-        plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
+        if save:
+            plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
         plt.show()
 
     def temp(self):
@@ -959,13 +998,14 @@ def plot_groupsize(save_type):
     plt.savefig('figure/choiceattend_groupsize'+save_type+'.pdf', transparent=True)
 
 
-# save_addon = 'allrule_weaknoise_300'
-# ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
-#                         analyze_allunits=False, fast_eval=True, redefine_choice=False)
-# ssa.plot_betaweights()
-# ssa.plot_statespace(plot_slowpoints=True)
+save_addon = 'allrule_weaknoise_140'
+ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
+                        analyze_allunits=False, fast_eval=True, redefine_choice=False,
+                         surrogate_data=True)
+ssa.plot_betaweights()
+ssa.plot_statespace(plot_slowpoints=False)
 
-save_addon = 'allrule_weaknoise_300'
+# save_addon = 'allrule_weaknoise_300'
 # save_addon = 'attendonly_weaknoise_300'
 # la = LesionAnalysis(save_addon)
 # la.prettyplot_hist_varprop()
