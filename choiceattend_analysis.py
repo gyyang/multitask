@@ -921,6 +921,44 @@ class LesionAnalysis(object):
         plt.savefig('figure/choiceattend_connectivity'+save_addon+'.pdf', transparent=True)
         plt.show()
 
+def plot_groupsize(save_type):
+    HDIMs = range(150, 1000)
+    group_sizes = {key : list() for key in ['1', '2', '12']}
+    HDIM_plot = list()
+    for HDIM in HDIMs:
+        save_addon = save_type+'_'+str(HDIM)
+        fname = 'data/config'+save_addon+'.pkl'
+        if not os.path.isfile(fname):
+            continue
+        la = LesionAnalysis(save_addon)
+        for key in ['1', '2', '12']:
+            group_sizes[key].append(len(la.ind_lesions[key]))
+
+        HDIM_plot.append(HDIM)
+
+    fs = 6
+    fig = plt.figure(figsize=(1.5,1.0))
+    ax = fig.add_axes([.3, .4, .5, .5])
+    colors = sns.xkcd_palette(['green', 'pink', 'sky blue'])
+    for i, key in enumerate(['1', '2', '12']):
+        ax.plot(HDIM_plot, group_sizes[key], label=key, color=colors[i])
+    ax.set_xlim([np.min(HDIM_plot)-30, np.max(HDIM_plot)+30])
+    ax.set_ylim([0,100])
+    ax.set_xlabel('Number of rec. units', fontsize=fs)
+    ax.set_ylabel('Group size', fontsize=fs)
+    lg = ax.legend(title='Group',
+                   fontsize=fs, ncol=1, bbox_to_anchor=(1.5,1.2),
+                   loc=1, frameon=False)
+    plt.setp(lg.get_title(),fontsize=fs)
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+    plt.locator_params(nbins=3)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    plt.savefig('figure/choiceattend_groupsize'+save_type+'.pdf', transparent=True)
+
+
 # save_addon = 'allrule_weaknoise_300'
 # ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
 #                         analyze_allunits=False, fast_eval=True, redefine_choice=False)
@@ -929,7 +967,7 @@ class LesionAnalysis(object):
 
 save_addon = 'allrule_weaknoise_300'
 # save_addon = 'attendonly_weaknoise_300'
-la = LesionAnalysis(save_addon)
+# la = LesionAnalysis(save_addon)
 # la.prettyplot_hist_varprop()
 
 # la.plot_performance_choicetasks()
@@ -939,4 +977,6 @@ la = LesionAnalysis(save_addon)
 # for lesion_group in ['1', '2', '12', '1+2']:
 #     la.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
 
-la.plot_connectivity()
+# la.plot_connectivity()
+
+# plot_groupsize('allrule_weaknoise')
