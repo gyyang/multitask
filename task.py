@@ -378,7 +378,7 @@ def choicego_(config, mode, tar_mod, **kwargs):
         # Target strengths
         tars_mean = np.random.uniform(0.8,1.2,(batch_size,))
         # tars_diff = np.random.uniform(0.01,0.2,(batch_size,))
-        tars_diff = np.random.choice([0.02, 0.04, 0.08], (batch_size,)) # This helo
+        tars_diff = np.random.choice([0.02, 0.04, 0.08], (batch_size,))
         tars_sign = np.random.choice([1,-1], (batch_size,))
 
         tar1_strengths = tars_mean + tars_diff*tars_sign/2
@@ -492,14 +492,16 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
         tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
 
         tars_mod1_mean = np.random.uniform(0.8,1.2,(batch_size,))
-        tars_mod1_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        # tars_mod1_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        tars_mod1_diff = np.random.choice([0.02, 0.04, 0.08], (batch_size,))
         tars_mod1_sign = np.random.choice([1,-1], (batch_size,))
 
         tar1_mod1_strengths = tars_mod1_mean + tars_mod1_diff*tars_mod1_sign/2
         tar2_mod1_strengths = tars_mod1_mean - tars_mod1_diff*tars_mod1_sign/2
 
         tars_mod2_mean = np.random.uniform(0.8,1.2,(batch_size,))
-        tars_mod2_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        # tars_mod2_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        tars_mod2_diff = np.random.choice([0.02, 0.04, 0.08], (batch_size,))
         tars_mod2_sign = np.random.choice([1,-1], (batch_size,))
 
         tar1_mod2_strengths = tars_mod2_mean + tars_mod2_diff*tars_mod2_sign/2
@@ -621,7 +623,8 @@ def choicego_int(config, mode, **kwargs):
         tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
 
         tars_mod1_mean = np.random.uniform(0.8,1.2,(batch_size,))
-        tars_mod1_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        # tars_mod1_diff = np.random.uniform(0.05,0.4,(batch_size,))
+        tars_mod1_diff = np.random.choice([0.02, 0.04, 0.08], (batch_size,))
         tars_mod1_sign = np.random.choice([1,-1], (batch_size,))
 
         tar1_mod1_strengths = tars_mod1_mean + tars_mod1_diff*tars_mod1_sign/2
