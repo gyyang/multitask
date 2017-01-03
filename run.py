@@ -16,6 +16,8 @@ from tensorflow.python.client.session import Session
 from task import *
 from network import LeakyRNNCell, popvec
 
+fast_eval = True
+
 class Run(Session):
     def __init__(self, save_addon, sigma_rec=None, lesion_units=None, fast_eval=False):
         '''
@@ -329,10 +331,11 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
     except TypeError:
         neurons = [neurons]
 
-    t_start = 500
     h_tests = dict()
-    with Run(save_addon, sigma_rec=0.0) as R:
+    with Run(save_addon, sigma_rec=0.0, fast_eval=fast_eval) as R:
         config = R.config
+        t_start = int(500/config['dt'])
+
         for rule in rules:
             task = generate_onebatch(rule=rule, config=config, mode='test')
             h_tests[rule] = R.f_h(task.x) # (Time, Batch, Units)
@@ -344,7 +347,7 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
             fig = plt.figure(figsize=(1.0,0.8))
             ax = fig.add_axes([0.35,0.25,0.55,0.55])
             ax.set_color_cycle(sns.color_palette("husl", h_tests[rule].shape[1]))
-            _ = ax.plot(np.arange(h_tests[rule][t_start:].shape[0])/1000.,
+            _ = ax.plot(np.arange(h_tests[rule][t_start:].shape[0])*config['dt']/1000,
                         h_tests[rule][t_start:,:,neuron], lw=0.5)
 
             if epoch is not None:
@@ -378,8 +381,8 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
 
 if __name__ == "__main__":
     # schematic_plot()
-    sample_plot(save_addon='allrule_weaknoise_300', rule=CHOICEDELAY_MOD1, save=False)
-    # plot_singleneuron_intime('allrule_strongnoise_500', [412], [GO, CHOICEDELAY_MOD2, DMCNOGO],
-    #                          epoch=None, save=True, ylabel_firstonly=True)
+    # sample_plot(save_addon='allrule_weaknoise_300', rule=CHOICEDELAY_MOD1, save=False)
+    plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
+                             epoch=None, save=False, ylabel_firstonly=True)
     pass
 
