@@ -11,7 +11,7 @@ import tensorflow as tf
 from task import *
 from run import Run
 
-def find_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True, dtype='float64'):
+def search_slowpoints(save_addon, input, start_points=None, find_fixedpoints=True, dtype='float64'):
     if find_fixedpoints:
         # Finding fixed points require less tolerange
         print('Findings fixed points...')

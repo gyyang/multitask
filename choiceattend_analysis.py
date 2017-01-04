@@ -19,9 +19,39 @@ import seaborn.apionly as sns # If you don't have this, then some colormaps won'
 from task import *
 from run import Run
 from network import get_perf
-from slowpoints import find_slowpoints
+from slowpoints import search_slowpoints
 
 save = True # TEMP
+
+def generate_surrogate_data():
+    # Generate surrogate data
+
+    # Number of time points
+    nt = 20
+    t_plot = np.linspace(0, 1, nt)
+
+    # Performance
+    perfs = np.ones(batch_size)
+
+    # Generate choice
+    rel_mod = '1' if rule == CHOICEATTEND_MOD1 else '2' # relevant modality
+    rel_coh = params['tar1_mod'+rel_mod+'_strengths']-params['tar2_mod'+rel_mod+'_strengths']
+    y_choice = (rel_coh>0)*2-1
+
+    # Generate underlying low-dimensional representation
+    mod1_plot = np.ones((nt, batch_size)) * (params['tar1_mod1_strengths']-params['tar2_mod1_strengths'])
+    mod2_plot = np.ones((nt, batch_size)) * (params['tar1_mod2_strengths']-params['tar2_mod2_strengths'])
+    choice_plot = (np.ones((nt, batch_size)).T * t_plot).T  * y_choice
+
+    # Generate surrogate neural activity
+    h_sur = np.zeros((nt, batch_size, 3))
+    h_sur[:, :, 0] = mod1_plot
+    h_sur[:, :, 1] = mod2_plot
+    h_sur[:, :, 2] = choice_plot
+
+    # Random orthogonal projection
+    h_sample = np.dot(h_sur, random_ortho_matrix[:3, :])
+    return h_sample, y_choice, perfs
 
 def gen_taskparams(tar1_loc, n_tar, n_rep):
     batch_size = n_rep * n_tar**2
@@ -380,110 +410,6 @@ class LesionAnalysis(object):
         plt.savefig('figure/choiceattend_connectivity'+save_addon+'.pdf', transparent=True)
         plt.show()
 
-def plot_groupsize(save_type):
-    HDIMs = range(150, 1000)
-    group_sizes = {key : list() for key in ['1', '2', '12']}
-    HDIM_plot = list()
-    for HDIM in HDIMs:
-        save_addon = save_type+'_'+str(HDIM)
-        fname = 'data/config'+save_addon+'.pkl'
-        if not os.path.isfile(fname):
-            continue
-        la = LesionAnalysis(save_addon)
-        for key in ['1', '2', '12']:
-            group_sizes[key].append(len(la.ind_lesions[key]))
-
-        HDIM_plot.append(HDIM)
-
-    fs = 6
-    fig = plt.figure(figsize=(1.5,1.0))
-    ax = fig.add_axes([.3, .4, .5, .5])
-    colors = sns.xkcd_palette(['green', 'pink', 'sky blue'])
-    for i, key in enumerate(['1', '2', '12']):
-        ax.plot(HDIM_plot, group_sizes[key], label=key, color=colors[i])
-    ax.set_xlim([np.min(HDIM_plot)-30, np.max(HDIM_plot)+30])
-    ax.set_ylim([0,100])
-    ax.set_xlabel('Number of rec. units', fontsize=fs)
-    ax.set_ylabel('Group size', fontsize=fs)
-    lg = ax.legend(title='Group',
-                   fontsize=fs, ncol=1, bbox_to_anchor=(1.5,1.2),
-                   loc=1, frameon=False)
-    plt.setp(lg.get_title(),fontsize=fs)
-    ax.tick_params(axis='both', which='major', labelsize=fs)
-    plt.locator_params(nbins=3)
-    ax.spines["right"].set_visible(False)
-    ax.spines["top"].set_visible(False)
-    ax.xaxis.set_ticks_position('bottom')
-    ax.yaxis.set_ticks_position('left')
-    plt.savefig('figure/choiceattend_groupsize'+save_type+'.pdf', transparent=True)
-
-
-# save_addon = 'allrule_weaknoise_140'
-# ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
-#                         analyze_allunits=False, fast_eval=True, redefine_choice=False,
-#                          surrogate_data=False)
-# ssa.plot_betaweights()
-# ssa.plot_statespace(plot_slowpoints=False)
-
-# save_addon = 'allrule_weaknoise_300'
-# save_addon = 'attendonly_weaknoise_300'
-# la = LesionAnalysis(save_addon)
-# la.prettyplot_hist_varprop()
-
-# la.plot_performance_choicetasks()
-
-# rule = CHOICEATTEND_MOD1
-# la.plot_performance_2D(rule=rule)
-# for lesion_group in ['1', '2', '12', '1+2']:
-#     la.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
-
-# la.plot_connectivity()
-
-# plot_groupsize('allrule_weaknoise')
-
-
-
-
-def generate_surrogate_data():
-    # Generate surrogate data
-
-    # Number of time points
-    nt = 20
-    t_plot = np.linspace(0, 1, nt)
-
-    # Performance
-    perfs = np.ones(batch_size)
-
-    # Generate choice
-    rel_mod = '1' if rule == CHOICEATTEND_MOD1 else '2' # relevant modality
-    rel_coh = params['tar1_mod'+rel_mod+'_strengths']-params['tar2_mod'+rel_mod+'_strengths']
-    y_choice = (rel_coh>0)*2-1
-
-    # Generate underlying low-dimensional representation
-    mod1_plot = np.ones((nt, batch_size)) * (params['tar1_mod1_strengths']-params['tar2_mod1_strengths'])
-    mod2_plot = np.ones((nt, batch_size)) * (params['tar1_mod2_strengths']-params['tar2_mod2_strengths'])
-    choice_plot = (np.ones((nt, batch_size)).T * t_plot).T  * y_choice
-
-    # Generate surrogate neural activity
-    h_sur = np.zeros((nt, batch_size, 3))
-    h_sur[:, :, 0] = mod1_plot
-    h_sur[:, :, 1] = mod2_plot
-    h_sur[:, :, 2] = choice_plot
-
-    # Random orthogonal projection
-    h_sample = np.dot(h_sur, random_ortho_matrix[:3, :])
-    return h_sample, y_choice, perfs
-
-
-
-
-# Re-write the state space analysis
-# save_addon = 'attendonly_weaknoise_300'
-# save_addon = 'allrule_weaknoise_360'
-# save_addon = 'allrule_weaknoise_480'
-save_addon = 'allrule_weaknoise_440'
-
-
 class StateSpaceAnalysis(object):
     def __init__(self, save_addon, **kwargs):
 
@@ -581,10 +507,10 @@ class StateSpaceAnalysis(object):
 
         # Z-scoring response across time and trials (can have a strong impact on results)
         if setting['z_score']:
-            meanh = H.mean(axis=0)
-            stdh  = H.std(axis=0)
-            H = H - meanh
-            H = H/stdh
+            self.meanh = H.mean(axis=0)
+            self.stdh  = H.std(axis=0)
+            H = H - self.meanh
+            H = H/self.stdh
 
         # Transform back
         H = H.reshape((nt, nb, nh))
@@ -683,6 +609,7 @@ class StateSpaceAnalysis(object):
 
         H_new_tran = np.dot(H_new, q)
 
+        self.config     = config
         self.setting    = setting
         self.Regrs      = Regrs_new
         self.H          = H_new
@@ -690,6 +617,9 @@ class StateSpaceAnalysis(object):
         self.regr_names = regr_names
         self.coef       = coef_maxt
         self.rules      = rules
+        self.ind_active = ind_active
+        self.tar1_loc   = tar1_loc
+        self.q          = q
 
     def plot_betaweights(self):
         '''
@@ -724,12 +654,135 @@ class StateSpaceAnalysis(object):
             plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
         plt.show()
 
+    def get_slowpoints(self):
+        ####################### Find Fixed & Slow Points ######################
+        if self.setting['redefine_choice']:
+            ValueError('Finding slow points is invalid when choices are redefined')
+
+        # Find Fixed points
+        # Choosing starting points
+        self.fixed_points_trans_all = dict()
+        self.slow_points_trans_all  = dict()
+
+        # Looping over rules
+        for rule in self.rules:
+
+            print(rule_name[rule])
+
+            ######################## Find Fixed Points ########################
+
+            # Zero-coherence network input
+            params = {'tar1_locs' : [self.tar1_loc],
+                      'tar2_locs' : [np.mod(self.tar1_loc+np.pi, 2*np.pi)],
+                      'tar1_mod1_strengths' : [1],
+                      'tar2_mod1_strengths' : [1],
+                      'tar1_mod2_strengths' : [1],
+                      'tar2_mod2_strengths' : [1],
+                      'tar_time'    : 600}
+
+            task        = generate_onebatch(rule, self.config, 'psychometric', noise_on=False, params=params)
+            epoch       = task.epochs['tar1']
+            input_coh0  = task.x[epoch[1]-1, 0, :]
+
+            # Get two starting points from averaged activity when choice is +1 or -1
+            tmp = list()
+            # Looping over choice
+            for ch in [-1, 1]:
+                # Last time point activity for all conditions with tihs choice
+                h_tmp = self.H[-1, self.Regrs[:,0]==ch, :]
+
+                # Get index of the condition that is farthest away from origin
+                ind = np.argmax(np.sum(h_tmp**2, 1))
+                tmp.append(h_tmp[ind, :])
+            tmp = np.array(tmp)
+
+            # Notice H is z-scored. Now get the starting point in original space
+            if self.setting['z_score']:
+                tmp *= self.stdh
+                tmp += self.meanh
+
+
+            nh_orig = self.config['shape'][1]
+            start_points = np.zeros((2, nh_orig))
+            print(start_points.shape)
+            # Re-express starting points in original space
+            start_points[:, self.ind_active] = tmp
+
+            # Find fixed points with function find_slowpoints
+            res_list = search_slowpoints(save_addon, input=input_coh0,
+                                       start_points=start_points, find_fixedpoints=True)
+
+            # Store fixed points in original space, and in z-scored, subsampled space
+            fixed_points_raws  = list()
+            fixed_points_trans = list()
+            for i, res in enumerate(res_list):
+                print(res.success, res.message, res.fun)
+
+                # Original space
+                fixed_points_raws.append(res.x)
+
+                # Transformed space
+                fixed_points = res.x[self.ind_active]
+                if self.setting['z_score']:
+                    fixed_points -= self.meanh
+                    fixed_points /= self.stdh
+
+                # Task-related axes space
+                fixed_points_tran = np.dot(fixed_points, self.q)
+                fixed_points_trans.append(fixed_points_tran)
+
+            fixed_points_raws  = np.array(fixed_points_raws)
+            fixed_points_trans = np.array(fixed_points_trans)
+            self.fixed_points_trans_all[rule] = fixed_points_trans
+
+
+            ######################## Find Slow Points ########################
+            # The starting conditions will be equally sampled points in between two fixed points
+            n_slow_points = 100 # actual points will be this minus 1
+            mix_weight = np.array([np.arange(1,n_slow_points),
+                                   n_slow_points-np.arange(1,n_slow_points)], dtype='float').T/n_slow_points
+
+            # Various ways to generate starting points for the search
+
+            # start_points = np.dot(mix_weight, fixed_points_raws)
+            start_points = np.dot(mix_weight, start_points)
+            # start_points+= np.random.randn(*start_points.shape) # Randomly perturb starting points
+            # start_points *= np.random.uniform(0, 2, size=start_points.shape) # Randomly perturb starting points
+            # start_points = np.random.rand(100, nh)*3
+
+            # Search slow points with the same input but different starting points
+            res_list = search_slowpoints(save_addon, input=input_coh0,
+                                       start_points=start_points, find_fixedpoints=False)
+
+            slow_points_trans = list()
+            for i, res in enumerate(res_list):
+                # Transformed space
+                slow_points = res.x[self.ind_active]
+                if self.setting['z_score']:
+                    slow_points -= self.meanh
+                    slow_points /= self.stdh
+
+                # Task-related axes space
+                slow_points_tran = np.dot(slow_points, self.q)
+                slow_points_trans.append(slow_points_tran)
+
+            slow_points_trans = np.array(slow_points_trans)
+            self.slow_points_trans_all[rule] = slow_points_trans
+
     def plot_statespace(self, plot_slowpoints=True):
         '''
         Plot state space analysis
         :param plot_slowpoints:
         :return:
         '''
+
+        if plot_slowpoints:
+            try:
+                # Check if slow points are already computed
+                _ = self.slow_points_trans_all
+            except AttributeError:
+                # If not, compute it now.
+                self.get_slowpoints()
 
         ################ Pretty Plotting of State-space Results #######################
         fs = 6
@@ -803,6 +856,18 @@ class StateSpaceAnalysis(object):
                         ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
                                 '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
 
+                        if not plot_slowpoints:
+                            continue
+
+                        # Plot slow points
+                        ax.plot(self.slow_points_trans_all[rule][:,pcs[0]],
+                                self.slow_points_trans_all[rule][:,pcs[1]],
+                                '+', markersize=1, mew=0.2, color=sns.xkcd_palette(['magenta'])[0])
+
+                        ax.plot(self.fixed_points_trans_all[rule][:,pcs[0]],
+                                self.fixed_points_trans_all[rule][:,pcs[1]],
+                                'x', markersize=2, mew=0.5, color=sns.xkcd_palette(['red'])[0])
+
         plt.tight_layout(pad=0.0)
 
         # Plot labels
@@ -828,7 +893,74 @@ class StateSpaceAnalysis(object):
             plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
         plt.show()
 
+def plot_groupsize(save_type):
+    HDIMs = range(150, 1000)
+    group_sizes = {key : list() for key in ['1', '2', '12']}
+    HDIM_plot = list()
+    for HDIM in HDIMs:
+        save_addon = save_type+'_'+str(HDIM)
+        fname = 'data/config'+save_addon+'.pkl'
+        if not os.path.isfile(fname):
+            continue
+        la = LesionAnalysis(save_addon)
+        for key in ['1', '2', '12']:
+            group_sizes[key].append(len(la.ind_lesions[key]))
 
+        HDIM_plot.append(HDIM)
+
+    fs = 6
+    fig = plt.figure(figsize=(1.5,1.0))
+    ax = fig.add_axes([.3, .4, .5, .5])
+    colors = sns.xkcd_palette(['green', 'pink', 'sky blue'])
+    for i, key in enumerate(['1', '2', '12']):
+        ax.plot(HDIM_plot, group_sizes[key], label=key, color=colors[i])
+    ax.set_xlim([np.min(HDIM_plot)-30, np.max(HDIM_plot)+30])
+    ax.set_ylim([0,100])
+    ax.set_xlabel('Number of rec. units', fontsize=fs)
+    ax.set_ylabel('Group size', fontsize=fs)
+    lg = ax.legend(title='Group',
+                   fontsize=fs, ncol=1, bbox_to_anchor=(1.5,1.2),
+                   loc=1, frameon=False)
+    plt.setp(lg.get_title(),fontsize=fs)
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+    plt.locator_params(nbins=3)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    plt.savefig('figure/choiceattend_groupsize'+save_type+'.pdf', transparent=True)
+
+
+# save_addon = 'allrule_weaknoise_140'
+# ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
+#                         analyze_allunits=False, fast_eval=True, redefine_choice=False,
+#                          surrogate_data=False)
+# ssa.plot_betaweights()
+# ssa.plot_statespace(plot_slowpoints=False)
+
+# save_addon = 'allrule_weaknoise_300'
+# save_addon = 'attendonly_weaknoise_300'
+# la = LesionAnalysis(save_addon)
+# la.prettyplot_hist_varprop()
+
+# la.plot_performance_choicetasks()
+
+# rule = CHOICEATTEND_MOD1
+# la.plot_performance_2D(rule=rule)
+# for lesion_group in ['1', '2', '12', '1+2']:
+#     la.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
+
+# la.plot_connectivity()
+
+# plot_groupsize('allrule_weaknoise')
+
+
+# Re-write the state space analysis
+# save_addon = 'attendonly_weaknoise_300'
+# save_addon = 'allrule_weaknoise_360'
+save_addon = 'allrule_weaknoise_480'
+# save_addon = 'allrule_weaknoise_440'
 ssa = StateSpaceAnalysis(save_addon)
 ssa.plot_betaweights()
 ssa.plot_statespace()
+# ssa.get_slowpoints()
