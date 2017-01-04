@@ -483,336 +483,352 @@ def generate_surrogate_data():
 # save_addon = 'allrule_weaknoise_480'
 save_addon = 'allrule_weaknoise_440'
 
-kwargs = dict()
-
-# Default settings
-default_setting = {
-    'save_addon'         : save_addon,
-    'analyze_threerules' : False,
-    'analyze_allunits'   : False,
-    'redefine_choice'    : False,
-    'regress_product'    : False, # regression of interaction terms
-    'z_score'            : True,
-    'fast_eval'          : True,
-    'surrogate_data'     : False}
-
-# Update settings with kwargs
-setting = default_setting
-for key, val in kwargs.iteritems():
-    setting[key] = val
-
-print('Current analysis setting:')
-for key, val in default_setting.iteritems():
-    print('{:20s} : {:s}'.format(key, str(val)))
-
-
-# # If using surrogate data, create random matrix for later use
-# if setting['surrogate_data']:
-#     from scipy.stats import ortho_group
-#     with Run(save_addon, fast_eval=True) as R:
-#         w_rec  = R.w_rec
-#     nh = w_rec.shape[0]
-#     random_ortho_matrix = ortho_group.rvs(dim=nh)
-
-
-#################### Computing Neural Activity #########################
-# Get rules and regressors
-rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
-regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
-
-n_rule = len(rules)
-n_regr = len(regr_names)
-
-# Generate task parameters used
-# Target location
-tar1_loc  = np.pi/2
-params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=2)
-params = params
-
-x     = list() # Network input
-y_loc = list() # Network target output location
-
-# Start computing the neural activity
-with Run(save_addon, sigma_rec=0, fast_eval=setting['fast_eval']) as R:
-    config = R.config
-
-    for i, rule in enumerate(rules):
-        # Generating task information
-        task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=False)
-        x.append(task.x)
-        y_loc.append(task.y_loc)
-
-    x     = np.concatenate(x    , axis=1)
-    y_loc = np.concatenate(y_loc, axis=1)
-
-    # Get neural activity
-    H     = R.f_h(x)
-    y_sample     = R.f_y(H)
-    y_sample_loc = R.f_y_loc(y_sample)
-
-# Get performance and choices
-perfs = get_perf(y_sample, y_loc)
-# y_choice is 1 for choosing tar1_loc, otherwise -1
-y_actual_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
-y_target_choice = 2*(get_dist(y_loc[-1]       -tar1_loc)<np.pi/2) - 1
-###################### Processing activity ##################################
-
-# Downsample in time
-every_t = int(50/config['dt'])
-# Only analyze the target epoch
-epoch = task.epochs['tar1']
-H = H[epoch[0]:epoch[1],...][::every_t,...]
-
-# Lumping time and trials together
-nt, nb, nh = H.shape
-H = H.reshape((-1, nh))
-
-# Analyze all units or only active units
-if setting['analyze_allunits']:
-    ind_active = range(nh)
-else:
-    ind_active = np.where(H.var(axis=0) > 1e-4)[0]
-    nh = len(ind_active) # new nh
-
-H = H[:, ind_active]
-
-# Z-scoring response across time and trials (can have a strong impact on results)
-if setting['z_score']:
-    meanh = H.mean(axis=0)
-    stdh  = H.std(axis=0)
-    H = H - meanh
-    H = H/stdh
-
-# Transform back
-H = H.reshape((nt, nb, nh))
 
-
-# Get neuronal preferences (+1 if activity is higher for choice=+1)
-# preferences = (H[:, (y_actual_choice== 1)*(perfs==1), :].mean(axis=(0,1)) >
-#                H[:, (y_actual_choice==-1)*(perfs==1), :].mean(axis=(0,1)))*2-1
-
-# preferences = (H[:, y_actual_choice== 1, :].mean(axis=(0,1)) >
-#                H[:, y_actual_choice==-1, :].mean(axis=(0,1)))*2-1
-
-# preferences = (H[:, y_target_choice== 1, :].mean(axis=(0,1)) >
-#                H[:, y_target_choice==-1, :].mean(axis=(0,1)))*2-1
-
-# preferences = (H[-1, y_actual_choice== 1, :].mean(axis=0) >
-#                H[-1, y_actual_choice==-1, :].mean(axis=0))*2-1
-
-preferences = (H[-1, y_target_choice== 1, :].mean(axis=0) >
-               H[-1, y_target_choice==-1, :].mean(axis=0))*2-1
-
-
-########################## Define Regressors ##################################
-
-# Coherences
-tar_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
-tar_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
-
-# Regressors (Choice, Mod1 Cohs, Mod2 Cohs, Rule)
-Regrs = np.zeros((n_rule * batch_size, n_regr))
-Regrs[:, 0] = y_target_choice
-Regrs[:, 1] = np.tile(tar_mod1_cohs/tar_mod1_cohs.max(), n_rule)
-Regrs[:, 2] = np.tile(tar_mod2_cohs/tar_mod2_cohs.max(), n_rule)
-Regrs[:, 3] = np.repeat([1, -1], batch_size) # +1 for Att 1, -1 for Att 2
-
-# Get unique regressors
-Regrs_new = np.vstack({tuple(row) for row in Regrs})
-
-n_cond = Regrs_new.shape[0]
-
-H_new = np.zeros((nt, n_cond, nh))
-
-for i_cond in range(n_cond):
-    regr = Regrs_new[i_cond, :]
-
-    if setting['redefine_choice']:
-        for pref in [1, -1]:
-            batch_ind = ((Regrs[:,0]==pref*regr[0])*(Regrs[:,1]==pref*regr[1])*
-                         (Regrs[:,2]==pref*regr[2])*(Regrs[:,3]==regr[3]))
-            H_new[:, i_cond, preferences==pref] = H[:, batch_ind, :][:, :, preferences==pref].mean(axis=1)
-
-    else:
-        batch_ind = ((Regrs[:,0]==regr[0])*(Regrs[:,1]==regr[1])*
-                     (Regrs[:,2]==regr[2])*(Regrs[:,3]==regr[3]))
-        H_new[:, i_cond, :] = H[:, batch_ind, :].mean(axis=1)
-
-################################### Regression ################################
-from sklearn import linear_model
-
-# Time-independent coefficient vectors (n_unit, n_regress)
-coef_maxt = np.zeros((nh, n_regr))
-
-# Looping over units
-# Although this is slower, it's still quite fast, and it's clearer and more flexible
-for i in range(nh):
-    # To satisfy sklearn standard
-    Y = np.swapaxes(H_new[:,:,i], 0, 1)
-
-    # Linear regression
-    regr = linear_model.LinearRegression()
-    regr.fit(Regrs_new, Y)
-
-    # Get time-independent coefficient vector
-    coef = regr.coef_
-    ind = np.argmax(np.sum(coef**2, axis=1))
-    coef_maxt[i, :] = coef[ind,:]
-
-
-# Orthogonalize with QR decomposition
-# Matrix q represents the orthogonalized task-related axes
-q, _ = np.linalg.qr(coef_maxt)
-
-# Standardize the signs of axes
-H_new_tran = np.dot(H_new, q)
-if ( H_new_tran[:, Regrs_new[:, 0]== 1, 0].mean(axis=(0,1)) >
-     H_new_tran[:, Regrs_new[:, 0]==-1, 0].mean(axis=(0,1)) ):
-    q[:, 0] = -q[:, 0]
-if ( H_new_tran[:, Regrs_new[:, 1] < 0, 1].mean(axis=(0,1)) >
-     H_new_tran[:, Regrs_new[:, 1] > 0, 1].mean(axis=(0,1)) ):
-    q[:, 1] = -q[:, 1]
-if ( H_new_tran[:, Regrs_new[:, 2] < 0, 2].mean(axis=(0,1)) >
-     H_new_tran[:, Regrs_new[:, 2] > 0, 2].mean(axis=(0,1)) ):
-    q[:, 2] = -q[:, 2]
-
-
-
-H_new_tran = np.dot(H_new, q)
-
-def plot_betaweights(coef_):
-    n_regr = 3
-
-    # Plot important comparisons
-    fig, axarr = plt.subplots(1, n_regr, sharex='col', sharey='row', figsize=(n_regr*2,2))
-    colors = sns.xkcd_palette(['grey', 'red', 'blue'])
-    fs = 6
-    i = 0
-    for j in range(1, 1+n_regr):
-        ax = axarr[j-1]
-
-        ax.plot(coef_[:,j], coef_[:, i], 'o', color='black', ms=1.5, mec='white', mew=0.2)
-        ax.set_xlabel(regr_names[j], fontsize=fs)
-        if j == 1:
-            ax.set_ylabel(regr_names[i], fontsize=fs)
-
-        ax.tick_params(axis='both', which='major', labelsize=6)
-        ax.locator_params(nbins=2)
-        ax.spines["right"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
-
-    plt.tight_layout()
-
-    if save:
-        plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
-    plt.show()
-
-plot_betaweights(coef_maxt)
-
-
-
-# if plot_slowpoints:
-#     try:
-#         _ = self.slow_points_trans_all
-#     except AttributeError:
-#         self.find_slowpoints()
-
-################ Pretty Plotting of State-space Results #######################
-fs = 6
-
-colors1 = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
-colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
-
-fig, axarr = plt.subplots(2, len(rules), sharex=True, sharey='row', figsize=(len(rules)*1,2))
-for i_col, rule in enumerate(rules):
-    j_rule = 1 if rule == CHOICEATTEND_MOD1 else -1
-
-    # Different ways of separation, either by Mod1 or Mod2
-    # Also different subspaces shown
-    for i_row in range(2):
-        ax = axarr[i_row, i_col]
-        ax.axis('off')
-
-        if i_row == 0:
-            # Separate by coherence of Mod 1
-            cohs = Regrs_new[:, 1]
-
-            # Show subspace (Choice, Mod1)
-            pcs = [0, 1]
-
-            # Color set
-            colors = colors1
-
-            # Rule title
-            ax.set_title(rule_name[rule], fontsize=fs, y=0.8)
+class StateSpaceAnalysis(object):
+    def __init__(self, save_addon, **kwargs):
+
+        # Default settings
+        default_setting = {
+            'save_addon'         : save_addon,
+            'analyze_threerules' : False,
+            'analyze_allunits'   : False,
+            'redefine_choice'    : False,
+            'regress_product'    : False, # regression of interaction terms
+            'z_score'            : True,
+            'fast_eval'          : True,
+            'surrogate_data'     : False}
+
+        # Update settings with kwargs
+        setting = default_setting
+        for key, val in kwargs.iteritems():
+            setting[key] = val
+
+        print('Current analysis setting:')
+        for key, val in default_setting.iteritems():
+            print('{:20s} : {:s}'.format(key, str(val)))
+
+
+        # # If using surrogate data, create random matrix for later use
+        # if setting['surrogate_data']:
+        #     from scipy.stats import ortho_group
+        #     with Run(save_addon, fast_eval=True) as R:
+        #         w_rec  = R.w_rec
+        #     nh = w_rec.shape[0]
+        #     random_ortho_matrix = ortho_group.rvs(dim=nh)
+
+
+        #################### Computing Neural Activity #########################
+        # Get rules and regressors
+        rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+        regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
+
+        n_rule = len(rules)
+        n_regr = len(regr_names)
+
+        # Generate task parameters used
+        # Target location
+        tar1_loc  = np.pi/2
+        params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=2)
+        params = params
+
+        x     = list() # Network input
+        y_loc = list() # Network target output location
+
+        # Start computing the neural activity
+        with Run(save_addon, sigma_rec=0, fast_eval=setting['fast_eval']) as R:
+            config = R.config
+
+            for i, rule in enumerate(rules):
+                # Generating task information
+                task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=False)
+                x.append(task.x)
+                y_loc.append(task.y_loc)
+
+            x     = np.concatenate(x    , axis=1)
+            y_loc = np.concatenate(y_loc, axis=1)
+
+            # Get neural activity
+            H     = R.f_h(x)
+            y_sample     = R.f_y(H)
+            y_sample_loc = R.f_y_loc(y_sample)
+
+        # Get performance and choices
+        perfs = get_perf(y_sample, y_loc)
+        # y_choice is 1 for choosing tar1_loc, otherwise -1
+        y_actual_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
+        y_target_choice = 2*(get_dist(y_loc[-1]       -tar1_loc)<np.pi/2) - 1
+
+        ###################### Processing activity ##################################
+
+        # Downsample in time
+        every_t = int(50/config['dt'])
+        # Only analyze the target epoch
+        epoch = task.epochs['tar1']
+        H = H[epoch[0]:epoch[1],...][::every_t,...]
+
+        # Lumping time and trials together
+        nt, nb, nh = H.shape
+        H = H.reshape((-1, nh))
+
+        # Analyze all units or only active units
+        if setting['analyze_allunits']:
+            ind_active = range(nh)
         else:
-            # Separate by coherence of Mod 2
-            cohs = Regrs_new[:, 2]
+            ind_active = np.where(H.var(axis=0) > 1e-4)[0]
+            nh = len(ind_active) # new nh
 
-            # Show subspace (Choice, Mod2)
-            pcs = [0, 2]
+        H = H[:, ind_active]
 
-            # Color set
-            colors = colors2
+        # Z-scoring response across time and trials (can have a strong impact on results)
+        if setting['z_score']:
+            meanh = H.mean(axis=0)
+            stdh  = H.std(axis=0)
+            H = H - meanh
+            H = H/stdh
 
-
-        if i_col == 0:
-            anc = [H_new_tran[:,:,pcs[0]].min()+1, H_new_tran[:,:,pcs[1]].max()-5] # anchor point
-            ax.plot([anc[0], anc[0]], [anc[1]-5, anc[1]-1], color='black', lw=1.0)
-            ax.plot([anc[0]+1, anc[0]+5], [anc[1], anc[1]], color='black', lw=1.0)
-            ax.text(anc[0], anc[1], regr_names[pcs[0]], fontsize=fs, va='bottom')
-            ax.text(anc[0], anc[1], regr_names[pcs[1]], fontsize=fs, rotation=90, ha='right', va='top')
+        # Transform back
+        H = H.reshape((nt, nb, nh))
 
 
-        # Loop over coherences to choice 1, from high to low
-        for i, s in enumerate(np.unique(cohs)[::-1]):
+        # Get neuronal preferences (+1 if activity is higher for choice=+1)
+        # preferences = (H[:, (y_actual_choice== 1)*(perfs==1), :].mean(axis=(0,1)) >
+        #                H[:, (y_actual_choice==-1)*(perfs==1), :].mean(axis=(0,1)))*2-1
 
-            # Loop over choices
-            for ch in [1, -1]:
+        # preferences = (H[:, y_actual_choice== 1, :].mean(axis=(0,1)) >
+        #                H[:, y_actual_choice==-1, :].mean(axis=(0,1)))*2-1
 
-                if ch == 1:
-                    # Solid circles
-                    kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+        # preferences = (H[:, y_target_choice== 1, :].mean(axis=(0,1)) >
+        #                H[:, y_target_choice==-1, :].mean(axis=(0,1)))*2-1
+
+        # preferences = (H[-1, y_actual_choice== 1, :].mean(axis=0) >
+        #                H[-1, y_actual_choice==-1, :].mean(axis=0))*2-1
+
+        preferences = (H[-1, y_target_choice== 1, :].mean(axis=0) >
+                       H[-1, y_target_choice==-1, :].mean(axis=0))*2-1
+
+
+        ########################## Define Regressors ##################################
+
+        # Coherences
+        tar_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
+        tar_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
+
+        # Regressors (Choice, Mod1 Cohs, Mod2 Cohs, Rule)
+        Regrs = np.zeros((n_rule * batch_size, n_regr))
+        Regrs[:, 0] = y_target_choice
+        Regrs[:, 1] = np.tile(tar_mod1_cohs/tar_mod1_cohs.max(), n_rule)
+        Regrs[:, 2] = np.tile(tar_mod2_cohs/tar_mod2_cohs.max(), n_rule)
+        Regrs[:, 3] = np.repeat([1, -1], batch_size) # +1 for Att 1, -1 for Att 2
+
+        # Get unique regressors
+        Regrs_new = np.vstack({tuple(row) for row in Regrs})
+
+        n_cond = Regrs_new.shape[0]
+
+        H_new = np.zeros((nt, n_cond, nh))
+
+        for i_cond in range(n_cond):
+            regr = Regrs_new[i_cond, :]
+
+            if setting['redefine_choice']:
+                for pref in [1, -1]:
+                    batch_ind = ((Regrs[:,0]==pref*regr[0])*(Regrs[:,1]==pref*regr[1])*
+                                 (Regrs[:,2]==pref*regr[2])*(Regrs[:,3]==regr[3]))
+                    H_new[:, i_cond, preferences==pref] = H[:, batch_ind, :][:, :, preferences==pref].mean(axis=1)
+
+            else:
+                batch_ind = ((Regrs[:,0]==regr[0])*(Regrs[:,1]==regr[1])*
+                             (Regrs[:,2]==regr[2])*(Regrs[:,3]==regr[3]))
+                H_new[:, i_cond, :] = H[:, batch_ind, :].mean(axis=1)
+
+
+
+        ################################### Regression ################################
+        from sklearn import linear_model
+
+        # Time-independent coefficient vectors (n_unit, n_regress)
+        coef_maxt = np.zeros((nh, n_regr))
+
+        # Looping over units
+        # Although this is slower, it's still quite fast, and it's clearer and more flexible
+        for i in range(nh):
+            # To satisfy sklearn standard
+            Y = np.swapaxes(H_new[:,:,i], 0, 1)
+
+            # Linear regression
+            regr = linear_model.LinearRegression()
+            regr.fit(Regrs_new, Y)
+
+            # Get time-independent coefficient vector
+            coef = regr.coef_
+            ind = np.argmax(np.sum(coef**2, axis=1))
+            coef_maxt[i, :] = coef[ind,:]
+
+
+        # Orthogonalize with QR decomposition
+        # Matrix q represents the orthogonalized task-related axes
+        q, _ = np.linalg.qr(coef_maxt)
+
+        # Standardize the signs of axes
+        H_new_tran = np.dot(H_new, q)
+        if ( H_new_tran[:, Regrs_new[:, 0]== 1, 0].mean(axis=(0,1)) >
+             H_new_tran[:, Regrs_new[:, 0]==-1, 0].mean(axis=(0,1)) ):
+            q[:, 0] = -q[:, 0]
+        if ( H_new_tran[:, Regrs_new[:, 1] < 0, 1].mean(axis=(0,1)) >
+             H_new_tran[:, Regrs_new[:, 1] > 0, 1].mean(axis=(0,1)) ):
+            q[:, 1] = -q[:, 1]
+        if ( H_new_tran[:, Regrs_new[:, 2] < 0, 2].mean(axis=(0,1)) >
+             H_new_tran[:, Regrs_new[:, 2] > 0, 2].mean(axis=(0,1)) ):
+            q[:, 2] = -q[:, 2]
+
+        H_new_tran = np.dot(H_new, q)
+
+        self.setting    = setting
+        self.Regrs      = Regrs_new
+        self.H          = H_new
+        self.H_tran     = H_new_tran
+        self.regr_names = regr_names
+        self.coef       = coef_maxt
+        self.rules      = rules
+
+    def plot_betaweights(self):
+        '''
+        Plot beta weights
+        :return:
+        '''
+        n_regr = 3
+
+        # Plot important comparisons
+        fig, axarr = plt.subplots(1, n_regr, sharex='col', sharey='row', figsize=(n_regr*2,2))
+        colors = sns.xkcd_palette(['grey', 'red', 'blue'])
+        fs = 6
+        i = 0
+        for j in range(1, 1+n_regr):
+            ax = axarr[j-1]
+
+            ax.plot(self.coef[:,j], self.coef[:, i], 'o', color='black', ms=1.5, mec='white', mew=0.2)
+            ax.set_xlabel(self.regr_names[j], fontsize=fs)
+            if j == 1:
+                ax.set_ylabel(self.regr_names[i], fontsize=fs)
+
+            ax.tick_params(axis='both', which='major', labelsize=6)
+            ax.locator_params(nbins=2)
+            ax.spines["right"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+
+        plt.tight_layout()
+
+        if save:
+            plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
+        plt.show()
+
+    def plot_statespace(self, plot_slowpoints=True):
+        '''
+        Plot state space analysis
+        :param plot_slowpoints:
+        :return:
+        '''
+
+        ################ Pretty Plotting of State-space Results #######################
+        fs = 6
+
+        colors1 = sns.diverging_palette(10, 220, sep=1, s=99, l=30, n=6)
+        colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
+
+        fig, axarr = plt.subplots(2, len(self.rules),
+                                  sharex=True, sharey='row', figsize=(len(self.rules)*1,2))
+        for i_col, rule in enumerate(self.rules):
+            j_rule = 1 if rule == CHOICEATTEND_MOD1 else -1
+
+            # Different ways of separation, either by Mod1 or Mod2
+            # Also different subspaces shown
+            for i_row in range(2):
+                ax = axarr[i_row, i_col]
+                ax.axis('off')
+
+                if i_row == 0:
+                    # Separate by coherence of Mod 1
+                    cohs = self.Regrs[:, 1]
+
+                    # Show subspace (Choice, Mod1)
+                    pcs = [0, 1]
+
+                    # Color set
+                    colors = colors1
+
+                    # Rule title
+                    ax.set_title(rule_name[rule], fontsize=fs, y=0.8)
                 else:
-                    # Empty circles
-                    kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
+                    # Separate by coherence of Mod 2
+                    cohs = self.Regrs[:, 2]
+
+                    # Show subspace (Choice, Mod2)
+                    pcs = [0, 2]
+
+                    # Color set
+                    colors = colors2
 
 
-                ind = (cohs==s)*(Regrs_new[:,3]==j_rule)*(Regrs_new[:,0]==ch) # for batch
+                if i_col == 0:
+                    anc = [self.H_tran[:,:,pcs[0]].min()+1, self.H_tran[:,:,pcs[1]].max()-5] # anchor point
+                    ax.plot([anc[0], anc[0]], [anc[1]-5, anc[1]-1], color='black', lw=1.0)
+                    ax.plot([anc[0]+1, anc[0]+5], [anc[1], anc[1]], color='black', lw=1.0)
+                    ax.text(anc[0], anc[1], self.regr_names[pcs[0]], fontsize=fs, va='bottom')
+                    ax.text(anc[0], anc[1], self.regr_names[pcs[1]], fontsize=fs, rotation=90, ha='right', va='top')
 
-                if not np.any(ind):
-                    continue
 
-                h_plot = H_new[:,ind,:].mean(axis=1)
+                # Loop over coherences to choice 1, from high to low
+                for i, s in enumerate(np.unique(cohs)[::-1]):
 
-                h_plot = np.dot(h_plot, q) # Transform
+                    # Loop over choices
+                    for ch in [1, -1]:
 
-                ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
-                        '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
+                        if ch == 1:
+                            # Solid circles
+                            kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+                        else:
+                            # Empty circles
+                            kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
 
-plt.tight_layout(pad=0.0)
 
-# Plot labels
-for i_row in range(2):
-    if i_row == 0:
-        ax = fig.add_axes([0.25,0.45,0.2,0.1])
-        colors = colors1
-    else:
-        ax = fig.add_axes([0.25,0.05,0.2,0.1])
-        colors = colors2
+                        ind = (cohs==s)*(self.Regrs[:,3]==j_rule)*(self.Regrs[:,0]==ch) # for batch
 
-    for i in range(6):
-        kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
-        ax.plot([i], [0], '.-', color=colors[i], markersize=4, markeredgewidth=0.5, **kwargs)
-    ax.axis('off')
-    ax.text(2.5, 1, 'Strong Weak Strong', fontsize=5, va='bottom', ha='center')
-    # During looping, we use coherence to choice 1 from high to low
-    ax.text(2.5, -1, 'To choice 1    To choice 2', fontsize=5, va='top', ha='center')
-    ax.set_xlim([-1,6])
-    ax.set_ylim([-3,3])
+                        if not np.any(ind):
+                            continue
 
-if save:
-    plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
-plt.show()
+                        h_plot = self.H_tran[:, ind, :].mean(axis=1)
+
+                        ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
+                                '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
+
+        plt.tight_layout(pad=0.0)
+
+        # Plot labels
+        for i_row in range(2):
+            if i_row == 0:
+                ax = fig.add_axes([0.25,0.45,0.2,0.1])
+                colors = colors1
+            else:
+                ax = fig.add_axes([0.25,0.05,0.2,0.1])
+                colors = colors2
+
+            for i in range(6):
+                kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+                ax.plot([i], [0], '.-', color=colors[i], markersize=4, markeredgewidth=0.5, **kwargs)
+            ax.axis('off')
+            ax.text(2.5, 1, 'Strong Weak Strong', fontsize=5, va='bottom', ha='center')
+            # During looping, we use coherence to choice 1 from high to low
+            ax.text(2.5, -1, 'To choice 1    To choice 2', fontsize=5, va='top', ha='center')
+            ax.set_xlim([-1,6])
+            ax.set_ylim([-3,3])
+
+        if save:
+            plt.savefig('figure/fixpoint_choicetasks_statespace'+save_addon+'.pdf', transparent=True)
+        plt.show()
+
+
+ssa = StateSpaceAnalysis(save_addon)
+ssa.plot_betaweights()
+ssa.plot_statespace()
