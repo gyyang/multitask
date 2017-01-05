@@ -411,7 +411,7 @@ class LesionAnalysis(object):
         plt.show()
 
 class StateSpaceAnalysis(object):
-    def __init__(self, save_addon, **kwargs):
+    def __init__(self, save_addon, lesion_units=None, **kwargs):
 
         # Default settings
         default_setting = {
@@ -461,7 +461,7 @@ class StateSpaceAnalysis(object):
         y_loc = list() # Network target output location
 
         # Start computing the neural activity
-        with Run(save_addon, sigma_rec=0, fast_eval=setting['fast_eval']) as R:
+        with Run(save_addon, sigma_rec=0, lesion_units=lesion_units, fast_eval=setting['fast_eval']) as R:
             config = R.config
 
             for i, rule in enumerate(rules):
@@ -620,6 +620,7 @@ class StateSpaceAnalysis(object):
         self.ind_active = ind_active
         self.tar1_loc   = tar1_loc
         self.q          = q
+        self.lesion_units = lesion_units
 
     def plot_betaweights(self):
         '''
@@ -658,6 +659,9 @@ class StateSpaceAnalysis(object):
         ####################### Find Fixed & Slow Points ######################
         if self.setting['redefine_choice']:
             ValueError('Finding slow points is invalid when choices are redefined')
+
+        if self.lesion_units is not None:
+            ValueError('Lesion units not supported yet')
 
         # Find Fixed points
         # Choosing starting points
@@ -960,7 +964,12 @@ def plot_groupsize(save_type):
 # save_addon = 'allrule_weaknoise_360'
 save_addon = 'allrule_weaknoise_480'
 # save_addon = 'allrule_weaknoise_440'
-ssa = StateSpaceAnalysis(save_addon)
+
+
+la = LesionAnalysis(save_addon)
+lesion_units = la.ind_lesions_orig['1']
+
+ssa = StateSpaceAnalysis(save_addon, lesion_units=lesion_units)
 ssa.plot_betaweights()
-ssa.plot_statespace()
+ssa.plot_statespace(plot_slowpoints=False)
 # ssa.get_slowpoints()
