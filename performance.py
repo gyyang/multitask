@@ -145,6 +145,8 @@ def plot_finalperformance(save_type):
     ax1.set_ylabel(r'$log_{10}$(cost)',fontsize=7)
     ax1.set_xticklabels([])
     ax1.set_title('After {:.1E} trials'.format(n_trial),fontsize=7)
+    ax1.locator_params(axis='y', nbins=3)
+    ax2.locator_params(axis='y', nbins=4)
     lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.65,0.5),
                     fontsize=7,labelspacing=0.3,loc=6)
     plt.setp(lg.get_title(),fontsize=7)
@@ -902,7 +904,7 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
 if __name__ == '__main__':
     pass
     # plot_trainingprogress('allrule_weaknoise_400')
-    # plot_finalperformance('allrule_weaknoise')
+    plot_finalperformance('allrule_weaknoise')
     # plot_finalperformance_lr()
     
     # psychometric_choice('allrule_weaknoise_400')
