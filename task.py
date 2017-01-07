@@ -247,8 +247,8 @@ def go(config, mode, **kwargs):
 
     elif mode == 'sample':
         tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(0.8*tdim)])
-        tar_locs  = [0.2*np.pi]
+        fix_offs  = np.array([int(1500/dt)])
+        tar_locs  = [1.5*np.pi]
         tar_mod   = 1
         batch_size = 1
 
@@ -315,9 +315,9 @@ def inhgo(config, mode, **kwargs):
 
     elif mode == 'sample':
         tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = [int(0.8*tdim)]
+        fix_offs  = np.array([int(1500/dt)])
         tar_locs  = [1.5*np.pi]
-        tar_ons   = [int(0.1*tdim)]
+        tar_ons   = np.array([int(300/dt)])
         tar_mod   = 1
         batch_size = 1
 
@@ -767,10 +767,10 @@ def choicedelaygo_(config, mode, tar_mod, **kwargs):
         tar1_ons = [int(100/dt)]
         tar1_offs = [int(300/dt)]
 
-        tdim = int(3300/dt)
-        fix_offs  = np.array([int(2800/dt)])
-        tar2_ons = [int(2500/dt)]
-        tar2_offs = [int(2700/dt)]
+        tdim = int(2000/dt)
+        fix_offs  = np.array([int(1800/dt)])
+        tar2_ons = [int(1500/dt)]
+        tar2_offs = [int(1700/dt)]
         batch_size = 1
 
     elif mode == 'test':
@@ -871,10 +871,10 @@ def delaygo(config, mode, **kwargs):
 
     elif mode == 'sample':
         tdim = int(2000/dt)
-        fix_offs  = np.array([int(1800/dt)])
+        fix_offs  = np.array([int(1500/dt)])
         tar_locs  = [1.5*np.pi]
-        tar_ons   = [int(200/dt)]
-        tar_offs  = [int(400/dt)]
+        tar_ons   = [int(300/dt)]
+        tar_offs  = [int(500/dt)]
         tar_mod   = 1
         batch_size = 1
 
@@ -1017,9 +1017,9 @@ def delayremapgo(config, mode, **kwargs):
 
     elif mode == 'sample':
         tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = [int(0.8*tdim)]
-        tar_ons   = [int(0.1*tdim)]
-        tar_offs  = [int(0.3*tdim)]
+        fix_offs  = np.array([int(1500/dt)])
+        tar_ons   = np.array([int(300/dt)])
+        tar_offs  = np.array([int(500/dt)])
         tar_locs  = np.array([1.5*np.pi])
         tar_mod   = 1
         batch_size = 1
@@ -1159,7 +1159,7 @@ def remapgo(config, mode, **kwargs):
 
     elif mode == 'sample':
         tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = [int(0.8*tdim)]
+        fix_offs  = np.array([int(1500/dt)])
         tar_locs  = np.array([1.5*np.pi])
         tar_mod   = 1
         batch_size = 1
@@ -1227,9 +1227,9 @@ def inhremapgo(config, mode, **kwargs):
 
     elif mode == 'sample':
         tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = [int(0.8*tdim)]
+        fix_offs  = np.array([int(1500/dt)])
         tar_locs  = np.array([1.5*np.pi])
-        tar_ons   = [int(0.1*tdim)]
+        tar_ons   = np.array([int(300/dt)])
         tar_mod   = 1
         batch_size = 1
 
@@ -1318,9 +1318,9 @@ def delaymatch_(config, mode, matchnogo, **kwargs):
         tar_dist = 0.5*np.pi
         tar1_locs = [0.5*np.pi]
         tar2_locs = [(0.5*np.pi+tar_dist*(1-matchs))%(2*np.pi)]
-        tar1_ons = np.array([int(100/dt)])
-        tar1_offs = [int(200/dt)]
-        tar2_ons = [int(700/dt)]
+        tar1_ons = np.array([int(300/dt)])
+        tar1_offs = tar1_ons + int(200/dt)
+        tar2_ons = tar1_offs + int(1000/dt)
         batch_size = 1
 
     elif mode == 'test':
