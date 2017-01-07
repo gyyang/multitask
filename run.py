@@ -189,9 +189,8 @@ def sample_plot(save_addon, rule, save=False):
     _ = plt.plot(h_sample[:,0,:20])
     plt.show()
 
-def schematic_plot():
-    save_addon = 'allrule_strongnoise_500'
-    fontsize = 5
+def schematic_plot(save_addon):
+    fontsize = 6
 
     rule = CHOICE_MOD1
 
@@ -212,7 +211,10 @@ def schematic_plot():
         ax = fig.add_axes([0.2,sum(heights[i+1:]+0.1)+0.05,0.7,heights[i]])
         cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
         plt.xticks([])
-        ax.tick_params(axis='both', which='major', labelsize=fontsize)
+
+        # Fixed style for these plots
+        ax.tick_params(axis='both', which='major', labelsize=fontsize, width=0.5, length=2, pad=3)
+        ax.spines["left"].set_linewidth(0.5)
         ax.spines["right"].set_visible(False)
         ax.spines["bottom"].set_visible(False)
         ax.spines["top"].set_visible(False)
@@ -237,32 +239,40 @@ def schematic_plot():
     plt.show()
 
     # Plot Rule Inputs
-    fig = plt.figure(figsize=(1.0, 0.4))
-    ax = fig.add_axes([0.2,0.1,0.7,0.65])
+    fig = plt.figure(figsize=(1.0, 0.5))
+    ax = fig.add_axes([0.2,0.3,0.7,0.45])
     cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
-    plt.xticks([])
-    ax.tick_params(axis='both', which='major', labelsize=fontsize)
+    X = x_sample[:,0,1+2*N_RING:]
+    plt.imshow(X.T, aspect='auto', vmin=0, vmax=1, cmap=cmap, interpolation='none',origin='lower')
+
+    plt.xticks([0, 1000])
+    ax.set_xlabel('Time (ms)', fontsize=fontsize, labelpad=-5)
+
+    # Fixed style for these plots
+    ax.tick_params(axis='both', which='major', labelsize=fontsize, width=0.5, length=2, pad=3)
+    ax.spines["left"].set_linewidth(0.5)
     ax.spines["right"].set_visible(False)
-    ax.spines["bottom"].set_visible(False)
+    ax.spines["bottom"].set_linewidth(0.5)
     ax.spines["top"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
 
-    X = x_sample[:,0,1+2*N_RING:]
-    plt.imshow(X.T, aspect='auto', vmin=0, vmax=1, cmap=cmap, interpolation='none',origin='lower')
     plt.yticks([0,X.shape[-1]-1],['1',str(X.shape[-1])],rotation='vertical')
     plt.title('Rule inputs', fontsize=fontsize, y=0.9)
     ax.get_yaxis().set_label_coords(-0.12,0.5)
+
     plt.savefig('figure/schematic_rule.pdf',transparent=True)
     plt.show()
 
 
     # Plot Units
     fig = plt.figure(figsize=(1.0, 0.8))
-    ax = fig.add_axes([0.2,0.1,0.7,0.65])
+    ax = fig.add_axes([0.2,0.1,0.7,0.75])
     cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
     plt.xticks([])
-    ax.tick_params(axis='both', which='major', labelsize=fontsize)
+    # Fixed style for these plots
+    ax.tick_params(axis='both', which='major', labelsize=fontsize, width=0.5, length=2, pad=3)
+    ax.spines["left"].set_linewidth(0.5)
     ax.spines["right"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
     ax.spines["top"].set_visible(False)
@@ -271,7 +281,7 @@ def schematic_plot():
 
     plt.imshow(h_sample[:,0,:].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
     plt.yticks([0,config['HDIM']-1],['1',str(config['HDIM'])],rotation='vertical')
-    plt.title('Recurrent units', fontsize=fontsize, y=0.9)
+    plt.title('Recurrent units', fontsize=fontsize, y=0.95)
     ax.get_yaxis().set_label_coords(-0.12,0.5)
     plt.savefig('figure/schematic_units.pdf',transparent=True)
     plt.show()
@@ -284,7 +294,10 @@ def schematic_plot():
         ax = fig.add_axes([0.2,sum(heights[i+1:]+0.15)+0.1,0.7,heights[i]])
         cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
         plt.xticks([])
-        ax.tick_params(axis='both', which='major', labelsize=fontsize)
+
+        # Fixed style for these plots
+        ax.tick_params(axis='both', which='major', labelsize=fontsize, width=0.5, length=2, pad=3)
+        ax.spines["left"].set_linewidth(0.5)
         ax.spines["right"].set_visible(False)
         ax.spines["bottom"].set_visible(False)
         ax.spines["top"].set_visible(False)
@@ -292,7 +305,7 @@ def schematic_plot():
         ax.yaxis.set_ticks_position('left')
 
         if i == 0:
-            plt.plot(task.y[:,0,0],color=sns.xkcd_palette(['green'])[0])
+            # plt.plot(task.y[:,0,0],color=sns.xkcd_palette(['green'])[0])
             plt.plot(y_sample[:,0,0],color=sns.xkcd_palette(['blue'])[0])
             plt.yticks([0.05,0.8],['',''],rotation='vertical')
             plt.ylim([-0.1,1.1])
@@ -380,9 +393,9 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
 
 
 if __name__ == "__main__":
-    # schematic_plot()
-    # sample_plot(save_addon='allrule_weaknoise_300', rule=CHOICEDELAY_MOD1, save=False)
-    plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
-                             epoch=None, save=False, ylabel_firstonly=True)
+    schematic_plot(save_addon='allrule_weaknoise_400')
+    # sample_plot(save_addon='allrule_weaknoise_300', rule=CHOICEATTEND_MOD1, save=False)
+    # plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
+    #                          epoch=None, save=False, ylabel_firstonly=True)
     pass
 
