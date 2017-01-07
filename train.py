@@ -19,7 +19,7 @@ from task import *
 from network import LeakyRNNCell, get_perf
 
 
-def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000, save_addon=None):
+def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon=None):
     '''
     Training the network
     :param HDIM: Number of recurrent units
@@ -81,6 +81,11 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000, save_addon
 
 
     rule_weights = np.ones(len(rules))
+
+    if 'allrule' in save_addon_type:
+        # Make them 5 times more common
+        rule_weights[rules.index(CHOICEATTEND_MOD1)] = 5
+        rule_weights[rules.index(CHOICEATTEND_MOD2)] = 5
 
     if save_addon is None:
         save_addon = save_addon_type

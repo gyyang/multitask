@@ -962,14 +962,14 @@ def plot_groupsize(save_type):
 # Re-write the state space analysis
 # save_addon = 'attendonly_weaknoise_300'
 # save_addon = 'allrule_weaknoise_360'
-save_addon = 'allrule_weaknoise_480'
+save_addon = 'allrule_weaknoise_300'
 # save_addon = 'allrule_weaknoise_440'
 
 
-la = LesionAnalysis(save_addon)
-lesion_units = la.ind_lesions_orig['1']
+# la = LesionAnalysis(save_addon)
+# lesion_units = la.ind_lesions_orig['1']
 
-ssa = StateSpaceAnalysis(save_addon, lesion_units=lesion_units)
+ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
 ssa.plot_betaweights()
 ssa.plot_statespace(plot_slowpoints=False)
 # ssa.get_slowpoints()
