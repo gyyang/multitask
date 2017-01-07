@@ -117,7 +117,9 @@ class Run(Session):
 
         self.test_ran = False
 
-def sample_plot(save_addon, rule, save=False):
+def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
+
+    fs = 6
 
     with Run(save_addon) as R:
         config = R.config
@@ -136,53 +138,67 @@ def sample_plot(save_addon, rule, save=False):
 
     N_RING = config['N_RING']
 
-    fig = plt.figure(figsize=(2.5,5))
-    ylabels = ['fix. in', 'stim. mod1', 'stim. mod2', 'units','fix. out', 'out']
-    heights = np.array([0.03,0.15,0.15,0.15,0.03,0.15])+0.01
-    for i in range(6):
+    fig = plt.figure(figsize=(1.3,2))
+    ylabels = ['fix. in', 'stim. mod1', 'stim. mod2','fix. out', 'out']
+    heights = np.array([0.03,0.2,0.2,0.03,0.2])+0.01
+    for i in range(5):
         ax = fig.add_axes([0.15,sum(heights[i+1:]+0.02)+0.1,0.8,heights[i]])
         cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
         plt.xticks([])
-        ax.tick_params(axis='both', which='major', labelsize=7)
-        ax.spines["right"].set_visible(False)
-        ax.spines["bottom"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
+        ax.tick_params(axis='both', which='major', labelsize=fs, width=0.5, length=2, pad=3)
+
+        if plot_ylabel:
+            ax.spines["right"].set_visible(False)
+            ax.spines["bottom"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+
+        else:
+            ax.spines["left"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.spines["bottom"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.xaxis.set_ticks_position('none')
 
         if i == 0:
             plt.plot(x_sample[:,0,0], color=sns.xkcd_palette(['blue'])[0])
-            plt.yticks([0,1],['',''],rotation='vertical')
+            if plot_ylabel:
+                plt.yticks([0,1],['',''],rotation='vertical')
             plt.ylim([-0.1,1.5])
-            plt.title('Rule: '+rule_name[rule],fontsize=7)
+            plt.title(rule_name[rule],fontsize=fs)
         elif i == 1:
             plt.imshow(x_sample[:,0,1:1+N_RING].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
-            plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
+            if plot_ylabel:
+                plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
         elif i == 2:
             plt.imshow(x_sample[:,0,1+N_RING:1+2*N_RING].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
             # plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
-            plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
+            if plot_ylabel:
+                plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
         elif i == 3:
-            plt.imshow(h_sample[:,0,:].T, aspect='auto', cmap=cmap, vmin=0, vmax=3, interpolation='none',origin='lower')
-            # plt.yticks([0,self.config['HDIM']-1],['1',str(self.config['HDIM'])],rotation='vertical')
-            plt.yticks([])
-        elif i == 4:
             plt.plot(y[:,0,0],color=sns.xkcd_palette(['green'])[0])
             plt.plot(y_sample[:,0,0],color=sns.xkcd_palette(['blue'])[0])
-            plt.yticks([0.05,0.8],['',''],rotation='vertical')
+            if plot_ylabel:
+                plt.yticks([0.05,0.8],['',''],rotation='vertical')
             plt.ylim([-0.1,1.1])
-        elif i == 5:
+        elif i == 4:
             plt.imshow(y_sample[:,0,1:].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
             # plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
-            plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
-            plt.xticks([0,1000,2000])
-            plt.xlabel('Time (ms)',fontsize=7)
+            if plot_ylabel:
+                plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
+            plt.xticks([0,2000], ['0', '2'])
+            plt.xlabel('Time (s)',fontsize=fs, labelpad=-3)
             ax.spines["bottom"].set_visible(True)
-        plt.ylabel(ylabels[i],fontsize=7)
+
+        if plot_ylabel:
+           plt.ylabel(ylabels[i],fontsize=fs)
+        else:
+            plt.yticks([])
         ax.get_yaxis().set_label_coords(-0.12,0.5)
 
     if save:
-        plt.savefig('figure/sample_'+rule_name[rule].replace(' ','')+config['save_addon']+'.pdf', transparent=True)
+        plt.savefig('figure/sample_'+rule_name[rule].replace(' ','')+'.pdf', transparent=True)
     plt.show()
 
 
@@ -393,8 +409,16 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
 
 
 if __name__ == "__main__":
-    schematic_plot(save_addon='allrule_weaknoise_400')
-    # sample_plot(save_addon='allrule_weaknoise_300', rule=CHOICEATTEND_MOD1, save=False)
+    # schematic_plot(save_addon='allrule_weaknoise_400')
+    # rules = [GO, INHGO, DELAYGO,\
+    #     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+    #     CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
+    #     REMAP, INHREMAP, DELAYREMAP,\
+    #     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+    for rule in rules:
+        pass
+        # sample_plot(save_addon='allrule_weaknoise_400', rule=rule, save=True)
+
     # plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
     #                          epoch=None, save=False, ylabel_firstonly=True)
     pass
