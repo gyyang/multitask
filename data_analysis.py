@@ -26,9 +26,11 @@ map2num = {'m':0, 'b':1, 'DMC':0, '1ID':1, 'MGS':2}
 monkey = 'b'
 neuron_id = 2
 
-with open('dmc_1id_dataset/data/code_mapping.pkl','rb') as f:
+datapath = 'dmc_1id_dataset/data/'
+
+with open(datapath+'code_mapping.pkl','rb') as f:
     code_mapping = pickle.load(f)
-with open('dmc_1id_dataset/data/cond_mapping.pkl','rb') as f:
+with open(datapath+'cond_mapping.pkl','rb') as f:
     cond_mapping = pickle.load(f)
 
 def convert_rawdata(monkey, neuron_id):
@@ -307,16 +309,21 @@ def get_rate_bycode(data, rule, code, tshift=0):
     all_conds = cond[cond_name] # all conditions
     return rates, all_conds
 
-def get_rate_bycode_trialaverage(data, rule, code, tshift=0):
+def get_rate_bycode_trialaverage(data, rule, code, tshift=0, shuffle_cond=False):
     # Get trial-averaged rate for data at time of code
     # And this function only takes data that has one spike train
+
     rates, all_conds = get_rate_bycode(data, rule, code, tshift=tshift)
     unique_conds = np.unique(all_conds) # all unique conditions to average within
     rates_averaged = np.zeros(len(unique_conds))
     for i, unique_cond in enumerate(unique_conds):
         ind = all_conds==unique_cond # trials for this sample
+        if shuffle_cond:
+            # Shuffle conditions
+            np.random.shuffle(ind)
         rate_averaged = np.mean(rates[ind]) # average across trials for this cond
         rates_averaged[i] = rate_averaged
+
     return rates_averaged
 
 def check_singlechannel(data):
@@ -575,7 +582,7 @@ def plot_dprimes():
     _ = plt.hist(dprimes, bins=30)
     plt.show()
 
-def get_vartimestim(monkey, neuron_id, rule):
+def get_vartimestim(monkey, neuron_id, rule, shuffle_cond=False):
     rule_codes = [('DMC', 26), ('1ID', 25), ('MGS', 26)]
     datas = get_processeddata(monkey=monkey, neuron_id=neuron_id, rule_codes=rule_codes)
 
@@ -592,7 +599,7 @@ def get_vartimestim(monkey, neuron_id, rule):
     tshifts = np.arange(-700,700,30)
     rates_shifts = list()
     for tshift in tshifts:
-        rates = get_rate_bycode_trialaverage(data, rule, code, tshift=tshift)
+        rates = get_rate_bycode_trialaverage(data, rule, code, tshift=tshift, shuffle_cond=shuffle_cond)
         rates_shifts.append(rates)
     rates_shifts = np.array(rates_shifts) # Time * Condition
 
@@ -606,15 +613,19 @@ def get_vartimestim(monkey, neuron_id, rule):
 
 
 
-def computeall_vartimestim():
+def computeall_vartimestim(shuffle_cond=False):
 
-
+    rules = ['DMC', '1ID', 'MGS']
     res = {k:[] for k in ['h_var_stim', 'h_var_time', 'h_mean', 'monkey', 'neuron_id', 'rule']}
     for monkey in ['m','b']:
         for neuron_id in range(60):
-            for rule in ['DMC', '1ID', 'MGS']:
-                temp = get_vartimestim(monkey, neuron_id, rule)
-                if temp is not None:
+            temp_list = list()
+            for rule in rules:
+                temp = get_vartimestim(monkey, neuron_id, rule, shuffle_cond)
+                temp_list.append(temp)
+            if None not in temp_list:
+                for temp, rule in zip(temp_list, rules):
+                    # Make sure every unit here has all three rules
                     h_var_time, h_var_stim, h_mean = temp
                     res['h_var_stim'].append(h_var_stim)
                     res['h_var_time'].append(h_var_time)
@@ -623,74 +634,125 @@ def computeall_vartimestim():
                     res['neuron_id'].append(neuron_id)
                     res['rule'].append(map2num[rule])
 
-    h_mean = np.array(res['h_mean'])
+    # h_mean = np.array(res['h_mean'])
     for k in res:
-        res[k] = np.array(res[k])[h_mean>0]
+        # res[k] = np.array(res[k])[h_mean>0]
+        res[k] = np.array(res[k])
 
-
-    with open('data/h_var.pkl','wb') as f:
+    savename = datapath+'h_var'
+    if shuffle_cond:
+        savename += '_shuffle'
+    with open(savename+'.pkl','wb') as f:
         pickle.dump(res, f)
 
-#def plot_varstim():
-with open('data/h_var.pkl','rb') as f:
+def plot_varstim():
+    with open(datapath+'h_var.pkl','rb') as f:
+        res = pickle.load(f)
+
+    h_varprop_stim = res['h_var_stim']/(res['h_var_stim']+res['h_var_time'])
+    res['h_var'] = res['h_var_stim'] + res['h_var_time']
+
+    rule = 'MGS'
+    h_varprop_stim1 = h_varprop_stim[res['rule']==map2num[rule]]
+    h_var = res['h_var'][res['rule']==map2num[rule]]
+    color = sns.xkcd_palette(['cerulean'])[0]
+    fig = plt.figure(figsize=(1.5,1.2))
+    ax = fig.add_axes([0.35,0.3,0.55,0.45])
+    # hist, bins_edge = np.histogram(h_varprop_stim1, bins=15)
+    hist, bins_edge = np.histogram(h_varprop_stim1[h_var>10], bins=15)
+    ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0], color=color, edgecolor='none')
+    plt.xlabel('Stim. var. prop. '+rule, fontsize=7)
+    plt.ylabel('unit counts', fontsize=7)
+    plt.title('Data - Freedman', fontsize=7)
+    plt.xticks([0,0.5,1])
+    plt.locator_params(axis='y', nbins=2)
+    plt.xlim([-0.1,1.1])
+    plt.ylim([0, hist.max()*1.2])
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    #plt.savefig('figure/data_var_stim_prop_hist'+rule+'.pdf', transparent=True)
+    plt.show()
+
+
+
+    rules = ['DMC', '1ID']
+    color = sns.xkcd_palette(['cerulean'])[0]
+    fig = plt.figure(figsize=(1.2,1.2))
+    ax = fig.add_axes([0.35,0.3,0.55,0.55])
+    ax.plot(h_varprop_stim[res['rule']==map2num[rules[0]]],
+            h_varprop_stim[res['rule']==map2num[rules[1]]],
+            'o', markerfacecolor=color, markeredgecolor=color,markersize=1.0,alpha=0.5)
+    plt.xlabel(rules[0], fontsize=7)
+    plt.ylabel(rules[1], fontsize=7)
+    plt.title('Stim. var. prop.', fontsize=7)
+    plt.xticks([0,0.5,1])
+    plt.yticks([0,0.5,1])
+    plt.xlim([-0.1,1.1])
+    plt.ylim([-0.1,1.1])
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    plt.savefig('figure/data_var_stim_prop_rulecomparison.pdf', transparent=True)
+    plt.show()
+
+
+# computeall_vartimestim(shuffle_cond=True)
+
+with open(datapath+'h_var.pkl','rb') as f:
     res = pickle.load(f)
 
-h_varprop_stim = res['h_var_stim']/(res['h_var_stim']+res['h_var_time'])
-res['h_var'] = res['h_var_stim'] + res['h_var_time']
+with open(datapath+'h_var_shuffle.pkl','rb') as f:
+    res_shuffle = pickle.load(f)
 
-rule = 'MGS'
-h_varprop_stim1 = h_varprop_stim[res['rule']==map2num[rule]]
-h_var = res['h_var'][res['rule']==map2num[rule]]
-color = sns.xkcd_palette(['cerulean'])[0]
-fig = plt.figure(figsize=(1.5,1.2))
-ax = fig.add_axes([0.35,0.3,0.55,0.45])
-# hist, bins_edge = np.histogram(h_varprop_stim1, bins=15)
-hist, bins_edge = np.histogram(h_varprop_stim1[h_var>10], bins=15)
-ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0], color=color, edgecolor='none')
-plt.xlabel('Stim. var. prop. '+rule, fontsize=7)
-plt.ylabel('unit counts', fontsize=7)
-plt.title('Data - Freedman', fontsize=7)
-plt.xticks([0,0.5,1])
-plt.locator_params(axis='y', nbins=2)
-plt.xlim([-0.1,1.1])
-plt.ylim([0, hist.max()*1.2])
-ax.tick_params(axis='both', which='major', labelsize=7)
-ax.spines["right"].set_visible(False)
-ax.spines["top"].set_visible(False)
-ax.xaxis.set_ticks_position('bottom')
-ax.yaxis.set_ticks_position('left')
-#plt.savefig('figure/data_var_stim_prop_hist'+rule+'.pdf', transparent=True)
+# rules = ['DMC', '1ID']
+# rules = ['MGS', '1ID']
+rules = ['MGS', 'DMC']
+h_var_stim_rule0 = res['h_var_stim'][res['rule']==map2num[rules[0]]]
+h_var_stim_rule1 = res['h_var_stim'][res['rule']==map2num[rules[1]]]
+
+# Subtract noise variance
+h_var_stim_rule0_shuffle = res_shuffle['h_var_stim'][res['rule']==map2num[rules[0]]]
+h_var_stim_rule1_shuffle = res_shuffle['h_var_stim'][res['rule']==map2num[rules[1]]]
+
+# h_var_stim_rule0 -= h_var_stim_rule0_shuffle
+# h_var_stim_rule1 -= h_var_stim_rule1_shuffle
+
+relu = lambda x : x*(x>0)
+
+h_var_stim_rule0 = relu(h_var_stim_rule0)
+h_var_stim_rule1 = relu(h_var_stim_rule1)
+
+var_stim_sum = h_var_stim_rule0+h_var_stim_rule1
+var_stim_ratio = h_var_stim_rule0/(h_var_stim_rule0+h_var_stim_rule1)
+
+
+var_stim_ratio_shuffle = h_var_stim_rule0_shuffle/(h_var_stim_rule0_shuffle+h_var_stim_rule1_shuffle)
+
+
+
+plt.hist(var_stim_ratio[var_stim_sum>0], bins=20)
+plt.xlim([0, 1])
 plt.show()
 
-
-
-rules = ['DMC', '1ID']
-color = sns.xkcd_palette(['cerulean'])[0]
-fig = plt.figure(figsize=(1.2,1.2))
-ax = fig.add_axes([0.35,0.3,0.55,0.55])
-ax.plot(h_varprop_stim[res['rule']==map2num[rules[0]]],
-        h_varprop_stim[res['rule']==map2num[rules[1]]],
-        'o', markerfacecolor=color, markeredgecolor=color,markersize=1.0,alpha=0.5)
-plt.xlabel(rules[0], fontsize=7)
-plt.ylabel(rules[1], fontsize=7)
-plt.title('Stim. var. prop.', fontsize=7)
-plt.xticks([0,0.5,1])
-plt.yticks([0,0.5,1])
-plt.xlim([-0.1,1.1])
-plt.ylim([-0.1,1.1])
-ax.tick_params(axis='both', which='major', labelsize=7)
-ax.spines["right"].set_visible(False)
-ax.spines["top"].set_visible(False)
-ax.xaxis.set_ticks_position('bottom')
-ax.yaxis.set_ticks_position('left')
-plt.savefig('figure/data_var_stim_prop_rulecomparison.pdf', transparent=True)
+plt.hist(var_stim_ratio_shuffle, bins=20)
+plt.xlim([0, 1])
 plt.show()
 
+plt.scatter(h_var_stim_rule0, h_var_stim_rule0_shuffle)
+plt.plot([0,300], [0, 300])
+lim = 30
+plt.xlim([0,lim])
+plt.ylim([0,lim])
 
-# TEMP
-rules = ['DMC', '1ID']
-tmp0 = res['h_var_stim'][res['rule']==map2num[rules[0]]]
-tmp1 = res['h_var_stim'][res['rule']==map2num[rules[1]]]
+#==============================================================================
+# plt.figure()
+# plt.hist(h_var_stim_rule0)
+# plt.hist(h_var_stim_rule0_shuffle)
+#==============================================================================
 
-plt.hist(tmp0/(tmp0+tmp1), bins=30)
-plt.show()
+

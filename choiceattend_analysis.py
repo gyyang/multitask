@@ -77,7 +77,7 @@ def gen_taskparams(tar1_loc, n_tar, n_rep):
               # If tar_time is long (~1600), we can reproduce the curving trajectories
     return params, batch_size
 
-class LesionAnalysis(object):
+class UnitAnalysis(object):
     def __init__(self, save_addon, fast_eval=True):
         data_type  = 'rule'
         fname = 'data/variance'+data_type+save_addon
@@ -112,6 +112,8 @@ class LesionAnalysis(object):
         self.h_normvar_all      = h_normvar_all
         self.rules              = rules
         self.ind_active         = ind_active
+        self.colors = dict(zip(['intact', '1', '2', '12'],
+                               sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
 
     def prettyplot_hist_varprop(self):
         # Similar to the function from variance.py, but prettier
@@ -125,13 +127,12 @@ class LesionAnalysis(object):
         hist, bins_edge = np.histogram(data_plot, bins=30, range=(0,1))
         ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
                color='gray', edgecolor='none')
-        colors = sns.xkcd_palette(['green', 'pink', 'sky blue'])
         bs = list()
         for i, group in enumerate(['1', '2', '12']):
             data_plot = self.h_normvar_all[self.ind_lesions[group], 0]
             hist, bins_edge = np.histogram(data_plot, bins=30, range=(0,1))
             b_tmp = ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-                   color=colors[i], edgecolor='none', label=group)
+                   color=self.colors[group], edgecolor='none', label=group)
             bs.append(b_tmp)
         plt.locator_params(nbins=3)
         xlabel = 'VarRatio({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
@@ -177,10 +178,9 @@ class LesionAnalysis(object):
         width = 0.15
         fig = plt.figure(figsize=(3,1.5))
         ax = fig.add_axes([0.17,0.35,0.8,0.4])
-        colors = sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])
         for i, key in enumerate(perf_stores.keys()):
             b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width, perf_stores[key],
-                   width=width, color=colors[i], edgecolor='none')
+                   width=width, color=self.colors[key], edgecolor='none')
         ax.set_xticks(np.arange(len(rules_perf)))
         ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
         ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
@@ -286,7 +286,7 @@ class LesionAnalysis(object):
                     self.save_addon+'.pdf', transparent=True)
         plt.show()
 
-    def plot_connectivity(self):
+    def plot_fullconnectivity(self):
         # Plot connectivity
         ind_active = self.ind_active
         h_normvar_all = self.h_normvar_all
@@ -409,6 +409,66 @@ class LesionAnalysis(object):
         ax2.axis('off')
         plt.savefig('figure/choiceattend_connectivity'+save_addon+'.pdf', transparent=True)
         plt.show()
+
+    def plot_inout_connectivity(self, conn_type='input'):
+        # Plot connectivity
+        # Sort data by labels and by input connectivity
+
+        with Run(save_addon, sigma_rec=0) as R:
+            w_in  = R.w_in # for later sorting
+            w_out = R.w_out
+            config = R.config
+        nx, nh, ny = config['shape']
+        n_ring = config['N_RING']
+
+        if conn_type == 'input':
+            w_conn = w_in[:, 1:n_ring+1]
+            xlabel = 'From stim mod 1'
+            lgtitle = 'To group'
+        elif conn_type == 'output':
+            w_conn = w_out[1:, :].T
+            xlabel = 'To output'
+            lgtitle = 'From group'
+        else:
+            ValueError('Unknown conn type')
+
+
+        groups = ['1', '2', '12']
+        w_aves = dict()
+
+        for group in groups:
+            ind_group  = self.ind_lesions_orig[group]
+            n_group    = len(ind_group)
+            w_group = np.zeros((n_group, n_ring))
+
+            for i, ind in enumerate(ind_group):
+                tmp           = w_conn[ind, :]
+                ind_max       = np.argmax(tmp)
+                w_group[i, :] = np.roll(tmp, int(n_ring/2)-ind_max)
+
+            w_aves[group] = w_group.mean(axis=0)
+
+        fs = 6
+        fig = plt.figure(figsize=(1.5, 1.0))
+        ax = fig.add_axes([.3, .3, .6, .6])
+        for group in groups:
+            ax.plot(w_aves[group], color=self.colors[group], label=group)
+        ax.set_xticks([int(n_ring/2)])
+        ax.set_xticklabels(['preferred loc.'])
+        ax.set_xlabel(xlabel, fontsize=fs, labelpad=3)
+        ax.set_ylabel('conn. weight', fontsize=fs)
+        lg = ax.legend(title=lgtitle, fontsize=fs, bbox_to_anchor=(1.2,1.2),
+                       labelspacing=0.2, loc=1, frameon=False)
+        plt.setp(lg.get_title(),fontsize=fs)
+        ax.tick_params(axis='both', which='major', labelsize=fs)
+        plt.locator_params(axis='y',nbins=3)
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+        plt.savefig('figure/conn_'+conn_type+'_choiceattend_'+save_addon+'.pdf', transparent=True)
+
+
 
 class StateSpaceAnalysis(object):
     def __init__(self, save_addon, lesion_units=None, **kwargs):
@@ -906,18 +966,17 @@ def plot_groupsize(save_type):
         fname = 'data/config'+save_addon+'.pkl'
         if not os.path.isfile(fname):
             continue
-        la = LesionAnalysis(save_addon)
+        ua = UnitAnalysis(save_addon)
         for key in ['1', '2', '12']:
-            group_sizes[key].append(len(la.ind_lesions[key]))
+            group_sizes[key].append(len(ua.ind_lesions[key]))
 
         HDIM_plot.append(HDIM)
 
     fs = 6
     fig = plt.figure(figsize=(1.5,1.0))
     ax = fig.add_axes([.3, .4, .5, .5])
-    colors = sns.xkcd_palette(['green', 'pink', 'sky blue'])
     for i, key in enumerate(['1', '2', '12']):
-        ax.plot(HDIM_plot, group_sizes[key], label=key, color=colors[i])
+        ax.plot(HDIM_plot, group_sizes[key], label=key, color=ua.colors[key])
     ax.set_xlim([np.min(HDIM_plot)-30, np.max(HDIM_plot)+30])
     ax.set_ylim([0,100])
     ax.set_xlabel('Number of rec. units', fontsize=fs)
@@ -942,9 +1001,13 @@ def plot_groupsize(save_type):
 # ssa.plot_betaweights()
 # ssa.plot_statespace(plot_slowpoints=False)
 
-# save_addon = 'allrule_weaknoise_300'
+save_addon = 'allrule_weaknoise_400'
 # save_addon = 'attendonly_weaknoise_300'
-# la = LesionAnalysis(save_addon)
+# ua = UnitAnalysis(save_addon)
+# ua.plot_inout_connectivity(conn_type='input')
+# ua.plot_inout_connectivity(conn_type='output')
+
+
 # la.prettyplot_hist_varprop()
 
 # la.plot_performance_choicetasks()
@@ -962,7 +1025,7 @@ def plot_groupsize(save_type):
 # Re-write the state space analysis
 # save_addon = 'attendonly_weaknoise_300'
 # save_addon = 'allrule_weaknoise_360'
-save_addon = 'allrule_weaknoise_300'
+save_addon = 'allrule_weaknoise_400'
 # save_addon = 'allrule_weaknoise_440'
 
 
@@ -971,5 +1034,5 @@ save_addon = 'allrule_weaknoise_300'
 
 ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
 ssa.plot_betaweights()
-ssa.plot_statespace(plot_slowpoints=False)
+ssa.plot_statespace(plot_slowpoints=True)
 # ssa.get_slowpoints()
