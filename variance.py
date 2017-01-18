@@ -16,7 +16,7 @@ import seaborn.apionly as sns
 from task import *
 from run import Run
 
-save = False
+save = True
 
 def compute_variance(save_addon, data_type, rules,
                      random_rotation=False, fast_eval=False):
@@ -120,6 +120,9 @@ def compute_hist_varprop(save_type, rules):
         data_plot = h_normvar_all[:, 0]
         hist, bins_edge = np.histogram(data_plot, bins=20, range=(0,1))
 
+        # Plot the percentage instead of the total count
+        hist = hist/np.sum(hist)
+
         # Store
         hists.append(hist)
         hdims.append(HDIM)
@@ -153,7 +156,7 @@ def plot_hist_varprop(save_type, rules, hdim_example=None):
         hist_example = hists[hdims.index(hdim_example)]
         ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
                color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
-    ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med, color='black')
+    ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med, color='black', linewidth=1.5)
     # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_low)
     # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_high)
     plt.locator_params(nbins=3)
@@ -295,20 +298,6 @@ if __name__ == '__main__':
         REMAP, INHREMAP, DELAYREMAP,\
         DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
 
-    # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
-    # rules = [DELAYMATCHGO, DMCGO]
-    # rules = [CHOICE_MOD1, CHOICE_MOD2]
-    
-    # start = time.time()
-
-    # plot_hist_totalvar(save_addon, data_type)
-    # print('Time taken {:0.2f} s'.format(time.time()-start))
-    # get_random_rotation_variance(save_addon, data_type)
-
-    # plot_hist_varprop(save_addon='allrule_weaknoise_500', rules=[DELAYGO, DELAYMATCHGO])
-    # plot_hist_varprop_all('allrule_weaknoise_300')
-    # plot_hist_varprop_selection()
-
 
     # compute_variance(save_addon, data_type, rules, random_rotation=True, fast_eval=True)
     # with open('data/variance'+data_type+save_addon+'_rr'+'.pkl','rb') as f:
@@ -320,6 +309,8 @@ if __name__ == '__main__':
     #
     # h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
+
     save_type = 'allrule_weaknoise'
     # plot_hist_varprop(save_type, rules=[DELAYMATCHGO, DMCGO], hdim_example=400)
     plot_hist_varprop_all('allrule_weaknoise')
+    # plot_hist_varprop_selection(save_type, hdim_example=400)
