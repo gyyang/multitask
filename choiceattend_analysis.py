@@ -99,9 +99,9 @@ class UnitAnalysis(object):
 
         ind_lesions = dict()
 
-        ind_lesions['1']  = np.where(h_normvar_all[:,0]>0.8)[0]
+        ind_lesions['1']  = np.where(h_normvar_all[:,0]>0.9)[0]
         ind_lesions['12'] = np.where(np.logical_and(h_normvar_all[:,0]>0.4, h_normvar_all[:,0]<0.6))[0]
-        ind_lesions['2']  = np.where(h_normvar_all[:,0]<0.2)[0]
+        ind_lesions['2']  = np.where(h_normvar_all[:,0]<0.1)[0]
 
         ind_lesions_orig = {key: ind_active[val] for key, val in ind_lesions.iteritems()}
 
@@ -421,7 +421,51 @@ class UnitAnalysis(object):
         nx, nh, ny = config['shape']
         n_ring = config['N_RING']
 
-        if conn_type == 'input':
+        ############# Plot input from rule ####################################
+        if conn_type == 'rule':
+            rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
+            groups = ['1', '2', '12']
+
+            w_stores = OrderedDict()
+
+            for group in groups:
+                w_store_tmp = list()
+                ind = self.ind_lesions_orig[group]
+                for rule in rules:
+                    w_conn = w_in[ind, 2*n_ring+1+rule].mean(axis=0)
+                    w_store_tmp.append(w_conn)
+
+                w_stores[group] = w_store_tmp
+
+            fs = 6
+            width = 0.15
+            fig = plt.figure(figsize=(3,1.5))
+            ax = fig.add_axes([0.17,0.35,0.8,0.4])
+            for i, group in enumerate(groups):
+                b0 = ax.bar(np.arange(len(rules))+(i-1.5)*width, w_stores[group],
+                       width=width, color=self.colors[group], edgecolor='none')
+            ax.set_xticks(np.arange(len(rules)))
+            ax.set_xticklabels([rule_name[r] for r in rules], rotation=25)
+            ax.set_xlabel('From rule input', fontsize=fs, labelpad=3)
+            ax.set_ylabel('conn. weight', fontsize=fs)
+            lg = ax.legend(groups, fontsize=fs, ncol=3, bbox_to_anchor=(1,1.4),
+                           labelspacing=0.2, loc=1, frameon=False, title='To group')
+            plt.setp(lg.get_title(),fontsize=fs)
+            ax.tick_params(axis='both', which='major', labelsize=fs)
+            plt.locator_params(axis='y',nbins=2)
+            ax.spines["right"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+            ax.set_xlim([-0.8, len(rules)-0.2])
+            ax.plot([-0.5, len(rules)-0.5], [0, 0], color='gray', linewidth=0.5)
+            plt.savefig('figure/conn_'+conn_type+'_choiceattend_'+save_addon+'.pdf', transparent=True)
+            plt.show()
+
+            return
+
+        ############## Plot input from stim or output to loc ##################
+        elif conn_type == 'input':
             w_conn = w_in[:, 1:n_ring+1]
             xlabel = 'From stim mod 1'
             lgtitle = 'To group'
@@ -467,8 +511,6 @@ class UnitAnalysis(object):
         ax.xaxis.set_ticks_position('bottom')
         ax.yaxis.set_ticks_position('left')
         plt.savefig('figure/conn_'+conn_type+'_choiceattend_'+save_addon+'.pdf', transparent=True)
-
-
 
 class StateSpaceAnalysis(object):
     def __init__(self, save_addon, lesion_units=None, **kwargs):
@@ -994,28 +1036,17 @@ def plot_groupsize(save_type):
     plt.savefig('figure/choiceattend_groupsize'+save_type+'.pdf', transparent=True)
 
 
-# save_addon = 'allrule_weaknoise_140'
-# ssa = StateSpaceAnalysis(save_addon, analyze_threerules=False,
-#                         analyze_allunits=False, fast_eval=True, redefine_choice=False,
-#                          surrogate_data=False)
-# ssa.plot_betaweights()
-# ssa.plot_statespace(plot_slowpoints=False)
-
 save_addon = 'allrule_weaknoise_400'
-# save_addon = 'attendonly_weaknoise_300'
-# ua = UnitAnalysis(save_addon)
-# ua.plot_inout_connectivity(conn_type='input')
+ua = UnitAnalysis(save_addon)
+ua.plot_inout_connectivity(conn_type='rule')
 # ua.plot_inout_connectivity(conn_type='output')
-
-
-# la.prettyplot_hist_varprop()
-
-# la.plot_performance_choicetasks()
-
+# ua.prettyplot_hist_varprop()
+# ua.plot_performance_choicetasks()
+#
 # rule = CHOICEATTEND_MOD1
-# la.plot_performance_2D(rule=rule)
+# ua.plot_performance_2D(rule=rule)
 # for lesion_group in ['1', '2', '12', '1+2']:
-#     la.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
+#     ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
 
 # la.plot_connectivity()
 
@@ -1032,7 +1063,7 @@ save_addon = 'allrule_weaknoise_400'
 # la = LesionAnalysis(save_addon)
 # lesion_units = la.ind_lesions_orig['1']
 
-ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
-ssa.plot_betaweights()
-ssa.plot_statespace(plot_slowpoints=True)
+# ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
+# ssa.plot_betaweights()
+# ssa.plot_statespace(plot_slowpoints=True)
 # ssa.get_slowpoints()
