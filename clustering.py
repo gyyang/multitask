@@ -14,10 +14,10 @@ import matplotlib.pyplot as plt
 import seaborn.apionly as sns
 
 from task import *
-from run import Run
+from run import Run, plot_singleneuron_intime
 
 ########################## Running the network ################################
-save_addon = 'allrule_weaknoise_300'
+save_addon = 'allrule_weaknoise_400'
 data_type = 'rule'
 
 rules = [GO, INHGO, DELAYGO,\
@@ -44,7 +44,7 @@ h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
 ################################## Clustering ################################
 if data_type == 'rule':
-    n_cluster = 12
+    n_cluster = 13
     # n_cluster = 3
 elif data_type == 'epoch':
     n_cluster = 15
@@ -175,7 +175,7 @@ plt.show()
 
 
 # Plot variance for an example unit
-ind = 0 # example unit
+ind = 1 # example unit
 fig = plt.figure(figsize=(1.5,1.2))
 ax = fig.add_axes([0.3,0.3,0.6,0.5])
 ax.plot(range(h_plot.shape[0]), h_plot[:, ind], 'o-', color='black', lw=1, ms=2)
@@ -193,27 +193,9 @@ ax.yaxis.set_ticks_position('left')
 plt.savefig('figure/exampleunit_variance.pdf', transparent=True)
 plt.show()
 
-################ Plotting distribution of variance ratio ######################
-# rule_hist = CHOICEATTEND_MOD1
-# if rule_hist is not None and data_type=='rule':
-#     fig = plt.figure(figsize=(1.5,1.2))
-#     ax = fig.add_axes([0.3,0.3,0.6,0.5])
-#     hist, bins_edge = np.histogram(h_normvar_all[:, keys.index(rule_hist)], bins=30, range=(0,1))
-#     ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-#            color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
-#     plt.xlim([-0.05, 1.05])
-#     plt.ylim([hist.max()*-0.05, hist.max()*1.1])
-#     plt.xlabel(r'Variance ratio', fontsize=7, labelpad=1)
-#     plt.ylabel('counts', fontsize=7)
-#     plt.title(rule_name[rule_hist], fontsize=7)
-#     plt.locator_params(nbins=3)
-#     ax.tick_params(axis='both', which='major', labelsize=7)
-#     ax.spines["right"].set_visible(False)
-#     ax.spines["top"].set_visible(False)
-#     ax.xaxis.set_ticks_position('bottom')
-#     ax.yaxis.set_ticks_position('left')
-#     plt.savefig('figure/hist_totalvar.pdf', transparent=True)
-#     plt.show()
+# Plot single example neuron in time
+plot_singleneuron_intime(save_addon, [ind_active[ind]], [INHGO],
+                             epoch=None, save=True, ylabel_firstonly=True)
 
 ######################### Plotting Connectivity ###############################
 nh = len(ind_active)

@@ -410,11 +410,11 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
 
 if __name__ == "__main__":
     # schematic_plot(save_addon='allrule_weaknoise_400')
-    # rules = [GO, INHGO, DELAYGO,\
-    #     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    #     CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
-    #     REMAP, INHREMAP, DELAYREMAP,\
-    #     DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+    rules = [GO, INHGO, DELAYGO,\
+        CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+        CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
+        REMAP, INHREMAP, DELAYREMAP,\
+        DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
     for rule in rules:
         pass
         # sample_plot(save_addon='allrule_weaknoise_400', rule=rule, save=True)

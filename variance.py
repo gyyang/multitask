@@ -312,5 +312,5 @@ if __name__ == '__main__':
 
     save_type = 'allrule_weaknoise'
     # plot_hist_varprop(save_type, rules=[DELAYMATCHGO, DMCGO], hdim_example=400)
-    plot_hist_varprop_all('allrule_weaknoise')
+    # plot_hist_varprop_all('allrule_weaknoise')
     # plot_hist_varprop_selection(save_type, hdim_example=400)
