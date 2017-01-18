@@ -16,6 +16,8 @@ import seaborn.apionly as sns
 from task import *
 from run import Run
 
+save = False
+
 def compute_variance(save_addon, data_type, rules,
                      random_rotation=False, fast_eval=False):
     ########################## Running the network ################################
@@ -54,7 +56,7 @@ def compute_variance(save_addon, data_type, rules,
 
     if data_type == 'rule':
         h_all = h_all_byrule
-        t_start = 500 # Important: Ignore the initial transition
+        t_start = int(500/config['dt']) # Important: Ignore the initial transition
     elif data_type == 'epoch':
         h_all = h_all_byepoch
         t_start = None
@@ -76,8 +78,59 @@ def compute_variance(save_addon, data_type, rules,
     with open('data/variance'+data_type+save_addon+'.pkl','wb') as f:
         pickle.dump(result, f)
 
+def compute_hist_varprop(save_type, rules):
+    data_type = 'rule'
+    assert len(rules) == 2
+    assert data_type == 'rule'
 
-def plot_hist_varprop(save_addon, rules):
+    HDIMs = range(200, 1000)
+    hists = list()
+    hdims = list()
+    for HDIM in HDIMs:
+        save_addon = save_type+'_'+str(HDIM)
+        fname = 'data/variance'+data_type+save_addon
+        fname += '.pkl'
+        if not os.path.isfile(fname):
+            continue
+
+        # If not computed, use variance.py
+        # fname = 'data/variance'+data_type+save_addon+'_rr'
+        # fname = 'data/variance'+data_type+save_addon
+        with open(fname,'rb') as f:
+            res = pickle.load(f)
+        h_var_all = res['h_var_all']
+        keys      = res['keys']
+
+        ind_rules = [keys.index(rule) for rule in rules]
+        h_var_all = h_var_all[:, ind_rules]
+
+        # First only get active units. Total variance across tasks larger than 1e-3
+        ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
+
+        # Temporary: Mimicking biased sampling. Notice the free parameter though.
+        # print('Mimicking selective sampling')
+        # ind_active = np.where((h_var_all.sum(axis=1) > 1e-3)*(h_var_all[:,0]>1*1e-2))[0]
+
+        h_var_all  = h_var_all[ind_active, :]
+
+        # Normalize by the total variance across tasks
+        h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
+
+        # Plot the proportion of variance for the first rule
+        data_plot = h_normvar_all[:, 0]
+        hist, bins_edge = np.histogram(data_plot, bins=20, range=(0,1))
+
+        # Store
+        hists.append(hist)
+        hdims.append(HDIM)
+
+    # Get median of all histogram
+    hists = np.array(hists)
+    # hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
+
+    return hists, bins_edge, hdims
+
+def plot_hist_varprop(save_type, rules, hdim_example=None):
     '''
     Plot histogram of proportion of variance for some tasks across units
     :param save_addon:
@@ -85,62 +138,50 @@ def plot_hist_varprop(save_addon, rules):
     :param rules: list of rules. Show proportion of variance for the first rule
     :return:
     '''
-    data_type = 'rule'
-    assert len(rules) == 2
-    assert data_type == 'rule'
-    # If not computed, use variance.py
-    # fname = 'data/variance'+data_type+save_addon+'_rr'
-    fname = 'data/variance'+data_type+save_addon
-    with open(fname+'.pkl','rb') as f:
-        res = pickle.load(f)
-    h_var_all = res['h_var_all']
-    keys      = res['keys']
 
-    ind_rules = [keys.index(rule) for rule in rules]
-    h_var_all = h_var_all[:, ind_rules]
+    hists, bins_edge, hdims = compute_hist_varprop(save_type, rules)
 
-    # First only get active units. Total variance across tasks larger than 1e-3
-    ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
-    h_var_all  = h_var_all[ind_active, :]
+    hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
 
-    # Normalize by the total variance across tasks
-    h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
-
-    # Plot the proportion of variance for the first rule
-    data_plot = h_normvar_all[:, 0]
+    # hist_med, bins_edge = np.histogram(data_plots, bins=20, range=(0,1))
+    # hist_med = np.array(hist_med)/len(hdims)
 
     fs = 6
     fig = plt.figure(figsize=(1.5,1.2))
     ax = fig.add_axes([0.2,0.3,0.6,0.5])
-    hist, bins_edge = np.histogram(data_plot, bins=30)
-    ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-           color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+    if hdim_example is not None:
+        hist_example = hists[hdims.index(hdim_example)]
+        ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
+               color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+    ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med, color='black')
+    # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_low)
+    # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_high)
     plt.locator_params(nbins=3)
     xlabel = 'VarRatio({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
     ax.set_xlabel(xlabel, fontsize=fs)
-    ax.set_ylim(bottom=-0.02*hist.max())
+    ax.set_ylim(bottom=-0.02*hist_med.max())
     ax.set_xlim([-0.1,1.1])
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
     ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
-    plt.savefig('figure/plot_hist_varprop'+
+    if save:
+        plt.savefig('figure/plot_hist_varprop'+
                 rule_name[rules[0]].replace(' ','')+
                 rule_name[rules[1]].replace(' ','')+
-                save_addon+'.pdf', transparent=True)
+                save_type+'.pdf', transparent=True)
 
-def plot_hist_varprop_selection():
+def plot_hist_varprop_selection(save_type, **kwargs):
     rules_list = [(CHOICE_MOD1, CHOICE_MOD2),
                   (CHOICEATTEND_MOD1, CHOICEATTEND_MOD2),
                   (CHOICE_MOD1, REMAP),
                   (DELAYMATCHGO, DMCGO),
                   (INHGO, GO)]
     for rules in rules_list:
-        plot_hist_varprop(save_addon='allrule_weaknoise_300', rules=rules)
+        plot_hist_varprop(save_type=save_type, rules=rules, **kwargs)
 
-
-def plot_hist_varprop_all(save_addon):
+def plot_hist_varprop_all(save_type, hdim_example=None):
     '''
     Plot histogram of proportion of variance for some tasks across units
     :param save_addon:
@@ -159,16 +200,6 @@ def plot_hist_varprop_all(save_addon):
     # rules = [GO, INHGO, DELAYGO]
     # figsize = (4, 4)
 
-
-    assert data_type == 'rule'
-    # If not computed, use variance.py
-    # fname = 'data/variance'+data_type+save_addon+'_rr'
-    fname = 'data/variance'+data_type+save_addon
-    with open(fname+'.pkl','rb') as f:
-        res = pickle.load(f)
-    h_var_all = res['h_var_all']
-    keys      = res['keys']
-
     fs = 6 # fontsize
 
     f, axarr = plt.subplots(len(rules), len(rules), figsize=figsize)
@@ -184,28 +215,21 @@ def plot_hist_varprop_all(save_addon):
             #     ax.axis('off')
             #     continue
 
-            rules_tmp = [rules[i], rules[j]]
-            ind_rules = [keys.index(rule) for rule in rules_tmp]
-            h_var_all_tmp = h_var_all[:, ind_rules]
+            hists, bins_edge, hdims = compute_hist_varprop(save_type, (rules[i], rules[j]))
 
-            # First only get active units. Total variance across tasks larger than 1e-3
-            ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
-            h_var_all_tmp  = h_var_all_tmp[ind_active, :]
+            hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
 
-            # Normalize by the total variance across tasks
-            h_normvar_all = (h_var_all_tmp.T/np.sum(h_var_all_tmp, axis=1)).T
+            if hdim_example is not None:
+                hist_example = hists[hdims.index(hdim_example)]
+                ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
+                       color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
 
-            # Plot the proportion of variance for the first rule
-            data_plot = h_normvar_all[:, 1]
-
-            hist, bins_edge = np.histogram(data_plot, bins=20, range=(0,1))
-            ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-                   color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+            ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med, color='black')
             plt.locator_params(nbins=3)
             # xlabel = r'$\frac{Var({:s})}{[Var({:s})+Var({:s})]}$'.format(rule_name[rules[0]],rule_name[rules[0]],rule_name[rules[1]])
             xlabel = 'VarRatio({:s},{:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
             # ax.set_xlabel(xlabel, fontsize=fs)
-            ax.set_ylim(bottom=-0.02*hist.max())
+            ax.set_ylim(bottom=-0.02*hist_med.max())
             ax.set_xticks([0,1])
             ax.set_xticklabels([])
             ax.set_yticks([])
@@ -217,9 +241,8 @@ def plot_hist_varprop_all(save_addon):
             ax.spines["top"].set_visible(False)
 
     # plt.tight_layout()
-    plt.savefig('figure/plot_hist_varprop_all'+save_addon+'.pdf', transparent=True)
-
-
+    if save:
+        plt.savefig('figure/plot_hist_varprop_all'+save_type+'.pdf', transparent=True)
 
 def get_random_rotation_variance(save_addon, data_type): ##TODO: Need more work
     # save_addon = 'allrule_weaknoise_300'
@@ -263,7 +286,7 @@ def get_random_rotation_variance(save_addon, data_type): ##TODO: Need more work
 
 
 if __name__ == '__main__':
-    save_addon = 'allrule_weaknoise_300'
+    save_addon = 'allrule_weaknoise_400'
     data_type = 'rule'
 
     rules = [GO, INHGO, DELAYGO,\
@@ -277,12 +300,26 @@ if __name__ == '__main__':
     # rules = [CHOICE_MOD1, CHOICE_MOD2]
     
     # start = time.time()
-    # compute_variance(save_addon, data_type, rules, random_rotation=True)
+
     # plot_hist_totalvar(save_addon, data_type)
     # print('Time taken {:0.2f} s'.format(time.time()-start))
     # get_random_rotation_variance(save_addon, data_type)
 
-    # plot_hist_varprop(save_addon='choiceonly_weaknoise_300', rules=[CHOICE_MOD1, CHOICE_MOD2])
+    # plot_hist_varprop(save_addon='allrule_weaknoise_500', rules=[DELAYGO, DELAYMATCHGO])
     # plot_hist_varprop_all('allrule_weaknoise_300')
-    plot_hist_varprop_selection()
+    # plot_hist_varprop_selection()
 
+
+    # compute_variance(save_addon, data_type, rules, random_rotation=True, fast_eval=True)
+    # with open('data/variance'+data_type+save_addon+'_rr'+'.pkl','rb') as f:
+    #     res = pickle.load(f)
+    # h_var_all = res['h_var_all']
+    # # First only get active units. Total variance across tasks larger than 1e-3
+    # # ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
+    # # h_var_all  = h_var_all[ind_active, :]
+    #
+    # h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
+
+    save_type = 'allrule_weaknoise'
+    # plot_hist_varprop(save_type, rules=[DELAYMATCHGO, DMCGO], hdim_example=400)
+    plot_hist_varprop_all('allrule_weaknoise')
