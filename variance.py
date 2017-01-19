@@ -288,6 +288,37 @@ def get_random_rotation_variance(save_addon, data_type): ##TODO: Need more work
     print('{:0.1f} percentile: {:0.2f}'.format(p_high, normvar_high))
 
 
+def compute_ntasks_selective():
+    # Compute the number of tasks each neuron is selective for
+    # NOT WELL DEFINED YET
+    # DOESN"T REALLY WORK
+    with open('data/variance'+data_type+save_addon+'_rr'+'.pkl','rb') as f:
+        res_rr = pickle.load(f)
+    h_var_all_rr = res_rr['h_var_all']
+
+    bounds = np.percentile(h_var_all_rr, 97.5, axis=0)
+
+    # bounds = 1e-2
+
+    with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
+        res = pickle.load(f)
+    h_var_all = res['h_var_all']
+
+    # First only get active units. Total variance across tasks larger than 1e-3
+    ind_active = np.where(h_var_all.sum(axis=1) > 3)[0]
+    h_var_all  = h_var_all[ind_active, :]
+
+    h_selective = h_var_all > bounds
+    n_selective = h_selective.sum(axis=1)
+
+    hist, bins_edge = np.histogram(n_selective, bins=len(rules)+1, range=(-0.5,len(rules)+0.5))
+
+    fig = plt.figure(figsize=(3,2.4))
+    ax = fig.add_axes([0.2,0.3,0.6,0.5])
+    ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
+               color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+
+
 if __name__ == '__main__':
     save_addon = 'allrule_weaknoise_400'
     data_type = 'rule'
@@ -300,14 +331,6 @@ if __name__ == '__main__':
 
 
     # compute_variance(save_addon, data_type, rules, random_rotation=True, fast_eval=True)
-    # with open('data/variance'+data_type+save_addon+'_rr'+'.pkl','rb') as f:
-    #     res = pickle.load(f)
-    # h_var_all = res['h_var_all']
-    # # First only get active units. Total variance across tasks larger than 1e-3
-    # # ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
-    # # h_var_all  = h_var_all[ind_active, :]
-    #
-    # h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
 
     save_type = 'allrule_weaknoise'
