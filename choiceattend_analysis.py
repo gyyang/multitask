@@ -308,12 +308,14 @@ class UnitAnalysis(object):
                 labels.append(1)
             elif (h_normvar_all[i,0]>0.15) and (h_normvar_all[i,0]<0.85):
                 # labels.append(2)
+
                 # Further divide
                 # This condition works especially for networks trained only for choiceattend
                 if np.max(w_in[ind_active[i],1:2*n_ring+1]) > 1.0:
                     labels.append(2)
                 else:
                     labels.append(3)
+
                     # if np.var(w_out[1:, ind_active[i]])>0.005:
                     #     labels.append(3)
                     # else:
@@ -346,8 +348,6 @@ class UnitAnalysis(object):
         ind_sort        = np.lexsort((w_prefs, labels)) # sort by labels then by prefs
         labels          = labels[ind_sort]
         ind_active      = ind_active[ind_sort]
-
-
 
 
         nh = len(ind_active)
@@ -394,7 +394,8 @@ class UnitAnalysis(object):
             ax.axis('off')
 
         # colors = sns.xkcd_palette(['green', 'sky blue', 'pink'])
-        colors = sns.color_palette('deep', len(np.unique(labels)))
+        # colors = sns.color_palette('deep', len(np.unique(labels)))
+        colors = [self.colors[group] for group in ['1', '2', '12']] + ['gray']
         ax1 = fig.add_axes([l     , l+nh*l0, nh*l0, 6*l0])
         ax2 = fig.add_axes([l-6*l0, l      , 6*l0 , nh*l0])
         for l in np.unique(labels):
@@ -417,14 +418,42 @@ class UnitAnalysis(object):
         with Run(save_addon, sigma_rec=0) as R:
             w_in  = R.w_in # for later sorting
             w_out = R.w_out
+            w_rec = R.w_rec
             config = R.config
         nx, nh, ny = config['shape']
         n_ring = config['N_RING']
 
+        groups = ['1', '2', '12']
+
+        ############# Plot recurrent connectivity #############################
+        if conn_type == 'rec':
+            w_rec_group = np.zeros((len(groups), len(groups)))
+            for i1, group1 in enumerate(groups):
+                for i2, group2 in enumerate(groups):
+                    ind1 = self.ind_lesions_orig[group1]
+                    ind2 = self.ind_lesions_orig[group2]
+                    w_rec_group[i2, i1] = w_rec[:, ind1][ind2, :].mean()
+
+            fs = 6
+            cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
+            fig = plt.figure(figsize=(2,2))
+            ax = fig.add_axes([.2, .2, .6, .6])
+            im = ax.imshow(w_rec_group, interpolation='nearest', cmap=cmap, aspect='auto')
+            ax.axis('off')
+
+            ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
+            cb = plt.colorbar(im, cax=ax)
+            cb.outline.set_linewidth(0.5)
+            cb.set_label('Prop. of choice 1', fontsize=fs, labelpad=2)
+            plt.tick_params(axis='both', which='major', labelsize=fs)
+
+            return
+
+
         ############# Plot input from rule ####################################
-        if conn_type == 'rule':
+        elif conn_type == 'rule':
             rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
-            groups = ['1', '2', '12']
+
 
             w_stores = OrderedDict()
 
@@ -476,8 +505,6 @@ class UnitAnalysis(object):
         else:
             ValueError('Unknown conn type')
 
-
-        groups = ['1', '2', '12']
         w_aves = dict()
 
         for group in groups:
@@ -1022,7 +1049,7 @@ def plot_groupsize(save_type):
     ax.set_xlim([np.min(HDIM_plot)-30, np.max(HDIM_plot)+30])
     ax.set_ylim([0,100])
     ax.set_xlabel('Number of rec. units', fontsize=fs)
-    ax.set_ylabel('Group size', fontsize=fs)
+    ax.set_ylabel('Group size (units)', fontsize=fs)
     lg = ax.legend(title='Group',
                    fontsize=fs, ncol=1, bbox_to_anchor=(1.5,1.2),
                    loc=1, frameon=False)
@@ -1038,7 +1065,8 @@ def plot_groupsize(save_type):
 
 save_addon = 'allrule_weaknoise_400'
 ua = UnitAnalysis(save_addon)
-ua.plot_inout_connectivity(conn_type='rule')
+# ua.plot_inout_connectivity(conn_type='rec')
+# ua.plot_inout_connectivity(conn_type='rule')
 # ua.plot_inout_connectivity(conn_type='output')
 # ua.prettyplot_hist_varprop()
 # ua.plot_performance_choicetasks()
@@ -1048,7 +1076,7 @@ ua.plot_inout_connectivity(conn_type='rule')
 # for lesion_group in ['1', '2', '12', '1+2']:
 #     ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
 
-# la.plot_connectivity()
+# ua.plot_fullconnectivity()
 
 # plot_groupsize('allrule_weaknoise')
 
@@ -1056,7 +1084,7 @@ ua.plot_inout_connectivity(conn_type='rule')
 # Re-write the state space analysis
 # save_addon = 'attendonly_weaknoise_300'
 # save_addon = 'allrule_weaknoise_360'
-save_addon = 'allrule_weaknoise_400'
+# save_addon = 'allrule_weaknoise_400'
 # save_addon = 'allrule_weaknoise_440'
 
 
