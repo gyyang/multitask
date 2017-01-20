@@ -1337,6 +1337,19 @@ def delaymatch_(config, mode, matchnogo, **kwargs):
         tar1_mod = 1
         tar2_mod = 1
 
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar1_locs = p['tar1_locs']
+        tar2_locs = p['tar2_locs']
+        batch_size = len(tar1_locs)
+
+        tdim = int(2500/dt)
+        tar1_ons  = int(500/dt)
+        tar1_offs = int(800/dt)
+        tar2_ons  = int(2000/dt)
+        tar1_mod = 1
+        tar2_mod = 1
+
     # time to check the saccade location
     check_ons = tar2_ons + int(100/dt)
 
