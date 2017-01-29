@@ -195,12 +195,88 @@ class UnitAnalysis(object):
         #             self.save_addon+'.pdf', transparent=True)
         plt.show()
 
-save_addon = 'allrule_weaknoise_400'
+        
+save_addon = 'allrule_weaknoise_320'
+# save_addon = 'allrule_weaknoise_400'
 ua = UnitAnalysis(save_addon)
-ua.prettyplot_hist_varprop()
-for rule in [DELAYMATCHGO, DMCGO]:
-    for lesion_group in ['1', '2', '12', '1+2']:
-        ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
+# ua.prettyplot_hist_varprop()
+# for rule in [DELAYMATCHGO, DMCGO]:
+#     for lesion_group in ['1', '2', '12', '1+2']:
+#         ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
 
 
 
+n_rep = 1
+n_tar_loc = 10 # increase repeat by increasing this
+batch_size = n_rep * n_tar_loc**2
+batch_shape = (n_rep, n_tar_loc,n_tar_loc)
+ind_rep, ind_tar_loc1, ind_tar_loc2 = np.unravel_index(range(batch_size),batch_shape)
+
+# Looping target location
+tar1_locs = 2*np.pi*ind_tar_loc1/n_tar_loc
+tar2_locs = 2*np.pi*ind_tar_loc2/n_tar_loc
+
+params = {'tar1_locs' : tar1_locs,
+          'tar2_locs' : tar2_locs}
+
+# rule = DELAYMATCHGO
+rule = DMCGO
+# lesion_group = '1'
+# lesion_group = '2'
+lesion_group = '12'
+# lesion_group = None
+
+if lesion_group is None:
+    lesion_units = None
+    lesion_group_name = 'intact'
+elif lesion_group == '1+2':
+    lesion_units = np.concatenate((ua.ind_lesions_orig['1'],ua.ind_lesions_orig['2']))
+    lesion_group_name = 'lesion groups 1 & 2'
+else:
+    lesion_units = ua.ind_lesions_orig[lesion_group]
+    lesion_group_name = 'lesion group ' + lesion_group
+    
+with Run(ua.save_addon, lesion_units=lesion_units, fast_eval=ua.fast_eval) as R:
+    task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+    y_sample = R.f_y_from_x(task.x)
+
+if rule in [DELAYMATCHGO, DMCGO]:
+    match_response = y_sample[-1, :, 0] < 0.5 # Last time point, fixation unit, match if go
+elif rule in [DELAYMATCHNOGO, DMCNOGO]:
+    match_response = y_sample[-1, :, 0] > 0.5
+match_response = match_response.reshape(batch_shape)
+match_response = match_response.mean(axis=0)
+
+kwargs = dict()
+fs = 6
+fig = plt.figure(figsize=(1.5,1.5))
+ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
+im = ax.imshow(match_response, cmap='BrBG', origin='lower',
+               aspect='auto', interpolation='nearest', vmin=0, vmax=1)
+ax.set_xlabel('Mod 2 loc.', fontsize=fs, labelpad=-3)
+plt.xticks([0, n_tar_loc-1], ['0', '360'],
+           rotation=0, va='center', fontsize=fs)
+if 'ylabel' in kwargs and kwargs['ylabel']==False:
+    plt.yticks([])
+else:
+    ax.set_ylabel('Mod 1 loc.', fontsize=fs, labelpad=-3)
+    plt.yticks([0, n_tar_loc-1], [0, 360],
+               rotation=0, va='center', fontsize=fs)
+plt.title(rule_name[rule] + '\n' + lesion_group_name, fontsize=fs)
+ax.tick_params('both', length=0)
+for loc in ['bottom','top','left','right']:
+    ax.spines[loc].set_visible(False)
+
+if 'colorbar' in kwargs and kwargs['colorbar']==False:
+    pass
+else:
+    ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
+    cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
+    cb.outline.set_linewidth(0.5)
+    cb.set_label('Prop. of match', fontsize=fs, labelpad=-3)
+    plt.tick_params(axis='both', which='major', labelsize=fs)
+
+# plt.savefig('figure/'+rule_name[rule].replace(' ','')+
+#             '_perf2D_lesion'+str(lesion_group)+
+#             self.save_addon+'.pdf', transparent=True)
+plt.show()

@@ -709,9 +709,9 @@ with open(datapath+'h_var.pkl','rb') as f:
 with open(datapath+'h_var_shuffle.pkl','rb') as f:
     res_shuffle = pickle.load(f)
 
-# rules = ['DMC', '1ID']
+rules = ['DMC', '1ID']
 # rules = ['MGS', '1ID']
-rules = ['MGS', 'DMC']
+# rules = ['MGS', 'DMC']
 h_var_stim_rule0 = res['h_var_stim'][res['rule']==map2num[rules[0]]]
 h_var_stim_rule1 = res['h_var_stim'][res['rule']==map2num[rules[1]]]
 
@@ -719,8 +719,8 @@ h_var_stim_rule1 = res['h_var_stim'][res['rule']==map2num[rules[1]]]
 h_var_stim_rule0_shuffle = res_shuffle['h_var_stim'][res['rule']==map2num[rules[0]]]
 h_var_stim_rule1_shuffle = res_shuffle['h_var_stim'][res['rule']==map2num[rules[1]]]
 
-# h_var_stim_rule0 -= h_var_stim_rule0_shuffle
-# h_var_stim_rule1 -= h_var_stim_rule1_shuffle
+h_var_stim_rule0 -= h_var_stim_rule0_shuffle
+h_var_stim_rule1 -= h_var_stim_rule1_shuffle
 
 relu = lambda x : x*(x>0)
 
@@ -735,19 +735,23 @@ var_stim_ratio_shuffle = h_var_stim_rule0_shuffle/(h_var_stim_rule0_shuffle+h_va
 
 
 
-plt.hist(var_stim_ratio[var_stim_sum>0], bins=20)
+plt.hist(var_stim_ratio[var_stim_sum>0], bins=15)
 plt.xlim([0, 1])
 plt.show()
 
-plt.hist(var_stim_ratio_shuffle, bins=20)
-plt.xlim([0, 1])
-plt.show()
+#==============================================================================
+# plt.hist(var_stim_ratio_shuffle, bins=20)
+# plt.xlim([0, 1])
+# plt.show()
+#==============================================================================
 
-plt.scatter(h_var_stim_rule0, h_var_stim_rule0_shuffle)
-plt.plot([0,300], [0, 300])
-lim = 30
-plt.xlim([0,lim])
-plt.ylim([0,lim])
+#==============================================================================
+# plt.scatter(h_var_stim_rule0, h_var_stim_rule0_shuffle)
+# plt.plot([0,300], [0, 300])
+# lim = 30
+# plt.xlim([0,lim])
+# plt.ylim([0,lim])
+#==============================================================================
 
 #==============================================================================
 # plt.figure()

@@ -119,7 +119,7 @@ class Run(Session):
 
 def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
 
-    fs = 6
+    fs = 7
 
     with Run(save_addon) as R:
         config = R.config
@@ -417,7 +417,7 @@ if __name__ == "__main__":
         DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
     for rule in rules:
         pass
-        # sample_plot(save_addon='allrule_weaknoise_400', rule=rule, save=True)
+        sample_plot(save_addon='allrule_weaknoise_400', rule=rule, save=True)
 
     # plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
     #                          epoch=None, save=False, ylabel_firstonly=True)

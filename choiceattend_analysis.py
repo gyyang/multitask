@@ -1,5 +1,5 @@
 """
-State space analysis for decision tasks
+Analysis of the choice att tasks
 """
 
 from __future__ import division
@@ -135,8 +135,9 @@ class UnitAnalysis(object):
                    color=self.colors[group], edgecolor='none', label=group)
             bs.append(b_tmp)
         plt.locator_params(nbins=3)
-        xlabel = 'VarRatio({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
+        xlabel = 'FracVar({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
         ax.set_xlabel(xlabel, fontsize=fs)
+        ax.set_ylabel('Units', fontsize=fs)
         ax.set_ylim(bottom=-0.02*hist.max())
         ax.set_xlim([-0.1,1.1])
         ax.spines["top"].set_visible(False)
@@ -1068,7 +1069,7 @@ ua = UnitAnalysis(save_addon)
 # ua.plot_inout_connectivity(conn_type='rec')
 # ua.plot_inout_connectivity(conn_type='rule')
 # ua.plot_inout_connectivity(conn_type='output')
-# ua.prettyplot_hist_varprop()
+ua.prettyplot_hist_varprop()
 # ua.plot_performance_choicetasks()
 #
 # rule = CHOICEATTEND_MOD1

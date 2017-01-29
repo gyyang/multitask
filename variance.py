@@ -160,7 +160,7 @@ def plot_hist_varprop(save_type, rules, hdim_example=None):
     # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_low)
     # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_high)
     plt.locator_params(nbins=3)
-    xlabel = 'VarRatio({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
+    xlabel = 'FracVar({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
     ax.set_xlabel(xlabel, fontsize=fs)
     ax.set_ylim(bottom=-0.02*hist_med.max())
     ax.set_xlim([-0.1,1.1])
@@ -230,7 +230,7 @@ def plot_hist_varprop_all(save_type, hdim_example=None):
             ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med, color='black')
             plt.locator_params(nbins=3)
             # xlabel = r'$\frac{Var({:s})}{[Var({:s})+Var({:s})]}$'.format(rule_name[rules[0]],rule_name[rules[0]],rule_name[rules[1]])
-            xlabel = 'VarRatio({:s},{:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
+            xlabel = 'FracVar({:s},{:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
             # ax.set_xlabel(xlabel, fontsize=fs)
             ax.set_ylim(bottom=-0.02*hist_med.max())
             ax.set_xticks([0,1])
@@ -336,4 +336,4 @@ if __name__ == '__main__':
     save_type = 'allrule_weaknoise'
     # plot_hist_varprop(save_type, rules=[DELAYMATCHGO, DMCGO], hdim_example=400)
     # plot_hist_varprop_all('allrule_weaknoise')
-    # plot_hist_varprop_selection(save_type, hdim_example=400)
+    plot_hist_varprop_selection(save_type, hdim_example=400)
