@@ -115,7 +115,7 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 # Submit a job
 #=========================================================================================
 
-if True:
+if False:
     nunits = range(20,501,20)[::-1]
     s_list = [1, 2, 4, 5, 7, 8]
     for nunit in nunits:
@@ -131,6 +131,25 @@ if True:
             jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
                                              ppn=1, gpus=0)
             subprocess.call(['qsub', jobfile])
+
+# Use GPUs
+if True:
+    nunits = [501, 401, 301, 201]
+    s_list = [1]
+    for nunit in nunits:
+        for s in s_list:
+            jobname = 'job_{:d}_{:d}'.format(s, nunit)
+            train_arg = 'HDIM={:d}, s={:d}'.format(nunit, s)
+            train_arg+= r", save_addon='"+'{:d}'.format(nunit)+r"'"
+            cmd     = r'''python -c "import train as t;t.train('''+train_arg+''')"'''
+
+            pbspath = './pbs/'
+            scratchpath = '/scratch/gy441/multitask/'
+
+            jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
+                                             ppn=1, gpus=1)
+            subprocess.call(['qsub', jobfile])
+
 
 if False:
     lrs = np.logspace(-2,-4,30)
