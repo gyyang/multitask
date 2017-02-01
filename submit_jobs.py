@@ -147,7 +147,7 @@ if True:
             scratchpath = '/scratch/gy441/multitask/'
 
             jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
-                                             ppn=1, gpus=1, mem=6, nhours=6)
+                                             ppn=1, gpus=1, mem=12, nhours=6)
             subprocess.call(['qsub', jobfile])
 
 
