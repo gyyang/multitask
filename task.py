@@ -1267,7 +1267,7 @@ def inhremapgo(config, mode, **kwargs):
     return task
 
 
-def delaymatch_(config, mode, matchnogo, **kwargs):
+def delaymatchsample_(config, mode, matchnogo, **kwargs):
     '''
     Delay-match-to-sample
 
@@ -1391,11 +1391,11 @@ def delaymatch_(config, mode, matchnogo, **kwargs):
     return task
 
 
-def delaymatchgo(config, mode, **kwargs):
-    return delaymatch_(config, mode, 0, **kwargs)
+def delaymatchsamplego(config, mode, **kwargs):
+    return delaymatchsample_(config, mode, 0, **kwargs)
 
-def delaymatchnogo(config, mode, **kwargs):
-    return delaymatch_(config, mode, 1, **kwargs)
+def delaymatchsamplenogo(config, mode, **kwargs):
+    return delaymatchsample_(config, mode, 1, **kwargs)
 
 def intervalreproduction(config, mode, **kwargs):
     '''
@@ -1633,8 +1633,8 @@ rule_mapping = {TEST_INIT               : test_init,
                 REMAP                   : remapgo,
                 DELAYTIMEDGO            : delaytimedgo,
                 DELAYREMAP              : delayremapgo,
-                DMSGO                   : delaymatchgo,
-                DMSNOGO                 : delaymatchnogo,
+                DMSGO                   : delaymatchsamplego,
+                DMSNOGO                 : delaymatchsamplenogo,
                 DMCGO                   : delaymatchcategorygo,
                 DMCNOGO                 : delaymatchcategorynogo,
                 INHGO                   : inhgo,

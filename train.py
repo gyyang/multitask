@@ -83,7 +83,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
         CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
         CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
         REMAP, INHREMAP, DELAYREMAP,\
-        DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+        DMSGO, DMSNOGO, DMCGO, DMCNOGO]
     elif 'attendonly' in save_addon_type:
         rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
     elif 'delaychoiceonly' in save_addon_type: # This has to be before choiceonly
