@@ -14,13 +14,13 @@ N_RULE          = 17
 # CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
 # TIMEDGO, DELAYTIMEDGO,\
 # REMAP, INHREMAP, DELAYREMAP,\
-# DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO, INTREPRO = range(N_RULE)
+# DMSGO, DMSNOGO, DMCGO, DMCNOGO, INTREPRO = range(N_RULE)
 
 GO, INHGO, DELAYGO,\
 CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
 CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
 REMAP, INHREMAP, DELAYREMAP,\
-DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO = range(N_RULE)
+DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
 
 CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
 
@@ -59,14 +59,22 @@ class Task(object):
         self.config     = config
         self.dt         = self.config['dt']
         N_RING          = self.config['N_RING']
+        if 'num_ring' in self.config:
+            self.config['num_ring'] = 2 # default number
+        num_ring        = self.config['num_ring']
+
         self.slices     = {'fix_in'     : 0,
-                           'tar_mod1'   : slice(1, N_RING+1),
-                           'tar_mod2'   : slice(N_RING+1, 2*N_RING+1),
-                           'rule_start' : 2*N_RING+1,
+                           'rule_start' : 1+num_ring*N_RING,
                            'fix_out'    : 0,
                            'out'        : slice(1, N_RING+1)
                            }
-        XDIM            = 1 + 2*N_RING + N_RULE
+
+        # Add the num_ring rings of stimulus inputs
+        for ring in range(num_ring):
+            self.slices['tar_mod{:d}'.format(ring+1)] = slice(1+ring*N_RING,
+                                                              1+(ring+1)*N_RING)
+
+        XDIM            = 1 + num_ring*N_RING + N_RULE
         YDIM            = 1 + N_RING
         self.pref       = np.arange(0,2*np.pi,2*np.pi/N_RING) # preferences
         self.N_RING     = N_RING
@@ -1625,8 +1633,8 @@ rule_mapping = {TEST_INIT               : test_init,
                 REMAP                   : remapgo,
                 DELAYTIMEDGO            : delaytimedgo,
                 DELAYREMAP              : delayremapgo,
-                DELAYMATCHGO            : delaymatchgo,
-                DELAYMATCHNOGO          : delaymatchnogo,
+                DMSGO                   : delaymatchgo,
+                DMSNOGO                 : delaymatchnogo,
                 DMCGO                   : delaymatchcategorygo,
                 DMCNOGO                 : delaymatchcategorynogo,
                 INHGO                   : inhgo,
@@ -1650,8 +1658,8 @@ rule_name    = {FIXATION                : 'Fixation',
                 REMAP                   : 'Remap',
                 DELAYREMAP              : 'Del Remap',
                 INHREMAP                : 'Inh Remap',
-                DELAYMATCHGO            : 'Del Match Go',
-                DELAYMATCHNOGO          : 'Del Match NoGo',
+                DMSGO                   : 'DMS Go',
+                DMSNOGO                 : 'DMS NoGo',
                 DMCGO                   : 'DMC Go',
                 DMCNOGO                 : 'DMC NoGo',
                 INTREPRO                : 'Int repro'}
@@ -1690,8 +1698,8 @@ rule_name    = {FIXATION                : 'Fixation',
 #                 REMAP               : [Mod1, Mod2, Remap],
 #                 DELAYREMAP          : [Mod1, Mod2, Inh, Delay, Remap],
 #                 INHREMAP            : [Mod1, Mod2, Inh, Remap],
-#                 DELAYMATCHGO        : [Mod1, Mod2, Inh, Match, Delay],
-#                 DELAYMATCHNOGO      : [Mod1, Mod2, Inh, Match, Delay],
+#                 DMSGO        : [Mod1, Mod2, Inh, Match, Delay],
+#                 DMSNOGO      : [Mod1, Mod2, Inh, Match, Delay],
 #                 INTREPRO            : [Mod1, Mod2, Inh, Timed, Delay]}
 
 def generate_onebatch(rule, config, mode, noise_on=True, **kwargs):

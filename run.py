@@ -19,6 +19,9 @@ from network import LeakyRNNCell, popvec
 fast_eval = True
 
 class Run(Session):
+    '''
+    Run the trained network
+    '''
     def __init__(self, save_addon, sigma_rec=None, lesion_units=None, fast_eval=False):
         '''
         save_addon: add on for loading and saving
@@ -26,18 +29,25 @@ class Run(Session):
         inh_output: If True, the inhibit the output of neurons, otherwise inhibit inputs to neurons
         '''
 
+        # Reset tensorflow graphs
         tf.reset_default_graph() # must be in the beginning
 
+        # Initialize tensorflow session
         super(Run, self).__init__() # initialize Session()
 
         print('Analyzing network ' + save_addon)
+
         # Load config
-        with open('data/config'+save_addon+'.pkl','rb') as f:
+        with open(os.path.join('data','config'+save_addon+'.pkl'),'rb') as f:
             config = pickle.load(f)
-        config['dt']    = 1
+
+
+        # Evaluate at a bigger time step
         if fast_eval:
             config['dt']    = 10
             print('Currently using fast evaluation')
+        else:
+            config['dt']    = 1
 
         config['alpha'] = config['dt']/TAU
 

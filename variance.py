@@ -179,7 +179,7 @@ def plot_hist_varprop_selection(save_type, **kwargs):
     rules_list = [(CHOICE_MOD1, CHOICE_MOD2),
                   (CHOICEATTEND_MOD1, CHOICEATTEND_MOD2),
                   (CHOICE_MOD1, REMAP),
-                  (DELAYMATCHGO, DMCGO),
+                  (DMSGO, DMCGO),
                   (INHGO, GO)]
     for rules in rules_list:
         plot_hist_varprop(save_type=save_type, rules=rules, **kwargs)
@@ -197,7 +197,7 @@ def plot_hist_varprop_all(save_type, hdim_example=None):
         CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
         CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
         REMAP, INHREMAP, DELAYREMAP,\
-        DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+        DMSGO, DMSNOGO, DMCGO, DMCNOGO]
     figsize = (8, 8)
 
     # rules = [GO, INHGO, DELAYGO]
@@ -327,13 +327,13 @@ if __name__ == '__main__':
         CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
         CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
         REMAP, INHREMAP, DELAYREMAP,\
-        DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+        DMSGO, DMSNOGO, DMCGO, DMCNOGO]
 
 
     # compute_variance(save_addon, data_type, rules, random_rotation=True, fast_eval=True)
 
 
     save_type = 'allrule_weaknoise'
-    # plot_hist_varprop(save_type, rules=[DELAYMATCHGO, DMCGO], hdim_example=400)
+    # plot_hist_varprop(save_type, rules=[DMSGO, DMCGO], hdim_example=400)
     # plot_hist_varprop_all('allrule_weaknoise')
     plot_hist_varprop_selection(save_type, hdim_example=400)

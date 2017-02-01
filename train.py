@@ -121,6 +121,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
               'sigma_rec'   : sigma_rec,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
+              'num_ring'    : 2,
               'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
               'save_addon'  : save_addon,
               'rules'       : rules,
@@ -148,7 +149,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
     # Recurrent activity
     cell = LeakyRNNCell(nh, config['alpha'], sigma_rec=config['sigma_rec'])
-    h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc), dtype=tf.float32, time_major=True) # time_major is important
+    h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc),
+                                dtype=tf.float32, time_major=True) # time_major is important
 
     # Output
     y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, nh)), wy) + by)
@@ -242,4 +244,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
 if __name__ == '__main__':
     pass
-    # train(HDIM=40, s=1)
+    train(HDIM=20, s=1, save_addon='_test')
