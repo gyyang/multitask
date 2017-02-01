@@ -41,6 +41,10 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
     :param save_addon:
     :return:
     '''
+
+    # Number of input rings
+    num_ring = 2
+
     if s == 0:
         save_addon_type = 'allrule_nonoise'
     elif s == 1:
@@ -65,6 +69,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
         save_addon_type = 'delaychoiceonly_weaknoise'
     elif s == 11:
         save_addon_type = 'delaychoiceonly_strongnoise'
+    elif s == 12:
+        save_addon_type = 'oiconly_weaknoise'
 
     tf.reset_default_graph()
 
@@ -90,6 +96,11 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
         rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
     elif 'choiceonly' in save_addon_type:
         rules = [CHOICE_MOD1, CHOICE_MOD2]
+    elif 'oiconly' in save_addon_type:
+        rules = [OIC]
+
+    if OIC in rules:
+        num_ring = 3
 
 
     rule_weights = np.ones(len(rules))
@@ -121,8 +132,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
               'sigma_rec'   : sigma_rec,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
-              'num_ring'    : 2,
-              'shape'       : (1+2*N_RING+N_RULE, HDIM, N_RING+1),
+              'num_ring'    : num_ring,
+              'shape'       : (1+num_ring*N_RING+N_RULE, HDIM, N_RING+1),
               'save_addon'  : save_addon,
               'rules'       : rules,
               'rule_weights': rule_weights,
@@ -130,6 +141,9 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
               'training_iters' : training_iters,
               'batch_size_train' : batch_size_train,
               'batch_size_test' : batch_size_test}
+
+    for key, val in config.iteritems():
+        print('{:20s} = '.format(key) + str(val))
 
     # Network Parameters
     nx, nh, ny = config['shape']
@@ -244,4 +258,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
 if __name__ == '__main__':
     pass
-    train(HDIM=20, s=1, save_addon='_test')
+    train(HDIM=20, s=12, save_addon='test', training_iters=200000)

@@ -8,24 +8,37 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-N_RULE          = 18
-# FIXATION, GO, INHGO, DELAYGO,\
-# CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-# CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
-# TIMEDGO, DELAYTIMEDGO,\
-# REMAP, INHREMAP, DELAYREMAP,\
-# DMSGO, DMSNOGO, DMCGO, DMCNOGO, INTREPRO = range(N_RULE)
+setup_type = 'OIC'
 
-GO, INHGO, DELAYGO,\
-CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
-REMAP, INHREMAP, DELAYREMAP,\
-DMSGO, DMSNOGO, DMCGO, DMCNOGO, OIC = range(N_RULE)
+if setup_type == 'standard':
 
-CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
+    N_RULE          = 17
 
-TEST_INIT = -1
+    GO, INHGO, DELAYGO,\
+    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
+    REMAP, INHREMAP, DELAYREMAP,\
+    DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
 
+    CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = -2 # dummy
+
+    TEST_INIT = -1
+
+elif setup_type == 'OIC':
+
+    N_RULE          = 2
+
+    OIC, DMC = range(N_RULE)
+
+    GO, INHGO, DELAYGO,\
+    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
+    REMAP, INHREMAP, DELAYREMAP,\
+    DMSGO, DMSNOGO, DMCGO, DMCNOGO = [-2] * 17
+
+    CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
+
+    TEST_INIT = -1
 #-----------------------------------------------------------------------------------------
 # Network structure
 #-----------------------------------------------------------------------------------------
@@ -52,14 +65,13 @@ class Task(object):
         :param config: dictionary of configuration
         :param tdim:
         :param batch_size:
-        :param info: TEMPORARILY info is provided here
         :return:
         '''
         self.float_type = 'float32' # This should be the default
         self.config     = config
         self.dt         = self.config['dt']
         N_RING          = self.config['N_RING']
-        if 'num_ring' in self.config:
+        if 'num_ring' not in self.config:
             self.config['num_ring'] = 2 # default number
         num_ring        = self.config['num_ring']
 
@@ -105,7 +117,7 @@ class Task(object):
         for i in range(self.batch_size):
             if loc_type == 'fix_in':
                 self.x[ons[i]:offs[i],i,self.slices[loc_type]] = 1
-            elif loc_type in ['tar_mod1','tar_mod2']:
+            elif 'tar_mod' in loc_type:
                 self.x[ons[i]:offs[i],i,self.slices[loc_type]] += self.add_x_loc(locs[i])*strengths[i]
             elif loc_type == 'fix_out':
                 # Notice this shouldn't be set at 1, because the output is logistic and saturates at 1
