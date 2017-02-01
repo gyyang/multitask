@@ -8,7 +8,7 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-N_RULE          = 17
+N_RULE          = 18
 # FIXATION, GO, INHGO, DELAYGO,\
 # CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
 # CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAY_MOD1_COPY,\
@@ -20,7 +20,7 @@ GO, INHGO, DELAYGO,\
 CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
 CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
 REMAP, INHREMAP, DELAYREMAP,\
-DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
+DMSGO, DMSNOGO, DMCGO, DMCNOGO, OIC = range(N_RULE)
 
 CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
 
@@ -1505,7 +1505,7 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
         # each batch consists of sequences of equal length
 
         # Use only mod 1 for input
-        tar1_mod  = 1
+        tar1_mod  = 1 #TODO: May want to change this to both categories
         tar2_mod  = 1
         # A list of locations of targets
         # Since tar1 is always shown first, it's important that we completely randomize their relative positions
@@ -1530,20 +1530,6 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
         tar2_ons = tar1_offs + int(1000/dt)
         batch_size = 1
         tdim = tar2_ons[0] + int(500/dt)
-
-    elif mode == 'psychometric':
-        tar1_mod = 1
-        tar2_mod = 1
-
-        p = kwargs['params']
-        tar1_locs = p['tar1_locs']
-        tar2_locs = p['tar2_locs']
-        tar1_ons  = int(300/dt) #TODO: Temporarily setting this high
-        tar1_offs = tar1_ons + int(300/dt)
-        tar2_ons  = tar1_offs + int(1000/dt)
-        batch_size = len(tar1_locs)
-
-        tdim = tar2_ons + int(500/dt)
 
     elif mode == 'test':
         # Set this test so the model always respond
@@ -1617,6 +1603,104 @@ def delaymatchcategorynogo(config, mode, **kwargs):
     return delaymatchcategory_(config, mode, 1, **kwargs)
 
 
+def oic(config, mode, **kwargs):
+    '''
+    One-interval categorization
+
+    One stimuli is shown in ring 1 for 1000ms,
+    then two targets are shown in rings 2 and 3.
+    If the stimulus is category 1, then go to the location of ring 2, otherwise ring 3
+
+    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    Optional parameters:
+    :param batch_size: Batch size (required for mode=='random')
+    :param tdim: dimension of time (required for mode=='sample')
+    :param param: a dictionary of parameters (required for mode=='explicit')
+    :return: 2 Tensor3 data array (Time, Batchsize, Units)
+    '''
+
+    dt = config['dt']
+    if mode == 'random': # Randomly generate parameters
+        batch_size = kwargs['batch_size']
+        # each batch consists of sequences of equal length
+        # A list of locations of targets
+        tar1_locs = np.random.choice(np.array([0.1, 0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9])*np.pi,size=(batch_size,))
+
+        # Color target
+        tar2_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
+        tar3_locs = (tar2_locs+np.pi)%(2*np.pi)
+
+        # Time of targets on/off
+        tar1_ons  = int(np.random.uniform(100,600)/dt)
+        fix_offs  = tar1_ons + int(1000/dt)
+
+        tdim = fix_offs + int(500/dt)
+
+    elif mode == 'sample':
+        batch_size = 1
+
+        tar1_locs = np.array([1.25*np.pi])
+        tar2_locs = np.array([0.5*np.pi])
+        tar3_locs = np.array([1.5*np.pi])
+
+        tar1_ons  = int(500/dt)
+        fix_offs  = tar1_ons + int(1000/dt)
+        tdim = fix_offs + int(500/dt)
+
+    elif mode == 'test':
+        batch_size = 2**BS_EXPO
+        tar1_locs = np.concatenate(((0.1+0.8*np.arange(batch_size)/batch_size),
+                                    (1.1+0.8*np.arange(batch_size)/batch_size)))*np.pi
+        tar2_locs = tar1_locs
+        tar3_locs = (tar2_locs+np.pi)%(2*np.pi)
+
+        tar1_ons  = int(500/dt)
+        fix_offs  = tar1_ons + int(1000/dt)
+        tdim = fix_offs + int(500/dt)
+
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar1_locs = p['tar1_locs']
+        tar2_locs = p['tar2_locs']
+        tar3_locs = p['tar3_locs']
+        batch_size = len(tar1_locs)
+
+        tar1_ons  = int(500/dt)
+        fix_offs  = tar1_ons + int(1000/dt)
+        tdim = fix_offs + int(500/dt)
+
+    # time to check the saccade location
+    check_ons = fix_offs + int(100/dt)
+
+    tar1_cats = tar1_locs<np.pi # Category of target 1
+
+    task = Task(config, tdim, batch_size)
+
+    task.add('fix_in')
+    task.add('tar_mod1', tar1_locs, ons=tar1_ons)
+    task.add('tar_mod2', tar2_locs, ons=fix_offs)
+    task.add('tar_mod3', tar3_locs, ons=fix_offs)
+
+    # Target location
+    tar_locs = list()
+    for i in range(batch_size):
+        if tar1_cats[i] == 0:
+            tar_locs.append(tar2_locs[i])
+        else:
+            tar_locs.append(tar3_locs[i])
+
+    task.add('fix_out', offs=fix_offs)
+    task.add('out', tar_locs, ons=fix_offs)
+
+    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
+
+    task.epochs = {'fix1'     : (None, tar1_ons),
+                   'tar1'     : (tar1_ons, fix_offs),
+                   'go1'      : (fix_offs, None)}
+
+    return task
+
+
 rule_mapping = {TEST_INIT               : test_init,
                 FIXATION                : fixation,
                 GO                      : go,
@@ -1639,7 +1723,8 @@ rule_mapping = {TEST_INIT               : test_init,
                 DMCNOGO                 : delaymatchcategorynogo,
                 INHGO                   : inhgo,
                 INHREMAP                : inhremapgo,
-                INTREPRO                : intervalreproduction}
+                INTREPRO                : intervalreproduction,
+                OIC                     : oic}
 
 rule_name    = {FIXATION                : 'Fixation',
                 GO                      : 'Go',
@@ -1662,7 +1747,8 @@ rule_name    = {FIXATION                : 'Fixation',
                 DMSNOGO                 : 'DMS NoGo',
                 DMCGO                   : 'DMC Go',
                 DMCNOGO                 : 'DMC NoGo',
-                INTREPRO                : 'Int repro'}
+                INTREPRO                : 'Int repro',
+                OIC                     : '1IC'}
 
 #-----------------------------------------------------------------------------------------
 # Rule features
