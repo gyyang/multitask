@@ -75,7 +75,7 @@ def compute_variance(save_addon, data_type, rules,
     if random_rotation:
         save_addon += '_rr'
 
-    with open('data/variance'+data_type+save_addon+'.pkl','wb') as f:
+    with open(os.path.join('data','variance'+data_type+save_addon+'.pkl'),'wb') as f:
         pickle.dump(result, f)
 
 def compute_hist_varprop(save_type, rules):
@@ -88,7 +88,7 @@ def compute_hist_varprop(save_type, rules):
     hdims = list()
     for HDIM in HDIMs:
         save_addon = save_type+'_'+str(HDIM)
-        fname = 'data/variance'+data_type+save_addon
+        fname = os.path.join('data','variance'+data_type+save_addon)
         fname += '.pkl'
         if not os.path.isfile(fname):
             continue
@@ -253,7 +253,7 @@ def get_random_rotation_variance(save_addon, data_type): ##TODO: Need more work
 
     # If not computed, use variance.py
     # fname = 'data/variance'+data_type+save_addon+'_rr'
-    fname = 'data/variance'+data_type+save_addon
+    fname = os.path.join('data', 'variance'+data_type+save_addon)
     with open(fname+'.pkl','rb') as f:
         res = pickle.load(f)
     h_var_all = res['h_var_all']
@@ -292,7 +292,7 @@ def compute_ntasks_selective():
     # Compute the number of tasks each neuron is selective for
     # NOT WELL DEFINED YET
     # DOESN"T REALLY WORK
-    with open('data/variance'+data_type+save_addon+'_rr'+'.pkl','rb') as f:
+    with open(os.path.join('data','variance'+data_type+save_addon+'_rr'+'.pkl'),'rb') as f:
         res_rr = pickle.load(f)
     h_var_all_rr = res_rr['h_var_all']
 
@@ -300,7 +300,7 @@ def compute_ntasks_selective():
 
     # bounds = 1e-2
 
-    with open('data/variance'+data_type+save_addon+'.pkl','rb') as f:
+    with open(os.path.join('data','variance'+data_type+save_addon+'.pkl'),'rb') as f:
         res = pickle.load(f)
     h_var_all = res['h_var_all']
 

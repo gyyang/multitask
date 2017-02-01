@@ -1,5 +1,5 @@
 """
-2016/06/03 Restart, with Blocks
+2016/06/03 @ Guangyu Robert Yang
 
 Main training loop and network structure
 """
@@ -11,6 +11,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import errno
 
 import tensorflow as tf
 from tensorflow.python.ops import rnn, rnn_cell
@@ -18,6 +19,17 @@ from tensorflow.python.ops import rnn, rnn_cell
 from task import *
 from network import LeakyRNNCell, get_perf
 
+def mkdir_p(path):
+    """
+    Portable mkdir -p
+    """
+    try:
+        os.makedirs(path)
+    except OSError as e:
+        if e.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
 
 def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon=None):
     '''
@@ -204,6 +216,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
             except KeyboardInterrupt:
                 break
 
+        mkdir_p('data')
+
         # Saving the model
         save_path = saver.save(sess, os.path.join('data', config['save_addon']+'.ckpt'))
         print("Model saved in file: %s" % save_path)
@@ -212,7 +226,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
         config['times']      = times
         config['cost_tests'] = cost_tests
         config['perf_tests'] = perf_tests
-        with open('data/config'+config['save_addon']+'.pkl', 'wb') as f:
+        with open(os.path.join('data', 'config'+config['save_addon']+'.pkl'), 'wb') as f:
             pickle.dump(config, f)
 
         print("Optimization Finished!")
@@ -227,4 +241,5 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
             compute_choicefamily_varytime(save_addon, rule)
 
 if __name__ == '__main__':
-    train(HDIM=40, s=1)
+    pass
+    # train(HDIM=40, s=1)

@@ -1,6 +1,4 @@
 """
-2016/06/03 Restart, with Blocks
-
 Collections of tasks
 """
 
