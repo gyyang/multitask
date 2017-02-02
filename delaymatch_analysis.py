@@ -57,7 +57,7 @@ class UnitAnalysis(object):
         h_var_all = res['h_var_all']
         keys      = res['keys']
 
-        rules = [DELAYMATCHGO, DMCGO]
+        rules = [DMSGO, DMCGO]
         ind_rules = [keys.index(rule) for rule in rules]
         h_var_all = h_var_all[:, ind_rules]
 
@@ -154,9 +154,9 @@ class UnitAnalysis(object):
             y_sample = R.f_y_from_x(task.x)
 
         ## TODO: Need better way to determine performance
-        if rule in [DELAYMATCHGO, DMCGO]:
+        if rule in [DMSGO, DMCGO]:
             match_response = y_sample[-1, :, 0] < 0.5 # Last time point, fixation unit, match if go
-        elif rule in [DELAYMATCHNOGO, DMCNOGO]:
+        elif rule in [DMSNOGO, DMCNOGO]:
             match_response = y_sample[-1, :, 0] > 0.5
         match_response = match_response.reshape(batch_shape)
         match_response = match_response.mean(axis=0)
@@ -200,7 +200,7 @@ save_addon = 'allrule_weaknoise_320'
 # save_addon = 'allrule_weaknoise_400'
 ua = UnitAnalysis(save_addon)
 # ua.prettyplot_hist_varprop()
-# for rule in [DELAYMATCHGO, DMCGO]:
+# for rule in [DMSGO, DMCGO]:
 #     for lesion_group in ['1', '2', '12', '1+2']:
 #         ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
 
@@ -219,7 +219,7 @@ tar2_locs = 2*np.pi*ind_tar_loc2/n_tar_loc
 params = {'tar1_locs' : tar1_locs,
           'tar2_locs' : tar2_locs}
 
-# rule = DELAYMATCHGO
+# rule = DMSGO
 rule = DMCGO
 # lesion_group = '1'
 # lesion_group = '2'
@@ -240,9 +240,9 @@ with Run(ua.save_addon, lesion_units=lesion_units, fast_eval=ua.fast_eval) as R:
     task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
     y_sample = R.f_y_from_x(task.x)
 
-if rule in [DELAYMATCHGO, DMCGO]:
+if rule in [DMSGO, DMCGO]:
     match_response = y_sample[-1, :, 0] < 0.5 # Last time point, fixation unit, match if go
-elif rule in [DELAYMATCHNOGO, DMCNOGO]:
+elif rule in [DMSNOGO, DMCNOGO]:
     match_response = y_sample[-1, :, 0] > 0.5
 match_response = match_response.reshape(batch_shape)
 match_response = match_response.mean(axis=0)

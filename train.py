@@ -247,11 +247,12 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
         print("Optimization Finished!")
 
-    if 'allrule' in save_addon_type:
-        from variance import compute_variance
-        compute_variance(config['save_addon'], 'rule', rules)
-        print('Computed variance')
 
+    from variance import compute_variance
+    compute_variance(config['save_addon'], 'rule', rules)
+    print('Computed variance')
+
+    if 'allrule' in save_addon_type:
         from performance import compute_choicefamily_varytime
         for rule in [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]:
             compute_choicefamily_varytime(save_addon, rule)

@@ -142,6 +142,8 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
         w_rec = R.w_rec
         w_in  = R.w_in
 
+    assert config['num_ring'] == 2
+
     y_sample = y_sample.reshape((-1,1,config['shape'][2]))
 
     y = task.y
@@ -424,7 +426,7 @@ if __name__ == "__main__":
         CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
         CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
         REMAP, INHREMAP, DELAYREMAP,\
-        DELAYMATCHGO, DELAYMATCHNOGO, DMCGO, DMCNOGO]
+        DMSGO, DMSNOGO, DMCGO, DMCNOGO]
     for rule in rules:
         pass
         # sample_plot(save_addon='allrule_weaknoise_400', rule=rule, save=True)

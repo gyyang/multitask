@@ -359,9 +359,7 @@ if __name__ == '__main__':
     # plot_hist_varprop_all('allrule_weaknoise')
     # plot_hist_varprop_selection(save_type, hdim_example=400)
 
-    rules = [OIC, DMC]
-    save_addon = 'oicdmconly_weaknoise_test'
-    compute_variance(save_addon, 'rule', rules,
-                     random_rotation=False, fast_eval=True)
-    hist, bins_edge = _compute_hist_varprop(save_addon, rules)
+
+    # Study OIC & DMC
+    hist, bins_edge = _compute_hist_varprop('oicdmconly_weaknoise_test', [OIC, DMC])
     _plot_hist_varprop(hist, bins_edge, hist_example=hist)
