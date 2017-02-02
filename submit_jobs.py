@@ -133,7 +133,7 @@ if False:
             subprocess.call(['qsub', jobfile])
 
 # Use GPUs
-if True:
+if False:
     nunits = [501, 401, 301, 201]
     s_list = [1]
     for nunit in nunits:
@@ -150,7 +150,7 @@ if True:
                                              ppn=1, gpus=1, mem=12, nhours=6)
             subprocess.call(['qsub', jobfile])
 
-
+# Vary learning rate
 if False:
     lrs = np.logspace(-2,-4,30)
     for i, lr in enumerate(lrs):
@@ -167,4 +167,20 @@ if False:
         subprocess.call(['qsub', jobfile])
 
 
+# Train OIC & DMC
+if True:
+    nunits = range(20,301,10)[::-1]
+    s = 12
+    training_iters=500000
+    for nunit in nunits:
+        jobname = 'job_{:d}_{:d}'.format(s, nunit)
+        train_arg = 'HDIM={:d}, s={:d}, training_iters={:d}'.format(nunit, s, training_iters)
+        train_arg+= r", save_addon='"+'{:d}'.format(nunit)+r"'"
+        cmd     = r'''python -c "import train as t;t.train('''+train_arg+''')"'''
 
+        pbspath = './pbs/'
+        scratchpath = '/scratch/gy441/multitask/'
+
+        jobfile = write_jobfile(cmd, jobname, pbspath, scratchpath,
+                                         ppn=1, gpus=0)
+        subprocess.call(['qsub', jobfile])
