@@ -70,7 +70,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
     elif s == 11:
         save_addon_type = 'delaychoiceonly_strongnoise'
     elif s == 12:
-        save_addon_type = 'oiconly_weaknoise'
+        save_addon_type = 'oicdmconly_weaknoise'
 
     tf.reset_default_graph()
 
@@ -96,8 +96,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
         rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
     elif 'choiceonly' in save_addon_type:
         rules = [CHOICE_MOD1, CHOICE_MOD2]
-    elif 'oiconly' in save_addon_type:
-        rules = [OIC]
+    elif 'oicdmconly' in save_addon_type:
+        rules = [OIC, DMC]
 
     if OIC in rules:
         num_ring = 3
@@ -258,4 +258,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
 if __name__ == '__main__':
     pass
-    train(HDIM=20, s=12, save_addon='test', training_iters=200000)
+    train(HDIM=20, s=12, save_addon='test', training_iters=300000)

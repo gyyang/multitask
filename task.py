@@ -20,7 +20,7 @@ if setup_type == 'standard':
     REMAP, INHREMAP, DELAYREMAP,\
     DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
 
-    CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = -2 # dummy
+    CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = DMC = -2 # dummy
 
     TEST_INIT = -1
 
@@ -1484,7 +1484,6 @@ def intervalreproduction(config, mode, **kwargs):
 def delaymatchcategory_(config, mode, matchnogo, **kwargs):
     '''
     Delay-match-to-category
-    Tailored to the Freedman experiment. Notably every interval is fixed during training
 
     Two stimuli are shown, separated in time, either at the locations of the same category or not
     Fixate before the second stimulus is shown
@@ -1499,10 +1498,6 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
 
     The first target is shown between (tar1_on, tar1_off)
     The second target is shown between (tar2_on, T)
-
-    The output should be fixation location for (0, tar2_on)
-    If two stimuli the different location, then for (tar2_on, T) go to tar2_loc
-    Otherwise keep fixation
 
     :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
     Optional parameters:
@@ -1660,9 +1655,9 @@ def oic(config, mode, **kwargs):
         tdim = fix_offs + int(500/dt)
 
     elif mode == 'test':
+        a = 2**(BS_EXPO-1)
         batch_size = 2**BS_EXPO
-        tar1_locs = np.concatenate(((0.1+0.8*np.arange(batch_size)/batch_size),
-                                    (1.1+0.8*np.arange(batch_size)/batch_size)))*np.pi
+        tar1_locs = np.concatenate(((0.1+0.8*np.arange(a)/a),(1.1+0.8*np.arange(a)/a)))*np.pi
         tar2_locs = tar1_locs
         tar3_locs = (tar2_locs+np.pi)%(2*np.pi)
 
@@ -1712,6 +1707,112 @@ def oic(config, mode, **kwargs):
 
     return task
 
+def delaymatchcategory_original(config, mode, **kwargs):
+    '''
+    Delay-match-to-category.
+    Tailored to the Freedman experiment. Notably some intervals are fixed during training
+
+    Two or three stimuli are shown in ring 1, separated in time, either at the locations of the same category or not
+    Fixate before the second stimulus is shown
+
+    If the two stimuli are different, then keep fixation.
+    If the two stimuli are match, then saccade to the location of the stimulus
+
+    The first target is shown between (tar1_on, tar1_off)
+    The second target is shown between (tar2_on, T)
+
+    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    Optional parameters:
+    :param batch_size: Batch size (required for mode=='random')
+    :param tdim: dimension of time (required for mode=='sample')
+    :param param: a dictionary of parameters (required for mode=='explicit')
+    :return: 2 Tensor3 data array (Time, Batchsize, Units)
+    '''
+    dt = config['dt']
+    if mode == 'random': # Randomly generate parameters
+        batch_size = kwargs['batch_size']
+        # each batch consists of sequences of equal length
+
+        # Use only ring 1 for stimulus input to be consistent with OIC
+        tar1_locs = np.random.choice(np.array([0.1, 0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9])*np.pi,size=(batch_size,))
+        tar2_locs = np.random.choice(np.array([0.1, 0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9])*np.pi,size=(batch_size,))
+
+        # Time of targets on/off
+        tar1_ons  = int(np.random.uniform(100,600)/dt)
+        tar1_offs = tar1_ons + int(1000/dt)
+        tar2_ons  = tar1_offs + int(1000/dt)
+        tdim = tar2_ons + int(500/dt)
+
+    elif mode == 'sample':
+        batch_size = 1
+
+        tar1_locs = np.array([1.25*np.pi])
+        tar2_locs = np.array([0.25*np.pi])
+        tar1_ons = int(500/dt)
+        tar1_offs = tar1_ons + int(1000/dt)
+        tar2_ons = tar1_offs + int(1000/dt)
+        tdim = tar2_ons + int(500/dt)
+
+    elif mode == 'test':
+        # Set this test so the model always respond
+        a = 2**(BS_EXPO-1)
+        batch_size = 2**BS_EXPO
+        tar1_locs = np.concatenate(((0.1+0.8*np.arange(a)/a),(1.1+0.8*np.arange(a)/a)))*np.pi
+        tar2_locs = tar1_locs
+        tar1_ons  = int(500/dt)
+        tar1_offs = tar1_ons + int(1000/dt)
+        tar2_ons  = tar1_offs + int(1000/dt)
+        tdim = tar2_ons + int(500/dt)
+
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar1_locs = p['tar1_locs']
+        tar2_locs = p['tar2_locs']
+        batch_size = len(tar1_locs)
+
+        tdim = int(3000/dt)
+        tar1_ons  = int(500/dt)
+        tar1_offs = int(1500/dt)
+        tar2_ons  = int(2500/dt)
+
+    # time to check the saccade location
+    check_ons = tar2_ons + int(100/dt)
+
+    tar1_cats = tar1_locs<np.pi # Category of target 1
+    tar2_cats = tar2_locs<np.pi # Category of target 2
+    matchs    = tar1_cats==tar2_cats
+
+    task = Task(config, tdim, batch_size)
+
+    task.add('fix_in')
+    task.add('tar_mod1', tar1_locs, ons=tar1_ons, offs=tar1_offs)
+    task.add('tar_mod1', tar2_locs, ons=tar2_ons)
+
+    if hasattr(tar2_ons, '__iter__'):
+        fix_out_offs = list(tar2_ons)
+    else:
+        fix_out_offs = [tar2_ons]*batch_size
+    out_offs = [None]*batch_size
+
+    for i in range(batch_size):
+        if matchs[i] == 0: # If non-match
+            fix_out_offs[i] = None # Keep fixation
+            out_offs[i] = 0 # And don't go to target location
+
+
+    task.add('fix_out', offs=fix_out_offs)
+    task.add('out', tar2_locs, ons=tar2_ons, offs=out_offs)
+
+    task.add_c_mask(pre_offs=tar2_ons, post_ons=check_ons)
+
+    task.epochs = {'fix1'     : (None, tar1_ons),
+                   'tar1'     : (tar1_ons, tar1_offs),
+                   'delay1'   : (tar1_offs, tar2_ons),
+                   'go1'      : (tar2_ons, None)}
+
+    return task
+
+
 
 rule_mapping = {TEST_INIT               : test_init,
                 FIXATION                : fixation,
@@ -1736,7 +1837,8 @@ rule_mapping = {TEST_INIT               : test_init,
                 INHGO                   : inhgo,
                 INHREMAP                : inhremapgo,
                 INTREPRO                : intervalreproduction,
-                OIC                     : oic}
+                OIC                     : oic,
+                DMC                     : delaymatchcategory_original}
 
 rule_name    = {FIXATION                : 'Fixation',
                 GO                      : 'Go',
@@ -1760,7 +1862,8 @@ rule_name    = {FIXATION                : 'Fixation',
                 DMCGO                   : 'DMC Go',
                 DMCNOGO                 : 'DMC NoGo',
                 INTREPRO                : 'Int repro',
-                OIC                     : '1IC'}
+                OIC                     : '1IC',
+                DMC                     : 'DMC'}
 
 #-----------------------------------------------------------------------------------------
 # Rule features
