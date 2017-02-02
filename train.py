@@ -70,7 +70,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
     elif s == 11:
         save_addon_type = 'delaychoiceonly_strongnoise'
     elif s == 12:
-        save_addon_type = 'oicdmconly_weaknoise'
+        save_addon_type = 'oicdmconly_strongnoise'
 
     tf.reset_default_graph()
 
@@ -259,4 +259,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
 if __name__ == '__main__':
     pass
-    train(HDIM=20, s=12, save_addon='test', training_iters=300000)
+    train(HDIM=30, s=12, save_addon='test', training_iters=300000)

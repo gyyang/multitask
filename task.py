@@ -1761,7 +1761,7 @@ def delaymatchcategory_original(config, mode, **kwargs):
         tar2_locs = tar1_locs
         tar1_ons  = int(500/dt)
         tar1_offs = tar1_ons + int(1000/dt)
-        tar2_ons  = tar1_offs + int(1000/dt)
+        tar2_ons  = tar1_offs + int(np.random.uniform(800,1200)/dt)
         tdim = tar2_ons + int(500/dt)
 
     elif mode == 'psychometric':

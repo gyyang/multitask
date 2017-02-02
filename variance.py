@@ -361,5 +361,5 @@ if __name__ == '__main__':
 
 
     # Study OIC & DMC
-    hist, bins_edge = _compute_hist_varprop('oicdmconly_weaknoise_test', [OIC, DMC])
+    hist, bins_edge = _compute_hist_varprop('oicdmconly_strongnoise_test', [OIC, DMC])
     _plot_hist_varprop(hist, bins_edge, hist_example=hist)
