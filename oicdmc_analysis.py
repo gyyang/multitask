@@ -47,7 +47,7 @@ def gen_taskparams():
 
     return params
 
-save_addon = 'oicdmconly_weaknoise_test'
+save_addon = 'oicdmconly_strongnoise_test'
 rules = [OIC, DMC]
 
 # Analyzing the sample period, so not iterating over second stimulus or target locations
@@ -63,22 +63,44 @@ with Run(save_addon, fast_eval=True) as R:
 
 
 ####################### Plotting neuronal activities ##########################
-if False:
-    rule = DMC
-    tar1_cats = params[rule]['tar1_cats']
-    h_sample_cat1 = h_samples[rule][:, tar1_cats==1, :]
-    h_sample_cat2 = h_samples[rule][:, tar1_cats==0, :]
+if True:
+    tar1_cats = params[OIC]['tar1_cats'] # Should be the same for both tasks
+
+    fs = 7
+
+    time_ind = np.arange(int(1500/config['dt']))
+    # Show same time range
+    t_plot = time_ind*config['dt']/1000.
 
     for plot_ind in range(config['HDIM']):
-        fig = plt.figure(figsize=(2,2))
-        t_plot = np.arange(h_samples[rule].shape[0])*config['dt']/1000
-        ax = fig.add_axes([.2, .2, .7, .7])
-        _ = ax.plot(t_plot, h_sample_cat1[:, :, plot_ind], color='blue')
-        _ = ax.plot(t_plot, h_sample_cat2[:, :, plot_ind], color='red')
+
+        ymax = np.max([np.max(h_samples[rule][time_ind, :, plot_ind]) for rule in rules])
+
+        fig = plt.figure(figsize=(3,1.5))
+        for i, rule in enumerate(rules):
+            # Show full range
+            # t_plot = np.arange(h_samples[rule].shape[0])*config['dt']/1000.
+            ax = fig.add_axes([.2+i*0.4, .2, .3, .7])
+
+            _ = ax.plot(t_plot, h_samples[rule][:, tar1_cats==1, plot_ind][time_ind], color='blue')
+            _ = ax.plot(t_plot, h_samples[rule][:, tar1_cats==0, plot_ind][time_ind], color='red')
+            ax.set_title(rule_name[rule] + ' Unit {:d}'.format(plot_ind), fontsize=fs)
+            ax.set_xlabel('Time (s)', fontsize=fs)
+            if i == 0:
+                ax.set_ylabel('Activity (a.u.)', fontsize=fs)
+            plt.locator_params(nbins=3)
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+            ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
+            ax.set_ylim([0, ymax*1.2])
+
+
 
 
 ############################ Classification ###################################
-if True:
+if False:
     from sklearn.svm import SVC, LinearSVC
     from sklearn.tree import DecisionTreeClassifier
     from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
@@ -161,4 +183,12 @@ if True:
                    fontsize=fs, ncol=1, bbox_to_anchor=(1.0,0.5),
                    loc=1, frameon=False)
     plt.setp(lg.get_title(),fontsize=fs)
-    plt.title('Trained on ' + rule_name[rule_train], fontsize=fs)
+    ax.set_title('Trained on ' + rule_name[rule_train], fontsize=fs)
+    ax.set_xlabel('Time (s)', fontsize=fs)
+    ax.set_ylabel('Classification performance', fontsize=fs)
+    plt.locator_params(nbins=3)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
