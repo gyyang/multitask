@@ -78,6 +78,49 @@ def compute_variance(save_addon, data_type, rules,
     with open(os.path.join('data','variance'+data_type+save_addon+'.pkl'),'wb') as f:
         pickle.dump(result, f)
 
+def _compute_hist_varprop(save_addon, rules):
+    data_type = 'rule'
+    assert len(rules) == 2
+    assert data_type == 'rule'
+
+    fname = os.path.join('data','variance'+data_type+save_addon)
+    fname += '.pkl'
+    if not os.path.isfile(fname):
+        return None, None
+
+    # If not computed, use variance.py
+    # fname = 'data/variance'+data_type+save_addon+'_rr'
+    # fname = 'data/variance'+data_type+save_addon
+    with open(fname,'rb') as f:
+        res = pickle.load(f)
+    h_var_all = res['h_var_all']
+    keys      = res['keys']
+
+    ind_rules = [keys.index(rule) for rule in rules]
+    h_var_all = h_var_all[:, ind_rules]
+
+    # First only get active units. Total variance across tasks larger than 1e-3
+    ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
+
+    # Temporary: Mimicking biased sampling. Notice the free parameter though.
+    # print('Mimicking selective sampling')
+    # ind_active = np.where((h_var_all.sum(axis=1) > 1e-3)*(h_var_all[:,0]>1*1e-2))[0]
+
+    h_var_all  = h_var_all[ind_active, :]
+
+    # Normalize by the total variance across tasks
+    h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
+
+    # Plot the proportion of variance for the first rule
+    data_plot = h_normvar_all[:, 0]
+    hist, bins_edge = np.histogram(data_plot, bins=20, range=(0,1))
+
+    # Plot the percentage instead of the total count
+    hist = hist/np.sum(hist)
+
+    return hist, bins_edge
+
+
 def compute_hist_varprop(save_type, rules):
     data_type = 'rule'
     assert len(rules) == 2
@@ -88,40 +131,10 @@ def compute_hist_varprop(save_type, rules):
     hdims = list()
     for HDIM in HDIMs:
         save_addon = save_type+'_'+str(HDIM)
-        fname = os.path.join('data','variance'+data_type+save_addon)
-        fname += '.pkl'
-        if not os.path.isfile(fname):
+
+        hist, bins_edge = _compute_hist_varprop(save_addon, rules)
+        if hist is None:
             continue
-
-        # If not computed, use variance.py
-        # fname = 'data/variance'+data_type+save_addon+'_rr'
-        # fname = 'data/variance'+data_type+save_addon
-        with open(fname,'rb') as f:
-            res = pickle.load(f)
-        h_var_all = res['h_var_all']
-        keys      = res['keys']
-
-        ind_rules = [keys.index(rule) for rule in rules]
-        h_var_all = h_var_all[:, ind_rules]
-
-        # First only get active units. Total variance across tasks larger than 1e-3
-        ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
-
-        # Temporary: Mimicking biased sampling. Notice the free parameter though.
-        # print('Mimicking selective sampling')
-        # ind_active = np.where((h_var_all.sum(axis=1) > 1e-3)*(h_var_all[:,0]>1*1e-2))[0]
-
-        h_var_all  = h_var_all[ind_active, :]
-
-        # Normalize by the total variance across tasks
-        h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
-
-        # Plot the proportion of variance for the first rule
-        data_plot = h_normvar_all[:, 0]
-        hist, bins_edge = np.histogram(data_plot, bins=20, range=(0,1))
-
-        # Plot the percentage instead of the total count
-        hist = hist/np.sum(hist)
 
         # Store
         hists.append(hist)
@@ -132,6 +145,32 @@ def compute_hist_varprop(save_type, rules):
     # hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
 
     return hists, bins_edge, hdims
+
+def _plot_hist_varprop(hist_plot, bins_edge, hist_example=None):
+    fs = 6
+    fig = plt.figure(figsize=(1.5,1.2))
+    ax = fig.add_axes([0.2,0.3,0.6,0.5])
+    if hist_example is not None:
+        ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
+               color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+    ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_plot, color='black', linewidth=1.5)
+    # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_low)
+    # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_high)
+    plt.locator_params(nbins=3)
+    xlabel = 'FracVar({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
+    ax.set_xlabel(xlabel, fontsize=fs)
+    ax.set_ylim(bottom=-0.02*hist_plot.max())
+    ax.set_xlim([-0.1,1.1])
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
+    if save:
+        plt.savefig('figure/plot_hist_varprop'+
+                rule_name[rules[0]].replace(' ','')+
+                rule_name[rules[1]].replace(' ','')+
+                save_type+'.pdf', transparent=True)
 
 def plot_hist_varprop(save_type, rules, hdim_example=None):
     '''
@@ -149,31 +188,13 @@ def plot_hist_varprop(save_type, rules, hdim_example=None):
     # hist_med, bins_edge = np.histogram(data_plots, bins=20, range=(0,1))
     # hist_med = np.array(hist_med)/len(hdims)
 
-    fs = 6
-    fig = plt.figure(figsize=(1.5,1.2))
-    ax = fig.add_axes([0.2,0.3,0.6,0.5])
     if hdim_example is not None:
         hist_example = hists[hdims.index(hdim_example)]
-        ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
-               color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
-    ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med, color='black', linewidth=1.5)
-    # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_low)
-    # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_high)
-    plt.locator_params(nbins=3)
-    xlabel = 'FracVar({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
-    ax.set_xlabel(xlabel, fontsize=fs)
-    ax.set_ylim(bottom=-0.02*hist_med.max())
-    ax.set_xlim([-0.1,1.1])
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.xaxis.set_ticks_position('bottom')
-    ax.yaxis.set_ticks_position('left')
-    ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
-    if save:
-        plt.savefig('figure/plot_hist_varprop'+
-                rule_name[rules[0]].replace(' ','')+
-                rule_name[rules[1]].replace(' ','')+
-                save_type+'.pdf', transparent=True)
+
+    hist_plot = hist_med
+    _plot_hist_varprop(hist_plot, bins_edge, hist_example=hist_example)
+
+
 
 def plot_hist_varprop_selection(save_type, **kwargs):
     rules_list = [(CHOICE_MOD1, CHOICE_MOD2),
@@ -336,4 +357,11 @@ if __name__ == '__main__':
     save_type = 'allrule_weaknoise'
     # plot_hist_varprop(save_type, rules=[DMSGO, DMCGO], hdim_example=400)
     # plot_hist_varprop_all('allrule_weaknoise')
-    plot_hist_varprop_selection(save_type, hdim_example=400)
+    # plot_hist_varprop_selection(save_type, hdim_example=400)
+
+    rules = [OIC, DMC]
+    save_addon = 'oicdmconly_weaknoise_test'
+    compute_variance(save_addon, 'rule', rules,
+                     random_rotation=False, fast_eval=True)
+    hist, bins_edge = _compute_hist_varprop(save_addon, rules)
+    _plot_hist_varprop(hist, bins_edge, hist_example=hist)
