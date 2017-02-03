@@ -132,9 +132,11 @@ def compute_hist_varprop(save_type, rules):
     for HDIM in HDIMs:
         save_addon = save_type+'_'+str(HDIM)
 
-        hist, bins_edge = _compute_hist_varprop(save_addon, rules)
+        hist, bins_edge_ = _compute_hist_varprop(save_addon, rules)
         if hist is None:
             continue
+        else:
+            bins_edge = bins_edge_
 
         # Store
         hists.append(hist)
@@ -151,6 +153,8 @@ def _plot_hist_varprop(hist_plot, bins_edge, hist_example=None):
     fig = plt.figure(figsize=(1.5,1.2))
     ax = fig.add_axes([0.2,0.3,0.6,0.5])
     if hist_example is not None:
+        print(bins_edge)
+        print(hist_example)
         ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
                color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
     ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_plot, color='black', linewidth=1.5)
@@ -361,5 +365,5 @@ if __name__ == '__main__':
 
 
     # Study OIC & DMC
-    hist, bins_edge = _compute_hist_varprop('oicdmconly_strongnoise_test', [OIC, DMC])
-    _plot_hist_varprop(hist, bins_edge, hist_example=hist)
+    rules = [OIC, DMC]
+    plot_hist_varprop('oicdmconly_strongnoise', rules=rules, hdim_example=200)
