@@ -904,7 +904,9 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
 if __name__ == '__main__':
     pass
     # plot_trainingprogress('allrule_weaknoise_400')
-    plot_finalperformance('allrule_weaknoise')
+    plot_trainingprogress('oicdmconly_strongnoise_200')
+    # plot_finalperformance('allrule_weaknoise')
+    # plot_finalperformance('oicdmconly_strongnoise')
     # plot_finalperformance_lr()
     
     # psychometric_choice('allrule_weaknoise_400')

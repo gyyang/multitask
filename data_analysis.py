@@ -709,7 +709,7 @@ with open(datapath+'h_var.pkl','rb') as f:
 with open(datapath+'h_var_shuffle.pkl','rb') as f:
     res_shuffle = pickle.load(f)
 
-rules = ['DMC', '1ID']
+rules = ['1ID', 'DMC']
 # rules = ['MGS', '1ID']
 # rules = ['MGS', 'DMC']
 h_var_stim_rule0 = res['h_var_stim'][res['rule']==map2num[rules[0]]]

@@ -8,7 +8,7 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-setup_type = 'OIC'
+setup_type = 'standard'
 
 if setup_type == 'standard':
 
@@ -24,7 +24,7 @@ if setup_type == 'standard':
 
     TEST_INIT = -1
 
-elif setup_type == 'OIC':
+elif setup_type == 'OICDMC':
 
     N_RULE          = 2
 

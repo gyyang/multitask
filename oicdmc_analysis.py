@@ -8,23 +8,15 @@ import os
 import numpy as np
 import pickle
 import time
-import copy
 from collections import OrderedDict
-import scipy.stats as stats
-from scipy.optimize import curve_fit, minimize
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
 from task import *
 from run import Run
-from network import get_perf
-from slowpoints import search_slowpoints
 
 save = True # TEMP
 
 def gen_taskparams():
-    a = 24
+    a = 12
     n_tar_loc = 2 * a
     batch_size = n_tar_loc
 
@@ -47,7 +39,7 @@ def gen_taskparams():
 
     return params
 
-save_addon = 'oicdmconly_strongnoise_test'
+save_addon = 'oicdmconly_strongnoise_30'
 rules = [OIC, DMC]
 
 # Analyzing the sample period, so not iterating over second stimulus or target locations
@@ -68,22 +60,26 @@ if True:
 
     fs = 7
 
-    time_ind = np.arange(int(1500/config['dt']))
+    # time_ind = np.arange(int(1500/config['dt']))
     # Show same time range
-    t_plot = time_ind*config['dt']/1000.
+    # t_plot = time_ind*config['dt']/1000.
 
+    # for plot_ind in range(0, 20):
     for plot_ind in range(config['HDIM']):
 
-        ymax = np.max([np.max(h_samples[rule][time_ind, :, plot_ind]) for rule in rules])
+        # ymax = np.max([np.max(h_samples[rule][time_ind, :, plot_ind]) for rule in rules])
+        ymax = np.max([np.max(h_samples[rule][:, :, plot_ind]) for rule in rules])
 
         fig = plt.figure(figsize=(3,1.5))
         for i, rule in enumerate(rules):
             # Show full range
-            # t_plot = np.arange(h_samples[rule].shape[0])*config['dt']/1000.
+            t_plot = np.arange(h_samples[rule].shape[0])*config['dt']/1000.
             ax = fig.add_axes([.2+i*0.4, .2, .3, .7])
 
-            _ = ax.plot(t_plot, h_samples[rule][:, tar1_cats==1, plot_ind][time_ind], color='blue')
-            _ = ax.plot(t_plot, h_samples[rule][:, tar1_cats==0, plot_ind][time_ind], color='red')
+            _ = ax.plot(t_plot, h_samples[rule][:, tar1_cats==1, plot_ind], color='blue')
+            _ = ax.plot(t_plot, h_samples[rule][:, tar1_cats==0, plot_ind], color='red')
+            # _ = ax.plot(t_plot, h_samples[rule][:, tar1_cats==1, plot_ind][time_ind], color='blue')
+            # _ = ax.plot(t_plot, h_samples[rule][:, tar1_cats==0, plot_ind][time_ind], color='red')
             ax.set_title(rule_name[rule] + ' Unit {:d}'.format(plot_ind), fontsize=fs)
             ax.set_xlabel('Time (s)', fontsize=fs)
             if i == 0:
@@ -95,8 +91,6 @@ if True:
             ax.yaxis.set_ticks_position('left')
             ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
             ax.set_ylim([0, ymax*1.2])
-
-
 
 
 ############################ Classification ###################################
@@ -122,73 +116,74 @@ if False:
     # clf = LinearSVC()
     # clf = LinearSVC(multi_class='crammer_singer')
 
-    rule_train = DMC # Rule used to train classifier
-
-    prop_train = 0.5 # Proportion of data used for training classifiers
-    batch_size = h_samples[OIC].shape[1]
-    n_train = int(batch_size*prop_train)
-    n_rep = 100 # Number of repetition for cross-validation
-
-    prop_subsample = 0.05
-    n_subsample = int(config['HDIM'] * prop_subsample)
-
+    for rule_train in rules: # Rule used to train classifier
+    # rule_train = DMC # Rule used to train classifier
     
-    # Store mean classification performance in time
-    preds_intime = {rule : [] for rule in rules}
-    time_inds = np.arange(150)
-    for time_ind in time_inds:
-        # Get mean prediction on hold-one-out data
-        X_oic = h_samples[OIC][time_ind] # (n_samples, n_features) = (n_trials, n_neurons)
-        X_dmc = h_samples[DMC][time_ind] # (n_samples, n_features) = (n_trials, n_neurons)
-        y = params[rule_train]['tar1_cats'] # categories, should be the same for both rules
-
-        preds = {rule : [] for rule in rules} # Store hold-one-out results
-
-        # Looping over hold-out data points
-        for i in range(n_rep):
-            # Get random trials
-            ind_shuffle = np.arange(batch_size)
-            np.random.shuffle(ind_shuffle)
-            ind_train = ind_shuffle[:n_train]
-            ind_test  = ind_shuffle[n_train:]
-
-            # Get random units
-            ind_shuffle = np.arange(config['HDIM'])
-            np.random.shuffle(ind_shuffle)
-            ind_subsample = ind_shuffle[:n_subsample]
-
-            X_train = h_samples[rule_train][time_ind, ind_train, :][:, ind_subsample]
-            clf.fit(X_train, y[ind_train])
-
-            for rule_test in rules:
-                X_test = h_samples[rule_test][time_ind, ind_test, :][:, ind_subsample]
-                y_test = params[rule_test]['tar1_cats'][ind_test]
-
-                preds[rule_test].append(np.mean(y_test==clf.predict(X_test)))
-
-
-        for rule in rules:
-            preds_intime[rule].append(np.mean(preds[rule]))
-
-
-    colors = ['black', 'red']
-    fs = 7
-
-    fig = plt.figure(figsize=(2,2))
-    ax = fig.add_axes([.2, .2, .7, .7])
-    for i, rule in enumerate(rules):
-        _ = ax.plot(time_inds*config['dt']/1000., preds_intime[rule], color=colors[i], label=rule_name[rule])
-
-    lg = ax.legend(title='test rule',
-                   fontsize=fs, ncol=1, bbox_to_anchor=(1.0,0.5),
-                   loc=1, frameon=False)
-    plt.setp(lg.get_title(),fontsize=fs)
-    ax.set_title('Trained on ' + rule_name[rule_train], fontsize=fs)
-    ax.set_xlabel('Time (s)', fontsize=fs)
-    ax.set_ylabel('Classification performance', fontsize=fs)
-    plt.locator_params(nbins=3)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.xaxis.set_ticks_position('bottom')
-    ax.yaxis.set_ticks_position('left')
-    ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
+        prop_train = 0.5 # Proportion of data used for training classifiers
+        batch_size = h_samples[OIC].shape[1]
+        n_train = int(batch_size*prop_train)
+        n_rep = 30 # Number of repetition for cross-validation
+    
+        prop_subsample = 0.05
+        n_subsample = int(config['HDIM'] * prop_subsample)
+    
+        # Store mean classification performance in time
+        preds_intime = {rule : [] for rule in rules}
+        time_inds = np.arange(150)
+        for time_ind in time_inds:
+            # Get mean prediction on hold-one-out data
+            X_oic = h_samples[OIC][time_ind] # (n_samples, n_features) = (n_trials, n_neurons)
+            X_dmc = h_samples[DMC][time_ind] # (n_samples, n_features) = (n_trials, n_neurons)
+            y = params[rule_train]['tar1_cats'] # categories, should be the same for both rules
+    
+            preds = {rule : [] for rule in rules} # Store hold-one-out results
+    
+            # Looping over hold-out data points
+            for i in range(n_rep):
+                # Get random trials
+                ind_shuffle = np.arange(batch_size)
+                np.random.shuffle(ind_shuffle)
+                ind_train = ind_shuffle[:n_train]
+                ind_test  = ind_shuffle[n_train:]
+    
+                # Get random units
+                ind_shuffle = np.arange(config['HDIM'])
+                np.random.shuffle(ind_shuffle)
+                ind_subsample = ind_shuffle[:n_subsample]
+    
+                X_train = h_samples[rule_train][time_ind, ind_train, :][:, ind_subsample]
+                clf.fit(X_train, y[ind_train])
+    
+                for rule_test in rules:
+                    X_test = h_samples[rule_test][time_ind, ind_test, :][:, ind_subsample]
+                    y_test = params[rule_test]['tar1_cats'][ind_test]
+    
+                    preds[rule_test].append(np.mean(y_test==clf.predict(X_test)))
+    
+    
+            for rule in rules:
+                preds_intime[rule].append(np.mean(preds[rule]))
+    
+    
+        colors = ['black', 'red']
+        fs = 7
+    
+        fig = plt.figure(figsize=(2,2))
+        ax = fig.add_axes([.2, .2, .7, .7])
+        for i, rule in enumerate(rules):
+            _ = ax.plot(time_inds*config['dt']/1000., preds_intime[rule],
+                        color=colors[i], label=rule_name[rule])
+    
+        lg = ax.legend(title='test rule',
+                       fontsize=fs, ncol=1, bbox_to_anchor=(1.0,0.5),
+                       loc=1, frameon=False)
+        plt.setp(lg.get_title(),fontsize=fs)
+        ax.set_title('Trained on ' + rule_name[rule_train], fontsize=fs)
+        ax.set_xlabel('Time (s)', fontsize=fs)
+        ax.set_ylabel('Classification performance', fontsize=fs)
+        plt.locator_params(nbins=3)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+        ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
