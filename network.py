@@ -20,11 +20,18 @@ from tensorflow.python.util import nest
 class LeakyRNNCell(RNNCell):
     """The most basic RNN cell."""
 
-    def __init__(self, num_units, alpha, sigma_rec=0, input_size=None, activation=tf.nn.softplus):
+    def __init__(self, num_units, alpha, sigma_rec=0, input_size=None, activation='softplus'):
         if input_size is not None:
             logging.warn("%s: The input_size parameter is deprecated.", self)
         self._num_units = num_units
-        self._activation = activation
+        if activation == 'softplus':
+            self._activation = tf.nn.softplus
+        elif activation == 'tanh':
+            self._activation = tf.tanh
+        elif activation == 'relu':
+            self._activation == tf.nn.relu
+        else:
+            raise ValueError('Unknown activation')
         self._alpha = alpha
         self._sigma = np.sqrt(2*alpha) * sigma_rec
 

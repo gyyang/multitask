@@ -46,42 +46,37 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
     num_ring = 2
 
     if s == 0:
-        save_addon_type = 'allrule_nonoise'
+        save_addon_type = 'allrule_softplus'
     elif s == 1:
-        save_addon_type = 'allrule_weaknoise'
+        save_addon_type = 'allrule_tanh'
     elif s == 2:
-        save_addon_type = 'allrule_strongnoise'
+        save_addon_type = 'allrule_relu'
     elif s == 3:
-        save_addon_type = 'attendonly_nonoise'
+        save_addon_type = 'attendonly_softplus'
     elif s == 4:
-        save_addon_type = 'attendonly_weaknoise'
+        save_addon_type = 'attendonly_tanh'
     elif s == 5:
-        save_addon_type = 'attendonly_strongnoise'
+        save_addon_type = 'attendonly_relu'
     elif s == 6:
-        save_addon_type = 'choiceonly_nonoise'
+        save_addon_type = 'choiceonly_softplus'
     elif s == 7:
-        save_addon_type = 'choiceonly_weaknoise'
+        save_addon_type = 'choiceonly_tanh'
     elif s == 8:
-        save_addon_type = 'choiceonly_strongnoise'
+        save_addon_type = 'choiceonly_relu'
     elif s == 9:
-        save_addon_type = 'delaychoiceonly_nonoise'
+        save_addon_type = 'delaychoiceonly_softplus'
     elif s == 10:
-        save_addon_type = 'delaychoiceonly_weaknoise'
+        save_addon_type = 'delaychoiceonly_tanh'
     elif s == 11:
-        save_addon_type = 'delaychoiceonly_strongnoise'
+        save_addon_type = 'delaychoiceonly_relu'
     elif s == 12:
-        save_addon_type = 'oicdmconly_strongnoise'
+        save_addon_type = 'oicdmconly_softplus'
 
     tf.reset_default_graph()
 
     N_RING = 16
 
-    if 'nonoise' in save_addon_type:
-        sigma_rec = 0
-    elif 'weaknoise' in save_addon_type:
-        sigma_rec = 0.05
-    elif 'strongnoise' in save_addon_type:
-        sigma_rec = 0.15
+    sigma_rec = 0.05
 
     if 'allrule' in save_addon_type:
         # Rules
@@ -101,6 +96,13 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
     if OIC in rules:
         num_ring = 3
+
+    if 'softplus' in save_addon_type:
+        activation = 'softplus'
+    elif 'tanh' in save_addon_type:
+        activation = 'tanh'
+    elif 'relu' in save_addon_type:
+        activation = 'relu'
 
 
     rule_weights = np.ones(len(rules))
@@ -162,7 +164,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
     h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
 
     # Recurrent activity
-    cell = LeakyRNNCell(nh, config['alpha'], sigma_rec=config['sigma_rec'])
+    cell = LeakyRNNCell(nh, config['alpha'], sigma_rec=config['sigma_rec'], activation=activation)
     h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc),
                                 dtype=tf.float32, time_major=True) # time_major is important
 
@@ -259,4 +261,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
 if __name__ == '__main__':
     pass
-    train(HDIM=30, s=12, save_addon='test', training_iters=300000)
+    train(HDIM=30, s=4, save_addon='test', training_iters=300000)
