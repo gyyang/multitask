@@ -53,30 +53,6 @@ def generate_surrogate_data():
     h_sample = np.dot(h_sur, random_ortho_matrix[:3, :])
     return h_sample, y_choice, perfs
 
-def gen_taskparams(tar1_loc, n_tar, n_rep):
-    batch_size = n_rep * n_tar**2
-    batch_shape = (n_tar, n_tar, n_rep)
-    ind_tar_mod1, ind_tar_mod2, ind_rep = np.unravel_index(range(batch_size),batch_shape)
-
-    tar1_locs = np.ones(batch_size)*tar1_loc
-    tar2_locs = (tar1_locs+np.pi) % (2*np.pi)
-
-    # tar_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.3
-    # tar_cohs = np.array([-0.5, -0.3, -0.1, 0.1, 0.3, 0.5])*0.5
-    tar_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.5
-    tar_mod1_cohs = np.array([tar_cohs[i] for i in ind_tar_mod1])
-    tar_mod2_cohs = np.array([tar_cohs[i] for i in ind_tar_mod2])
-
-    params = {'tar1_locs' : tar1_locs,
-              'tar2_locs' : tar2_locs,
-              'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
-              'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
-              'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
-              'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-              'tar_time'    : 1000}
-              # If tar_time is long (~1600), we can reproduce the curving trajectories
-    return params, batch_size
-
 class UnitAnalysis(object):
     def __init__(self, save_addon, fast_eval=True):
         data_type  = 'rule'
@@ -112,8 +88,13 @@ class UnitAnalysis(object):
         self.h_normvar_all      = h_normvar_all
         self.rules              = rules
         self.ind_active         = ind_active
-        self.colors = dict(zip(['intact', '1', '2', '12'],
+        self.colors = dict(zip([None, '1', '2', '12'],
                                sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
+        self.lesion_group_names = {None : 'intact',
+                                   '1'  : 'lesion groups 1',
+                                   '2'  : 'lesion groups 2',
+                                   '12' : 'lesion groups 12',
+                                   '1+2': 'lesion groups 1 & 2'}
 
     def prettyplot_hist_varprop(self):
         # Similar to the function from variance.py, but prettier
@@ -154,34 +135,106 @@ class UnitAnalysis(object):
                 rule_name[rules[1]].replace(' ','')+
                 save_addon+'.pdf', transparent=True)
 
+    def get_performance(self, rule, lesion_group, n_coh=8, n_tar_loc=20):
+        if lesion_group is None:
+            lesion_units = None
+        elif lesion_group == '1+2':
+            lesion_units = np.concatenate((self.ind_lesions_orig['1'],self.ind_lesions_orig['2']))
+        else:
+            lesion_units = self.ind_lesions_orig[lesion_group]
+
+        # Generate task parameters for choice tasks
+        coh_range = 0.2
+        cohs = np.linspace(-coh_range, coh_range, n_coh)
+
+        batch_size = n_tar_loc * n_coh**2
+        batch_shape = (n_tar_loc,n_coh,n_coh)
+        ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
+
+        # Looping target location
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
+
+        tar_mod1_cohs = cohs[ind_tar_mod1]
+        tar_mod2_cohs = cohs[ind_tar_mod2]
+
+        if rule in [CHOICE_MOD1, CHOICE_MOD2]:
+            params = {'tar1_locs' : tar1_locs,
+                      'tar2_locs' : tar2_locs,
+                      'tar1_strengths' : 1 + tar_mod1_cohs, # Just use mod 1 value
+                      'tar2_strengths' : 1 - tar_mod1_cohs,
+                      'tar_time'    : 800
+                      }
+        elif rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
+            params = {'tar1_locs' : tar1_locs,
+                      'tar2_locs' : tar2_locs,
+                      'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+                      'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+                      'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
+                      'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
+                      'tar_time'    : 800
+                      }
+        elif rule == CHOICE_INT:
+            params = {'tar1_locs' : tar1_locs,
+                      'tar2_locs' : tar2_locs,
+                      'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+                      'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+                      'tar1_mod2_strengths' : 1 + tar_mod1_cohs, # Same as Mod 1
+                      'tar2_mod2_strengths' : 1 - tar_mod1_cohs,
+                      'tar_time'    : 800
+                      }
+        else:
+            raise ValueError('Unsupported rule')
+
+        with Run(self.save_addon, lesion_units=lesion_units, fast_eval=self.fast_eval) as R:
+            task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+            y_sample = R.f_y_from_x(task.x)
+            y_sample_loc = R.f_y_loc(y_sample)
+
+        perf = get_perf(y_sample, task.y_loc)
+        print('Performance {:0.3f}'.format(np.mean(perf)))
+
+        # Compute the overall performance.
+        # Importantly, discard trials where no decision was made to one of the choices
+        loc_cor = task.y_loc[-1] # last time point, correct locations
+        loc_err = (loc_cor+np.pi)%(2*np.pi)
+        choose_cor = (get_dist(y_sample_loc[-1] - loc_cor) < 0.3*np.pi).sum()
+        choose_err = (get_dist(y_sample_loc[-1] - loc_err) < 0.3*np.pi).sum()
+        perf = choose_cor/(choose_cor+choose_err)
+
+        # Compute the proportion of choosing choice 1, while maintaining the batch_shape
+        tar1_locs_ = np.reshape(tar1_locs, batch_shape)
+        tar2_locs_ = np.reshape(tar2_locs, batch_shape)
+
+        y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
+        choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
+        choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
+        prop1s = choose1/(choose1 + choose2)
+
+        return perf, prop1s, cohs
+
     def plot_performance_choicetasks(self):
         # Rules for performance
         rules_perf = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
+        lesion_group_list = [None, '1', '2', '12']
+
         perf_stores = OrderedDict()
-        for key in ['intact', '1', '2', '12']:
-            perf_stores[key] = list()
-        lesion_units_list = [None] + [self.ind_lesions_orig[lesion_group] for lesion_group in ['1', '2', '12']]
+        for lesion_group in lesion_group_list:
+            perf_stores[lesion_group] = list()
 
-        for lesion_units, perfs_store in zip(lesion_units_list, perf_stores.values()):
-            with Run(self.save_addon, lesion_units=lesion_units, fast_eval=self.fast_eval) as R:
-                config = R.config
-                for rule in rules_perf:
-                    task = generate_onebatch(rule=rule, config=config, mode='test')
-                    y_hat = R.f_y_from_x(task.x)
-                    perf = get_perf(y_hat, task.y_loc)
-                    perfs_store.append(perf.mean())
+            for rule in rules_perf:
+                perf, prop1s, cohs = self.get_performance(rule=rule, lesion_group=lesion_group, n_tar_loc=20)
+                perf_stores[lesion_group].append(perf)
 
-
-        for key in perf_stores:
-            perf_stores[key] = np.array(perf_stores[key])
+            perf_stores[lesion_group] = np.array(perf_stores[lesion_group])
 
         fs = 6
         width = 0.15
         fig = plt.figure(figsize=(3,1.5))
         ax = fig.add_axes([0.17,0.35,0.8,0.4])
-        for i, key in enumerate(perf_stores.keys()):
-            b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width, perf_stores[key],
-                   width=width, color=self.colors[key], edgecolor='none')
+        for i, lesion_group in enumerate(lesion_group_list):
+            b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width, perf_stores[lesion_group],
+                   width=width, color=self.colors[lesion_group], edgecolor='none')
         ax.set_xticks(np.arange(len(rules_perf)))
         ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
         ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
@@ -197,62 +250,18 @@ class UnitAnalysis(object):
         ax.xaxis.set_ticks_position('bottom')
         ax.yaxis.set_ticks_position('left')
         ax.set_xlim([-0.8, len(rules_perf)-0.2])
-        plt.savefig('figure/perf_choiceattend_lesion'+save_addon+'.pdf', transparent=True)
+        if save:
+            plt.savefig('figure/perf_choiceattend_lesion'+save_addon+'.pdf', transparent=True)
         plt.show()
 
     def plot_performance_2D(self, rule, lesion_group=None, **kwargs):
-        if lesion_group is None:
-            lesion_units = None
-            lesion_group_name = 'intact'
-        elif lesion_group == '1+2':
-            lesion_units = np.concatenate((self.ind_lesions_orig['1'],self.ind_lesions_orig['2']))
-            lesion_group_name = 'lesion groups 1 & 2'
-        else:
-            lesion_units = self.ind_lesions_orig[lesion_group]
-            lesion_group_name = 'lesion group ' + lesion_group
 
-        # tar_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.5
+        perf, prop1s, cohs = self.get_performance(rule=rule, lesion_group=lesion_group)
 
-        n_coh = 8
-        coh_range = 0.2
-        cohs = np.linspace(-coh_range, coh_range, n_coh)
+        self._plot_performance_2D(prop1s, cohs, rule, lesion_group, **kwargs)
 
-        n_tar_loc = 20 # increase repeat by increasing this
-        batch_size = n_tar_loc * n_coh**2
-        batch_shape = (n_tar_loc,n_coh,n_coh)
-        ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
-
-        # Looping target location
-        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-
-        tar_mod1_cohs = cohs[ind_tar_mod1]
-        tar_mod2_cohs = cohs[ind_tar_mod2]
-
-        params = {'tar1_locs' : tar1_locs,
-                  'tar2_locs' : tar2_locs,
-                  'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
-                  'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
-                  'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
-                  'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-                  'tar_time'    : 800}
-
-        with Run(self.save_addon, lesion_units=lesion_units, fast_eval=self.fast_eval) as R:
-            task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
-            y_sample = R.f_y_from_x(task.x)
-            y_sample_loc = R.f_y_loc(y_sample)
-
-        perf = get_perf(y_sample, task.y_loc)
-        print('Performance {:0.3f}'.format(np.mean(perf)))
-
-        tar1_locs_ = np.reshape(tar1_locs, batch_shape)
-        tar2_locs_ = np.reshape(tar2_locs, batch_shape)
-
-        y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
-        choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
-        choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
-        prop1s = choose1/(choose1 + choose2)
-
+    def _plot_performance_2D(self, prop1s, cohs, rule, lesion_group=None, **kwargs):
+        n_coh = len(cohs)
 
         fs = 6
         fig = plt.figure(figsize=(1.5,1.5))
@@ -268,7 +277,7 @@ class UnitAnalysis(object):
             ax.set_ylabel('Mod 1 coh.', fontsize=fs, labelpad=-3)
             plt.yticks([0, n_coh-1], [cohs[0], cohs[-1]],
                        rotation=0, va='center', fontsize=fs)
-        plt.title(rule_name[rule] + '\n' + lesion_group_name, fontsize=fs)
+        plt.title(rule_name[rule] + '\n' + self.lesion_group_names[lesion_group], fontsize=fs)
         ax.tick_params('both', length=0)
         for loc in ['bottom','top','left','right']:
             ax.spines[loc].set_visible(False)
@@ -282,9 +291,10 @@ class UnitAnalysis(object):
             cb.set_label('Prop. of choice 1', fontsize=fs, labelpad=-3)
             plt.tick_params(axis='both', which='major', labelsize=fs)
 
-        plt.savefig('figure/'+rule_name[rule].replace(' ','')+
-                    '_perf2D_lesion'+str(lesion_group)+
-                    self.save_addon+'.pdf', transparent=True)
+        if save:
+            plt.savefig('figure/'+rule_name[rule].replace(' ','')+
+                        '_perf2D_lesion'+str(lesion_group)+
+                        self.save_addon+'.pdf', transparent=True)
         plt.show()
 
     def plot_fullconnectivity(self):
@@ -752,6 +762,32 @@ class StateSpaceAnalysis(object):
         self.q          = q
         self.lesion_units = lesion_units
 
+    @staticmethod
+    def gen_taskparams(tar1_loc, n_tar, n_rep):
+        # Generate task parameterse for state-space analysis
+        batch_size = n_rep * n_tar**2
+        batch_shape = (n_tar, n_tar, n_rep)
+        ind_tar_mod1, ind_tar_mod2, ind_rep = np.unravel_index(range(batch_size),batch_shape)
+
+        tar1_locs = np.ones(batch_size)*tar1_loc
+        tar2_locs = (tar1_locs+np.pi) % (2*np.pi)
+
+        # tar_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.3
+        # tar_cohs = np.array([-0.5, -0.3, -0.1, 0.1, 0.3, 0.5])*0.5
+        tar_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.5
+        tar_mod1_cohs = np.array([tar_cohs[i] for i in ind_tar_mod1])
+        tar_mod2_cohs = np.array([tar_cohs[i] for i in ind_tar_mod2])
+
+        params = {'tar1_locs' : tar1_locs,
+                  'tar2_locs' : tar2_locs,
+                  'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+                  'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+                  'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
+                  'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
+                  'tar_time'    : 1000}
+                  # If tar_time is long (~1600), we can reproduce the curving trajectories
+        return params, batch_size
+
     def plot_betaweights(self):
         '''
         Plot beta weights
@@ -1069,9 +1105,9 @@ ua = UnitAnalysis(save_addon)
 # ua.plot_inout_connectivity(conn_type='rec')
 # ua.plot_inout_connectivity(conn_type='rule')
 # ua.plot_inout_connectivity(conn_type='output')
-ua.prettyplot_hist_varprop()
+# ua.prettyplot_hist_varprop()
 # ua.plot_performance_choicetasks()
-#
+
 # rule = CHOICEATTEND_MOD1
 # ua.plot_performance_2D(rule=rule)
 # for lesion_group in ['1', '2', '12', '1+2']:
