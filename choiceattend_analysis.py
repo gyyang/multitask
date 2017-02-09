@@ -559,7 +559,7 @@ class StateSpaceAnalysis(object):
             'save_addon'         : save_addon,
             'analyze_threerules' : False,
             'analyze_allunits'   : False,
-            'redefine_choice'    : True,
+            'redefine_choice'    : False,
             'regress_product'    : False, # regression of interaction terms
             'z_score'            : True,
             'fast_eval'          : True,
@@ -801,10 +801,13 @@ class StateSpaceAnalysis(object):
 
     def sort_ind_bygroup(self):
         # Sort ind by group 1, 2, 12, and others
+        # ind_group are indices for the current matrix, not original
+        # ind_active_group are for original matrix
 
         ua = UnitAnalysis(self.setting['save_addon'])
 
         ind_group = dict()
+        ind_active_group = dict()
 
         for group in ['1', '2', '12', None]:
             if group is not None:
@@ -814,7 +817,10 @@ class StateSpaceAnalysis(object):
                 ind_othergroup = np.concatenate(ua.ind_lesions_orig.values())
                 ind_group[group] = [k for k, ind in enumerate(self.ind_active) if ind not in ind_othergroup]
 
-        return ind_group
+            # Transform to original matrix indices
+            ind_active_group[group] = [self.ind_active[k] for k in ind_group[group]]
+
+        return ind_group, ind_active_group
 
     def sort_coefs_bygroup(self, coefs=None):
         # Sort coefs by group 1, 2, 12, and others
@@ -822,7 +828,7 @@ class StateSpaceAnalysis(object):
         if coefs is None:
             coefs = dict() # Initialize
 
-        ind_group = self.sort_ind_bygroup()
+        ind_group, _ = self.sort_ind_bygroup()
 
         for group in ['1', '2', '12', None]:
             if group not in coefs:
@@ -1005,6 +1011,26 @@ class StateSpaceAnalysis(object):
             slow_points_trans = np.array(slow_points_trans)
             self.slow_points_trans_all[rule] = slow_points_trans
 
+    def get_regr_ind(self, choice=None, coh1=None, coh2=None, rule=None):
+        # For given choice, coh1, coh2, rule, get the indices of trials
+        ind = np.ones(self.Regrs.shape[0], dtype=bool) # initialize
+
+        if choice is not None:
+            ind *= (self.Regrs[:, 0] == choice)
+
+        if coh1 is not None:
+            ind *= (self.Regrs[:, 1] == coh1)
+
+        if coh2 is not None:
+            ind *= (self.Regrs[:, 2] == coh2)
+
+        if rule is not None:
+            j_rule = 1 if rule == CHOICEATTEND_MOD1 else -1
+            ind *= (self.Regrs[:, 3] == j_rule)
+
+        return ind
+
+
     def plot_statespace(self, plot_slowpoints=True):
         '''
         Plot state space analysis
@@ -1029,8 +1055,6 @@ class StateSpaceAnalysis(object):
         fig, axarr = plt.subplots(2, len(self.rules),
                                   sharex=True, sharey='row', figsize=(len(self.rules)*1,2))
         for i_col, rule in enumerate(self.rules):
-            j_rule = 1 if rule == CHOICEATTEND_MOD1 else -1
-
             # Different ways of separation, either by Mod1 or Mod2
             # Also different subspaces shown
             for i_row in range(2):
@@ -1069,20 +1093,25 @@ class StateSpaceAnalysis(object):
 
 
                 # Loop over coherences to choice 1, from high to low
-                for i, s in enumerate(np.unique(cohs)[::-1]):
+                for i, coh in enumerate(np.unique(cohs)[::-1]):
 
                     # Loop over choices
-                    for ch in [1, -1]:
+                    for choice in [1, -1]:
 
-                        if ch == 1:
+                        if choice == 1:
                             # Solid circles
                             kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
                         else:
                             # Empty circles
                             kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
 
+                        if i_row == 0:
+                            # Separate by coherence of Mod 1
+                            ind = self.get_regr_ind(choice=choice, coh1=coh, rule=rule) # for batch
+                        else:
+                            # Separate by coherence of Mod 2
+                            ind = self.get_regr_ind(choice=choice, coh2=coh, rule=rule) # for batch
 
-                        ind = (cohs==s)*(self.Regrs[:,3]==j_rule)*(self.Regrs[:,0]==ch) # for batch
 
                         if not np.any(ind):
                             continue
@@ -1175,13 +1204,15 @@ def plot_betaweights(save_type):
         if not os.path.isfile(fname):
             continue
 
-        ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
+        ssa = StateSpaceAnalysis(save_addon, lesion_units=None, redefine_choice=True)
+
+        # Update coefficient dictionary
         coefs = ssa.sort_coefs_bygroup(coefs)
 
     ssa.plot_betaweights(coefs, fancy_color=False)
     ssa.plot_betaweights(coefs, fancy_color=True)
 
-save_addon = 'allrule_weaknoise_200'
+save_addon = 'allrule_weaknoise_400'
 # ua = UnitAnalysis(save_addon)
 # ua.plot_inout_connectivity(conn_type='rec')
 # ua.plot_inout_connectivity(conn_type='rule')
@@ -1200,10 +1231,14 @@ save_addon = 'allrule_weaknoise_200'
 
 # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, ind_active=ua.ind_active)
 # ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
-# ssa.plot_betaweights(fancy_plot=True)
 # ssa.plot_statespace(plot_slowpoints=True)
-# ssa.get_slowpoints()
 
 # save_type = 'allrule_weaknoise'
 # plot_betaweights(save_type)
+
+
+
+# ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
+# _, ind_active_group = ssa.sort_ind_bygroup()
+# hh = ssa.H_original
 
