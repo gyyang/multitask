@@ -68,6 +68,7 @@ class UnitAnalysis(object):
 
         # First only get active units. Total variance across tasks larger than 1e-3
         ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
+        # ind_active = np.where(h_var_all.sum(axis=1) > 1e-1)[0] # TEMPORARY
         h_var_all  = h_var_all[ind_active, :]
 
         # Normalize by the total variance across tasks
@@ -558,7 +559,7 @@ class StateSpaceAnalysis(object):
             'save_addon'         : save_addon,
             'analyze_threerules' : False,
             'analyze_allunits'   : False,
-            'redefine_choice'    : False,
+            'redefine_choice'    : True,
             'regress_product'    : False, # regression of interaction terms
             'z_score'            : True,
             'fast_eval'          : True,
@@ -594,7 +595,7 @@ class StateSpaceAnalysis(object):
         # Generate task parameters used
         # Target location
         tar1_loc  = np.pi/2
-        params, batch_size = gen_taskparams(tar1_loc, n_tar=6, n_rep=2)
+        params, batch_size = self.gen_taskparams(tar1_loc, n_tar=6, n_rep=2)
         params = params
 
         x     = list() # Network input
@@ -618,6 +619,8 @@ class StateSpaceAnalysis(object):
             y_sample     = R.f_y(H)
             y_sample_loc = R.f_y_loc(y_sample)
 
+        H_original = H.copy()
+
         # Get performance and choices
         perfs = get_perf(y_sample, y_loc)
         # y_choice is 1 for choosing tar1_loc, otherwise -1
@@ -632,18 +635,24 @@ class StateSpaceAnalysis(object):
         epoch = task.epochs['tar1']
         H = H[epoch[0]:epoch[1],...][::every_t,...]
 
-        # Lumping time and trials together
         nt, nb, nh = H.shape
-        H = H.reshape((-1, nh))
 
         # Analyze all units or only active units
         if setting['analyze_allunits']:
             ind_active = range(nh)
         else:
-            ind_active = np.where(H.var(axis=0) > 1e-4)[0]
-            nh = len(ind_active) # new nh
+            if 'ind_active' in kwargs:
+                ind_active = kwargs['ind_active']
+            else:
+                # The way to select these units are important
+                # ind_active = np.where(H.reshape((-1, nh)).var(axis=0) > 1e-4)[0]
+                ind_active = np.where(H[-1].var(axis=0) > 1e-3)[0]
+                # ind_active = np.where(H[2:].var(axis=1).mean(axis=0) > 1e-4)[0]
+
+        H = H.reshape((-1, nh))
 
         H = H[:, ind_active]
+        nh = len(ind_active) # new nh
 
         # Z-scoring response across time and trials (can have a strong impact on results)
         if setting['z_score']:
@@ -754,6 +763,7 @@ class StateSpaceAnalysis(object):
         self.Regrs      = Regrs_new
         self.H          = H_new
         self.H_tran     = H_new_tran
+        self.H_original = H_original
         self.regr_names = regr_names
         self.coef       = coef_maxt
         self.rules      = rules
@@ -761,6 +771,7 @@ class StateSpaceAnalysis(object):
         self.tar1_loc   = tar1_loc
         self.q          = q
         self.lesion_units = lesion_units
+
 
     @staticmethod
     def gen_taskparams(tar1_loc, n_tar, n_rep):
@@ -788,25 +799,44 @@ class StateSpaceAnalysis(object):
                   # If tar_time is long (~1600), we can reproduce the curving trajectories
         return params, batch_size
 
-    def plot_betaweights(self):
+    @staticmethod
+    def plot_betaweights(coefs, fancy_color=False):
         '''
         Plot beta weights
         :return:
         '''
-        n_regr = 3
+
+        regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
+        colors = dict(zip([None, '1', '2', '12'],
+                           sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
 
         # Plot important comparisons
-        fig, axarr = plt.subplots(1, n_regr, sharex='col', sharey='row', figsize=(n_regr*2,2))
-        colors = sns.xkcd_palette(['grey', 'red', 'blue'])
+        fig, axarr = plt.subplots(3, 2, figsize=(4,5))
         fs = 6
-        i = 0
-        for j in range(1, 1+n_regr):
-            ax = axarr[j-1]
 
-            ax.plot(self.coef[:,j], self.coef[:, i], 'o', color='black', ms=1.5, mec='white', mew=0.2)
-            ax.set_xlabel(self.regr_names[j], fontsize=fs)
-            if j == 1:
-                ax.set_ylabel(self.regr_names[i], fontsize=fs)
+        pairs = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]
+
+        for i_plot in range(6):
+            i, j = pairs[i_plot]
+            ax = axarr[i_plot//2, i_plot%2]
+
+            for group in [None, '12', '1', '2']:
+                if group is not None:
+                    if fancy_color:
+                        color = colors[group]
+                    else:
+                        color = 'gray'
+                else:
+                    color = 'gray'
+                # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
+                ax.plot(coefs[group][:,j], coefs[group][:,i], 'o', color=color, ms=1.5, mec='white', mew=0.2)
+
+            ax.plot([-2, 2], [0, 0], color='gray')
+            ax.plot([0, 0], [-2, 2], color='gray')
+            ax.set_xlabel(regr_names[j], fontsize=fs)
+            ax.set_ylabel(regr_names[i], fontsize=fs)
+            ax.set_xlim([-2, 2])
+            ax.set_ylim([-2, 2])
 
             ax.tick_params(axis='both', which='major', labelsize=6)
             ax.locator_params(nbins=2)
@@ -818,8 +848,12 @@ class StateSpaceAnalysis(object):
         plt.tight_layout()
 
         if save:
-            plt.savefig('figure/beta_weights_sub.pdf', transparent=True)
+            save_name = 'beta_weights_sub'
+            if fancy_color:
+                save_name = save_name + '_color'
+            plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
         plt.show()
+
 
     def get_slowpoints(self):
         ####################### Find Fixed & Slow Points ######################
@@ -1099,9 +1133,37 @@ def plot_groupsize(save_type):
     ax.yaxis.set_ticks_position('left')
     plt.savefig('figure/choiceattend_groupsize'+save_type+'.pdf', transparent=True)
 
+def plot_betaweights(save_type):
+    HDIMs = range(150, 1000)
+    coefs = {}
 
-save_addon = 'allrule_weaknoise_400'
-ua = UnitAnalysis(save_addon)
+    for HDIM in HDIMs:
+        save_addon = save_type+'_'+str(HDIM)
+        fname = 'data/config'+save_addon+'.pkl'
+        if not os.path.isfile(fname):
+            continue
+
+        ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
+        ua = UnitAnalysis(save_addon)
+
+        for group in ['1', '2', '12', None]:
+            if group is not None:
+                # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
+                ind_group = [k for k, ind in enumerate(ssa.ind_active) if ind in ua.ind_lesions_orig[group]]
+            else:
+                ind_othergroup = np.concatenate(ua.ind_lesions_orig.values())
+                ind_group = [k for k, ind in enumerate(ssa.ind_active) if ind not in ind_othergroup]
+
+            if group not in coefs:
+                coefs[group] = ssa.coef[ind_group, :]
+            else:
+                coefs[group] = np.concatenate((coefs[group], ssa.coef[ind_group, :]))
+
+    ssa.plot_betaweights(coefs, fancy_color=False)
+    ssa.plot_betaweights(coefs, fancy_color=True)
+
+save_addon = 'allrule_weaknoise_200'
+# ua = UnitAnalysis(save_addon)
 # ua.plot_inout_connectivity(conn_type='rec')
 # ua.plot_inout_connectivity(conn_type='rule')
 # ua.plot_inout_connectivity(conn_type='output')
@@ -1117,18 +1179,12 @@ ua = UnitAnalysis(save_addon)
 
 # plot_groupsize('allrule_weaknoise')
 
-
-# Re-write the state space analysis
-# save_addon = 'attendonly_weaknoise_300'
-# save_addon = 'allrule_weaknoise_360'
-# save_addon = 'allrule_weaknoise_400'
-# save_addon = 'allrule_weaknoise_440'
-
-
-# la = LesionAnalysis(save_addon)
-# lesion_units = la.ind_lesions_orig['1']
-
+# ssa = StateSpaceAnalysis(save_addon, lesion_units=None, ind_active=ua.ind_active)
 # ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
-# ssa.plot_betaweights()
+# ssa.plot_betaweights(fancy_plot=True)
 # ssa.plot_statespace(plot_slowpoints=True)
 # ssa.get_slowpoints()
+
+save_type = 'allrule_weaknoise'
+plot_betaweights(save_type)
+
