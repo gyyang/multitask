@@ -799,6 +799,39 @@ class StateSpaceAnalysis(object):
                   # If tar_time is long (~1600), we can reproduce the curving trajectories
         return params, batch_size
 
+    def sort_ind_bygroup(self):
+        # Sort ind by group 1, 2, 12, and others
+
+        ua = UnitAnalysis(self.setting['save_addon'])
+
+        ind_group = dict()
+
+        for group in ['1', '2', '12', None]:
+            if group is not None:
+                # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
+                ind_group[group] = [k for k, ind in enumerate(self.ind_active) if ind in ua.ind_lesions_orig[group]]
+            else:
+                ind_othergroup = np.concatenate(ua.ind_lesions_orig.values())
+                ind_group[group] = [k for k, ind in enumerate(self.ind_active) if ind not in ind_othergroup]
+
+        return ind_group
+
+    def sort_coefs_bygroup(self, coefs=None):
+        # Sort coefs by group 1, 2, 12, and others
+
+        if coefs is None:
+            coefs = dict() # Initialize
+
+        ind_group = self.sort_ind_bygroup()
+
+        for group in ['1', '2', '12', None]:
+            if group not in coefs:
+                coefs[group] = self.coef[ind_group[group], :]
+            else:
+                coefs[group] = np.concatenate((coefs[group], self.coef[ind_group[group], :]))
+
+        return coefs
+
     @staticmethod
     def plot_betaweights(coefs, fancy_color=False):
         '''
@@ -853,7 +886,6 @@ class StateSpaceAnalysis(object):
                 save_name = save_name + '_color'
             plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
         plt.show()
-
 
     def get_slowpoints(self):
         ####################### Find Fixed & Slow Points ######################
@@ -1144,20 +1176,7 @@ def plot_betaweights(save_type):
             continue
 
         ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
-        ua = UnitAnalysis(save_addon)
-
-        for group in ['1', '2', '12', None]:
-            if group is not None:
-                # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
-                ind_group = [k for k, ind in enumerate(ssa.ind_active) if ind in ua.ind_lesions_orig[group]]
-            else:
-                ind_othergroup = np.concatenate(ua.ind_lesions_orig.values())
-                ind_group = [k for k, ind in enumerate(ssa.ind_active) if ind not in ind_othergroup]
-
-            if group not in coefs:
-                coefs[group] = ssa.coef[ind_group, :]
-            else:
-                coefs[group] = np.concatenate((coefs[group], ssa.coef[ind_group, :]))
+        coefs = ssa.sort_coefs_bygroup(coefs)
 
     ssa.plot_betaweights(coefs, fancy_color=False)
     ssa.plot_betaweights(coefs, fancy_color=True)
@@ -1185,6 +1204,6 @@ save_addon = 'allrule_weaknoise_200'
 # ssa.plot_statespace(plot_slowpoints=True)
 # ssa.get_slowpoints()
 
-save_type = 'allrule_weaknoise'
-plot_betaweights(save_type)
+# save_type = 'allrule_weaknoise'
+# plot_betaweights(save_type)
 
