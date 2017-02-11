@@ -31,6 +31,26 @@ color_rules = np.array([
             [255,0,16],[94,241,242],[0,153,143],[224,255,102],[116,10,255],
             [153,0,0],[255,255,128],[255,255,0],[255,80,5]])/255.
 
+rule_color={GO                : sns.xkcd_palette(['green'])[0],
+            DELAYGO           : sns.xkcd_palette(['olive'])[0],
+            INHGO             : sns.xkcd_palette(['light green'])[0],
+            REMAP             : sns.xkcd_palette(['mustard'])[0],
+            DELAYREMAP        : sns.xkcd_palette(['tan'])[0],
+            INHREMAP          : sns.xkcd_palette(['yellow'])[0],
+            CHOICE_MOD1       : sns.xkcd_palette(['lavender'])[0],
+            CHOICE_MOD2       : sns.xkcd_palette(['aqua'])[0],
+            CHOICEATTEND_MOD1 : sns.xkcd_palette(['bright purple'])[0],
+            CHOICEATTEND_MOD2 : sns.xkcd_palette(['cyan'])[0],
+            CHOICE_INT        : sns.xkcd_palette(['blue'])[0],
+            CHOICEDELAY_MOD1  : sns.xkcd_palette(['violet'])[0],
+            CHOICEDELAY_MOD2  : sns.xkcd_palette(['teal'])[0],
+            DMSGO             : sns.xkcd_palette(['purple'])[0],
+            DMSNOGO           : sns.xkcd_palette(['pink'])[0],
+            DMCGO             : sns.xkcd_palette(['red'])[0],
+            DMCNOGO           : sns.xkcd_palette(['orange'])[0]
+            }
+
+
 # If True, will evaluate the network with larger time steps
 fast_eval = True
 
@@ -59,8 +79,10 @@ def plot_trainingprogress(save_addon, rule_plot=None, save=True):
         rule_plot = cost_tests.keys()
 
     for i, rule in enumerate(rule_plot):
-        line = ax1.plot(x_plot, np.log10(cost_tests[rule]),color=color_rules[i%26])
-        ax2.plot(x_plot, perf_tests[rule],color=color_rules[i%26])
+        # line = ax1.plot(x_plot, np.log10(cost_tests[rule]),color=color_rules[i%26])
+        # ax2.plot(x_plot, perf_tests[rule],color=color_rules[i%26])
+        line = ax1.plot(x_plot, np.log10(cost_tests[rule]),color=rule_color[rule])
+        ax2.plot(x_plot, perf_tests[rule],color=rule_color[rule])
         lines.append(line[0])
         labels.append(rule_name[rule])
 
@@ -131,8 +153,10 @@ def plot_finalperformance(save_type):
     lines = list()
     labels = list()
     for i, rule in enumerate(rule_plot):
-        line = ax1.plot(x_plot,np.log10(final_cost[rule]),color=color_rules[i%26])
-        ax2.plot(x_plot,final_perf[rule],color=color_rules[i%26])
+        # line = ax1.plot(x_plot,np.log10(final_cost[rule]),color=color_rules[i%26])
+        # ax2.plot(x_plot,final_perf[rule],color=color_rules[i%26])
+        line = ax1.plot(x_plot,np.log10(final_cost[rule]),color=rule_color[rule])
+        ax2.plot(x_plot,final_perf[rule],color=rule_color[rule])
         lines.append(line[0])
         labels.append(rule_name[rule])
 
@@ -904,8 +928,8 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
 if __name__ == '__main__':
     pass
     # plot_trainingprogress('allrule_weaknoise_400')
-    plot_trainingprogress('oicdmconly_strongnoise_200')
-    # plot_finalperformance('allrule_weaknoise')
+    # plot_trainingprogress('oicdmconly_strongnoise_200')
+    plot_finalperformance('allrule_weaknoise')
     # plot_finalperformance('oicdmconly_strongnoise')
     # plot_finalperformance_lr()
     
