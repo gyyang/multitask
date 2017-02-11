@@ -37,10 +37,10 @@ rule_color={GO                : sns.xkcd_palette(['green'])[0],
             CHOICE_INT        : sns.xkcd_palette(['blue'])[0],
             CHOICEDELAY_MOD1  : sns.xkcd_palette(['violet'])[0],
             CHOICEDELAY_MOD2  : sns.xkcd_palette(['teal'])[0],
-            DMSGO             : sns.xkcd_palette(['purple'])[0],
-            DMSNOGO           : sns.xkcd_palette(['pink'])[0],
-            DMCGO             : sns.xkcd_palette(['red'])[0],
-            DMCNOGO           : sns.xkcd_palette(['orange'])[0]
+            DMSGO             : sns.xkcd_palette(['red'])[0],
+            DMSNOGO           : sns.xkcd_palette(['rose'])[0],
+            DMCGO             : sns.xkcd_palette(['orange'])[0],
+            DMCNOGO           : sns.xkcd_palette(['peach'])[0]
             }
 
 

@@ -261,4 +261,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
 if __name__ == '__main__':
     pass
-    train(HDIM=30, s=4, save_addon='test', training_iters=300000)
+    train(HDIM=30, s=7, save_addon='test', training_iters=300000)
