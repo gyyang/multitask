@@ -18,10 +18,23 @@ from run import Run, plot_singleneuron_intime
 
 save = True
 
+def get_dim(h):
+    # Get effective dimension
+
+    # Abbott, Rajan, Sompolinsky 2011
+    # N_eff = (\sum \lambda_i)^2 / \sum (\lambda_i^2)
+    # \lambda_i is the i-th eigenvalue
+
+    _, s, _ = np.linalg.svd(h)
+    l = s**2 # get eigenvalues
+    N_eff = (np.sum(l)**2) / np.sum(l**2)
+
+    return N_eff
+
+
 class TaskSetAnalysis(object):
     def __init__(self, save_addon, fast_eval=True):
         ########################## Running the network ################################
-        data_type = 'rule'
         rules = [GO, INHGO, DELAYGO,\
                 CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
                 CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
@@ -37,8 +50,12 @@ class TaskSetAnalysis(object):
         ########################## Running the network ################################
         n_rules = len(rules)
 
-        h_all_byrule  = OrderedDict()
-        h_all_byepoch = OrderedDict()
+        # Stimulus-averaged traces
+        h_stimavg_byrule  = OrderedDict()
+        h_stimavg_byepoch = OrderedDict()
+        # Last time points of epochs
+        h_lastt_byepoch   = OrderedDict()
+
         with Run(save_addon, sigma_rec=0, fast_eval=fast_eval) as R:
             config = R.config
             nx, nh, ny = config['shape']
@@ -48,14 +65,14 @@ class TaskSetAnalysis(object):
                 h = R.f_h(task.x)
 
                 # Average across stimulus conditions
-                h = h.mean(axis=1)
+                h_stimavg = h.mean(axis=1)
 
                 dt_new = 50
                 every_t = int(dt_new/config['dt'])
 
                 t_start = int(500/config['dt']) # Important: Ignore the initial transition
                 # Average across stimulus conditions
-                h_all_byrule[rule] = h[t_start:, :][::every_t,...]
+                h_stimavg_byrule[rule] = h_stimavg[t_start:, :][::every_t,...]
 
                 for e_name, e_time in task.epochs.iteritems():
                     if 'fix' in e_name:
@@ -63,13 +80,16 @@ class TaskSetAnalysis(object):
 
                     # if ('fix' not in e_name) and ('go' not in e_name):
                     # Take epoch
-                    h_all_byepoch[(rule, e_name)] = h[e_time[0]:e_time[1],:][::every_t,...]
+                    h_stimavg_byepoch[(rule, e_name)] = h_stimavg[e_time[0]:e_time[1],:][::every_t,...]
                     # Take last time point from epoch
                     # h_all_byepoch[(rule, e_name)] = np.mean(h[e_time[0]:e_time[1],:,:][-1], axis=1)
 
+                    h_lastt_byepoch[(rule, e_name)] = h[e_time[0]:e_time[1],:,:][-1]
+
         self.rules = rules
-        self.h_all_byrule  = h_all_byrule
-        self.h_all_byepoch = h_all_byepoch
+        self.h_stimavg_byrule  = h_stimavg_byrule
+        self.h_stimavg_byepoch = h_stimavg_byepoch
+        self.h_lastt_byepoch   = h_lastt_byepoch
         self.save_addon = save_addon
 
     @staticmethod
@@ -109,7 +129,7 @@ class TaskSetAnalysis(object):
         # Plot tasks in space
 
         # Only get last time points for each epoch
-        h = self.filter(self.h_all_byepoch, epochs=epochs, rules=rules, get_lasttimepoint=True)
+        h = self.filter(self.h_stimavg_byepoch, epochs=epochs, rules=rules, get_lasttimepoint=True)
 
         # Concatenate across rules to create dataset
         data = np.concatenate(h.values(), axis=0)
@@ -193,6 +213,31 @@ class TaskSetAnalysis(object):
             plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
 
 
+    def compute_dim(self):
+        # compute dimensions of each epoch
+
+        self.dim_lastt_byepoch = OrderedDict()
+        for key, val in self.h_lastt_byepoch.iteritems():
+            self.dim_lastt_byepoch[key] = get_dim(val)
+
+    def compute_dim_pair(self):
+        # Compute dimension of each pair of epochs, and the dimension ratio
+        self.dimpair_lastt_byepoch = OrderedDict()
+        self.dimpairratio_lastt_byepoch = OrderedDict()
+
+        for key1, val1 in h_all_byepoch.iteritems():
+            for key2, val2 in h_all_byepoch.iteritems():
+
+                h_pair = np.concatenate((val1, val2), axis=0)
+
+                dim_pair = get_dim(h_pair)
+                dim1, dim2 = self.dim_lastt_byepoch[key1], self.dim_lastt_byepoch[key2]
+
+                self.dimpair_lastt_byepoch[(key1, key2)] = dim_pair
+                self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
+
+
+
 def plot_taskspaces():
     save_addon = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(save_addon)
@@ -209,4 +254,85 @@ def plot_taskspaces():
     # epochs = ['tar1', 'delay1', 'go1']
     # epochs = None
 
+def plot_dim():
+    save_addon = 'allrule_weaknoise_400'
+    tsa = TaskSetAnalysis(save_addon)
+    tsa.compute_dim()
+
+    epoch_names = tsa.dim_lastt_byepoch.keys()
+    dims = tsa.dim_lastt_byepoch.values()
+
+    ind_sort = np.argsort(dims)
+    tick_names = [rule_name[epoch_names[i][0]] +' '+ epoch_names[i][1] for i in ind_sort]
+    dims = [dims[i] for i in ind_sort]
+
+    fig = plt.figure(figsize=(1.5,5))
+    ax = fig.add_axes([0.6,0.15,0.35,0.8])
+    ax.plot(dims,range(len(dims)), 'o-', color=sns.xkcd_palette(['cerulean'])[0], markersize=3)
+    plt.yticks(range(len(dims)),tick_names, rotation=0, ha='right', fontsize=6)
+    plt.ylim([-0.5, len(dims)-0.5])
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    plt.xlabel('Task Dim.', fontsize=7, labelpad=1)
+    plt.locator_params(axis='x',nbins=3)
+    plt.savefig('figure/temp.pdf', transparent=True)
+    plt.show()
+
+def plot_dimpair():
+    save_addon = 'allrule_weaknoise_400'
+    tsa = TaskSetAnalysis(save_addon)
+    tsa.compute_dim()
+    tsa.compute_dim_pair()
+
+
+    epoch_names = tsa.h_lastt_byepoch.keys()
+
+    # Arbitrarily define sort order for epochs
+    epoch_map = dict(zip(['tar1', 'tar2', 'delay1', 'delay2', 'go1'], range(5)))
+    epoch_names_forsort = [(en[0], epoch_map[en[1]]) for en in epoch_names]
+    ind_sort = np.lexsort(zip(*epoch_names_forsort)) # sort epoch_names first by epoch then by rule
+    epoch_names = [epoch_names[i] for i in ind_sort]
+
+
+    dimratio_pair_matrix = np.zeros((len(epoch_names), len(epoch_names)))
+    for i1, key1 in enumerate(epoch_names):
+        for i2, key2 in enumerate(epoch_names):
+            dimratio_pair_matrix[i1, i2] = dimratio_pair_byepoch[(key1, key2)]
+
+
+    figsize = (5,5)
+    rect = [0.2,0.2,0.7,0.7]
+    tick_names = [rule_name[en[0]] +' '+ en[1] for en in epoch_names]
+
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_axes(rect)
+    cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+    im = ax.imshow(2-2*dimratio_pair_matrix, aspect='equal', cmap='hot',
+                   vmin=0,vmax=1.0,interpolation='nearest',origin='lower')
+
+    if len(tick_names)<20:
+        tick_fontsize = 7
+    elif len(tick_names)<30:
+        tick_fontsize = 6
+    else:
+        tick_fontsize = 5
+
+    _ = plt.xticks(range(len(tick_names)), tick_names,
+               rotation=90, ha='left', fontsize=tick_fontsize)
+    _ = plt.yticks(range(len(tick_names)), tick_names,
+               rotation=0, va='center', fontsize=tick_fontsize)
+
+    cax = fig.add_axes([rect[0]+rect[2]+0.05, rect[1], 0.05, rect[3]])
+    cb = plt.colorbar(im, cax=cax, ticks=[0,0.5,1])
+    cb.set_label('Similarity', fontsize=7, labelpad=3)
+    plt.tick_params(axis='both', which='major', labelsize=7)
+    plt.savefig('figure/temp.pdf',transparent=True)
+
+
 # plot_taskspaces()
+
+# plot_dim()
+# plot_dimpair()
