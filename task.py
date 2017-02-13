@@ -271,11 +271,15 @@ def go(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 20
-        batch_size = a
+        n_tar_loc, n_tar_mod = batch_shape = 20, 2
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
+
         fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
-        tar_mod   = 1
+        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar_mod   = ind_tar_mod + 1
+
+
 
     # time to check the saccade location
     check_ons  = fix_offs + int(100/dt)
@@ -291,7 +295,6 @@ def go(config, mode, **kwargs):
                    'go1'      : (fix_offs, None)}
 
     return task
-
 
 def inhgo(config, mode, **kwargs):
     '''
@@ -359,6 +362,76 @@ def inhgo(config, mode, **kwargs):
 
     task.epochs = {'fix1'     : (None, tar_ons),
                    'tar1'     : (tar_ons, fix_offs),
+                   'go1'      : (fix_offs, None)}
+
+    return task
+
+def delaygo(config, mode, **kwargs):
+    '''
+    Fixate whenever fixation point is shown,
+    saccade to the location of the previously shown target
+    whenever the fixation point is off
+    Generate one batch of trials
+
+    The fixation is shown between (0, fix_off)
+    The target is shown between (tar_on, tar_off)
+
+    The output should be fixation location for (0, fix_off)
+    and the target location for (fix_off, T)
+
+    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    Optional parameters:
+    :param batch_size: Batch size (required for mode=='random')
+    :param tdim: dimension of time (required for mode=='sample')
+    :param param: a dictionary of parameters (required for mode=='explicit')
+    :return: 2 Tensor3 data array (Time, Batchsize, Units)
+    '''
+    dt = config['dt']
+    if mode == 'random': # Randomly generate parameters
+        batch_size = kwargs['batch_size']
+        # each batch consists of sequences of equal length
+        tdim = int(np.random.choice([1600,1800,2000,3000])/dt)
+
+        # A list of locations of fixation points and fixation off time
+        fix_offs = tdim - (np.ones(batch_size)*500/dt).astype(int)
+
+        # A list of locations of targets and on/off time
+        tar_locs = np.random.rand(batch_size)*2*np.pi
+        tar_ons  = (np.random.uniform(100,300,(batch_size,))/dt).astype(int)
+        tar_offs = tar_ons + int(200/dt)
+        tar_mod  = np.random.choice([1,2])
+
+    elif mode == 'sample':
+        tdim = int(2000/dt)
+        fix_offs  = np.array([int(1500/dt)])
+        tar_locs  = [1.5*np.pi]
+        tar_ons   = [int(300/dt)]
+        tar_offs  = [int(500/dt)]
+        tar_mod   = 1
+        batch_size = 1
+
+    elif mode == 'test':
+        tdim = int(2500/dt)
+        a = 20
+        batch_size = a
+        fix_offs  = int(2000/dt)
+        tar_locs  = 2*np.pi*np.arange(a)/a
+        tar_ons   = int(500/dt)
+        tar_mod   = 1
+        tar_offs  = int(700/dt)
+
+    check_ons= fix_offs + int(100/dt)
+
+    task = Task(config, tdim, batch_size)
+    task.add('fix_in', offs=fix_offs)
+    task.add('tar', tar_locs, ons=tar_ons, offs=tar_offs, mods=tar_mod)
+    task.add('fix_out', offs=fix_offs)
+    task.add('out', tar_locs, ons=fix_offs)
+    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
+
+    task.epochs = {'fix1'     : (None, tar_ons),
+                   'tar1'     : (tar_ons, tar_offs),
+                   'delay1'   : (tar_offs, fix_offs),
                    'go1'      : (fix_offs, None)}
 
     return task
@@ -853,18 +926,18 @@ def choicedelaygo_mod2(config, mode, **kwargs):
     return choicedelaygo_(config, mode, 2, **kwargs)
 
 
-def delaygo(config, mode, **kwargs):
+def remapgo(config, mode, **kwargs):
     '''
     Fixate whenever fixation point is shown,
-    saccade to the location of the previously shown target
-    whenever the fixation point is off
+    A target will be shown once the fixation is off
+    And output should saccade away from the target location
     Generate one batch of trials
 
     The fixation is shown between (0, fix_off)
-    The target is shown between (tar_on, tar_off)
+    The target is shown between (fix_off,T)
 
     The output should be fixation location for (0, fix_off)
-    and the target location for (fix_off, T)
+    Otherwise should be the anti location of the target location
 
     :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
     Optional parameters:
@@ -877,23 +950,90 @@ def delaygo(config, mode, **kwargs):
     if mode == 'random': # Randomly generate parameters
         batch_size = kwargs['batch_size']
         # each batch consists of sequences of equal length
-        tdim = int(np.random.choice([1600,1800,2000,3000])/dt)
+        tdim = int(np.random.uniform(1000,2000)/dt)
 
         # A list of locations of fixation points and fixation off time
-        fix_offs = tdim - (np.ones(batch_size)*500/dt).astype(int)
+        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
 
-        # A list of locations of targets and on/off time
-        tar_locs = np.random.rand(batch_size)*2*np.pi
-        tar_ons  = (np.random.uniform(100,300,(batch_size,))/dt).astype(int)
-        tar_offs = tar_ons + int(200/dt)
+        # A list of locations of targets (they are always on)
+        tar_locs      = np.random.uniform(0, 2*np.pi, (batch_size,))
+
         tar_mod  = np.random.choice([1,2])
 
     elif mode == 'sample':
-        tdim = int(2000/dt)
+        tdim = int(kwargs['t_tot']/dt)
         fix_offs  = np.array([int(1500/dt)])
-        tar_locs  = [1.5*np.pi]
-        tar_ons   = [int(300/dt)]
-        tar_offs  = [int(500/dt)]
+        tar_locs  = np.array([1.5*np.pi])
+        tar_mod   = 1
+        batch_size = 1
+
+    elif mode == 'test':
+        tdim = int(2500/dt)
+        n_tar_loc, n_tar_mod = batch_shape = 20, 2
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
+
+        fix_offs  = int(2000/dt)
+        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar_mod   = ind_tar_mod + 1
+
+    # time to check the saccade location
+    check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
+
+    tar_anti_locs = (tar_locs+np.pi)%(2*np.pi)
+
+    task = Task(config, tdim, batch_size)
+    task.add('fix_in', offs=fix_offs)
+    task.add('tar', tar_locs, ons=fix_offs, mods=tar_mod)
+    task.add('fix_out', offs=fix_offs)
+    task.add('out', tar_anti_locs, ons=fix_offs)
+    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
+
+    task.epochs = {'fix1'     : (None, fix_offs),
+                   'go1'      : (fix_offs, None)}
+
+    return task
+
+def inhremapgo(config, mode, **kwargs):
+    '''
+    Fixate whenever fixation point is shown,
+    A target will be shown from the beginning
+    And output should saccade away from the target location
+    Generate one batch of trials
+
+    The fixation is shown between (0, fix_off)
+    The target is shown between (0, T)
+
+    The output should be fixation location for (0, fix_off)
+    Otherwise should be the anti location of the target location
+
+    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    Optional parameters:
+    :param batch_size: Batch size (required for mode=='random')
+    :param tdim: dimension of time (required for mode=='sample')
+    :param param: a dictionary of parameters (required for mode=='explicit')
+    :return: 2 Tensor3 data array (Time, Batchsize, Units)
+    '''
+    dt = config['dt']
+    if mode == 'random': # Randomly generate parameters
+        batch_size = kwargs['batch_size']
+        # each batch consists of sequences of equal length
+        tdim = int(np.random.uniform(1000,2000)/dt)
+
+        # A list of locations of fixation points and fixation off time
+        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
+
+        # A list of locations of targets (they are always on)
+        tar_locs      = np.random.uniform(0, 2*np.pi, (batch_size,))
+        tar_mod  = np.random.choice([1,2])
+
+        tar_ons  = (np.ones(batch_size)*np.random.uniform(100,300)/dt).astype(int)
+
+    elif mode == 'sample':
+        tdim = int(kwargs['t_tot']/dt)
+        fix_offs  = np.array([int(1500/dt)])
+        tar_locs  = np.array([1.5*np.pi])
+        tar_ons   = np.array([int(300/dt)])
         tar_mod   = 1
         batch_size = 1
 
@@ -905,97 +1045,24 @@ def delaygo(config, mode, **kwargs):
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_ons   = int(500/dt)
         tar_mod   = 1
-        tar_offs  = int(700/dt)
 
-    check_ons= fix_offs + int(100/dt)
+    # time to check the saccade location
+    check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
+
+    tar_anti_locs = (tar_locs+np.pi)%(2*np.pi)
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar', tar_locs, ons=tar_ons, offs=tar_offs, mods=tar_mod)
+    task.add('tar', tar_locs, ons=tar_ons, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_locs, ons=fix_offs)
+    task.add('out', tar_anti_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
 
     task.epochs = {'fix1'     : (None, tar_ons),
-                   'tar1'     : (tar_ons, tar_offs),
-                   'delay1'   : (tar_offs, fix_offs),
+                   'tar1'     : (tar_ons, fix_offs),
                    'go1'      : (fix_offs, None)}
 
     return task
-
-
-def delaytimedgo(config, mode, **kwargs):
-    '''
-    Fixation point is always on
-    Saccade to the target location after a fixed interval following the target offset
-    Generate one batch of trials
-
-    The fixation is shown between (0, T)
-    The target is shown between (tar_on, tar_off)
-    The time difference between tar_off and the supposed saccade time sac_on is fixed:
-    sac_on = tar_off + 500
-
-    The output should be fixation location for (0, sac_on)
-    Otherwise should be the target location
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    timed_interval = 1000
-
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-
-        # Fixation and target locations
-        tar_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
-
-        # Target onset and fixation offset
-        tar_ons  = (np.random.uniform(200,600)*np.ones(batch_size)/dt).astype(int)
-        tar_offs = tar_ons + (np.random.uniform(200,400)*np.ones(batch_size)/dt).astype(int)
-        sac_ons  = tar_offs + int(timed_interval/dt)
-
-        # each batch consists of sequences of equal length
-        tdim = max(sac_ons) + int(500/dt)
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        tar_ons   = [int(200/dt)]
-        tar_offs  = [int(300/dt)]
-        sac_ons   = np.array([int((300+timed_interval)/dt)])
-        tar_locs  = [1.5*np.pi]
-        batch_size = 1
-
-    elif mode == 'test':
-        tdim = int(2500/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
-        sac_ons   = int(2000/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
-        tar_ons   = int(500/dt)
-        tar_offs  = int(1000/dt)
-
-    # time to check the saccade location
-    check_ons  = sac_ons + int(100/dt)
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in')
-    task.add('tar', tar_locs, ons=tar_ons, offs=tar_offs)
-    task.add('fix_out', offs=sac_ons)
-    task.add('out', tar_locs, ons=sac_ons)
-    task.add_c_mask(pre_offs=sac_ons, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, tar_ons),
-                   'tar1'     : (tar_ons, tar_offs),
-                   'delay1'   : (tar_offs, sac_ons),
-                   'go1'      : (sac_ons, None)}
-
-    return task
-
 
 def delayremapgo(config, mode, **kwargs):
     '''
@@ -1068,214 +1135,6 @@ def delayremapgo(config, mode, **kwargs):
     task.epochs = {'fix1'     : (None, tar_ons),
                    'tar1'     : (tar_ons, tar_offs),
                    'delay1'   : (tar_offs, fix_offs),
-                   'go1'      : (fix_offs, None)}
-
-    return task
-
-
-def timedgo(config, mode, **kwargs):
-    '''
-    Fixation point is always on
-    Saccade to the target location after a fixed interval following the target onset
-    Generate one batch of trials
-
-    The fixation is shown between (0, T)
-    The target is shown between (tar_on, T)
-    The time difference between tar_on and the supposed saccade time sac_on is fixed:
-    sac_on = tar_on + 500
-
-    The output should be fixation location for (0, sac_on)
-    Otherwise should be the target location
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    timed_interval = 1000
-
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-
-        # Fixation and target locations
-        tar_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
-
-        # Target onset and fixation offset
-        tar_ons  = (np.random.uniform(200,600)*np.ones(batch_size)/dt).astype(int)
-        sac_ons  = tar_ons + int(timed_interval/dt)
-
-        # each batch consists of sequences of equal length
-        tdim = max(sac_ons) + int(500/dt)
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        tar_ons   = [int(200/dt)]
-        sac_ons   = np.array([int((200+timed_interval)/dt)])
-        tar_locs  = [1.5*np.pi]
-        batch_size = 1
-
-    elif mode == 'test':
-        tdim = int(2000/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
-        tar_ons   = int(500/dt)
-        sac_ons   = int(1000/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
-
-    # time to check the saccade location
-    check_ons  = sac_ons + int(100/dt)
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in')
-    task.add('tar', tar_locs, ons=tar_ons)
-    task.add('fix_out', offs=sac_ons)
-    task.add('out', tar_locs, ons=sac_ons)
-    task.add_c_mask(pre_offs=sac_ons, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, tar_ons),
-                   'tar1'     : (tar_ons, sac_ons),
-                   'go1'      : (sac_ons, None)}
-
-    return task
-
-
-def remapgo(config, mode, **kwargs):
-    '''
-    Fixate whenever fixation point is shown,
-    A target will be shown once the fixation is off
-    And output should saccade away from the target location
-    Generate one batch of trials
-
-    The fixation is shown between (0, fix_off)
-    The target is shown between (fix_off,T)
-
-    The output should be fixation location for (0, fix_off)
-    Otherwise should be the anti location of the target location
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,2000)/dt)
-
-        # A list of locations of fixation points and fixation off time
-        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
-
-        # A list of locations of targets (they are always on)
-        tar_locs      = np.random.uniform(0, 2*np.pi, (batch_size,))
-
-        tar_mod  = np.random.choice([1,2])
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(1500/dt)])
-        tar_locs  = np.array([1.5*np.pi])
-        tar_mod   = 1
-        batch_size = 1
-
-    elif mode == 'test':
-        tdim = int(2500/dt)
-        a = 20
-        batch_size = a
-        fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
-
-        tar_mod   = 1
-
-    # time to check the saccade location
-    check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
-
-    tar_anti_locs = (tar_locs+np.pi)%(2*np.pi)
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in', offs=fix_offs)
-    task.add('tar', tar_locs, ons=fix_offs, mods=tar_mod)
-    task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_anti_locs, ons=fix_offs)
-    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, fix_offs),
-                   'go1'      : (fix_offs, None)}
-
-    return task
-
-
-def inhremapgo(config, mode, **kwargs):
-    '''
-    Fixate whenever fixation point is shown,
-    A target will be shown from the beginning
-    And output should saccade away from the target location
-    Generate one batch of trials
-
-    The fixation is shown between (0, fix_off)
-    The target is shown between (0, T)
-
-    The output should be fixation location for (0, fix_off)
-    Otherwise should be the anti location of the target location
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,2000)/dt)
-
-        # A list of locations of fixation points and fixation off time
-        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
-
-        # A list of locations of targets (they are always on)
-        tar_locs      = np.random.uniform(0, 2*np.pi, (batch_size,))
-        tar_mod  = np.random.choice([1,2])
-
-        tar_ons  = (np.ones(batch_size)*np.random.uniform(100,300)/dt).astype(int)
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(1500/dt)])
-        tar_locs  = np.array([1.5*np.pi])
-        tar_ons   = np.array([int(300/dt)])
-        tar_mod   = 1
-        batch_size = 1
-
-    elif mode == 'test':
-        tdim = int(2500/dt)
-        a = 20
-        batch_size = a
-        fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
-        tar_ons   = int(500/dt)
-        tar_mod   = 1
-
-    # time to check the saccade location
-    check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
-
-    tar_anti_locs = (tar_locs+np.pi)%(2*np.pi)
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in', offs=fix_offs)
-    task.add('tar', tar_locs, ons=tar_ons, mods=tar_mod)
-    task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_anti_locs, ons=fix_offs)
-    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, tar_ons),
-                   'tar1'     : (tar_ons, fix_offs),
                    'go1'      : (fix_offs, None)}
 
     return task
@@ -1414,77 +1273,6 @@ def delaymatchsamplego(config, mode, **kwargs):
 
 def delaymatchsamplenogo(config, mode, **kwargs):
     return delaymatchsample_(config, mode, 1, **kwargs)
-
-def intervalreproduction(config, mode, **kwargs):
-    '''
-    Reproduce a temporal interval
-    A stimulus in mod 2 is shown twice, with a certain time interval Dt
-    The model should go to the location of the location of the stimulus in mod 1 after time Dt
-    following the second appearance of the stimulus in mod 2
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    tar1_mod2_ons = int(200/dt)
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        interval  = int(np.random.uniform(500,1000)/dt)
-
-        # Location of target
-        tar_mod1_locs  = np.random.rand(batch_size)*2*np.pi
-
-        tar1_mod2_ons  = int(np.random.uniform(100,300)/dt)
-
-    elif mode == 'sample':
-        batch_size     = 1
-        tar_mod1_locs  = np.array([1.0*np.pi])
-        interval  = int(750/dt)
-
-    elif mode == 'test':
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
-        tar_mod1_locs  = 2*np.pi*np.arange(a)/a
-        interval  = int(750/dt)
-
-    elif mode == 'psychometric':
-        p = kwargs['params']
-        interval      = int(p['interval']/dt)
-        tar_mod1_locs = p['tar_mod1_locs']
-        batch_size    = len(tar_mod1_locs)
-
-
-    tar1_mod2_locs  = (tar_mod1_locs+np.pi)%(2*np.pi)
-    tar2_mod2_locs  = (tar_mod1_locs+np.pi/2)%(2*np.pi)
-    tar1_mod2_offs = tar1_mod2_ons + int(100/dt)
-    tar2_mod2_ons  = tar1_mod2_ons + interval
-    tar2_mod2_offs = tar2_mod2_ons + int(100/dt)
-    sac_ons        = tar2_mod2_ons + interval
-    tdim           = sac_ons + int(400/dt)
-    check_ons      = sac_ons + int(100/dt)
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in')
-    task.add('tar_mod1', tar_mod1_locs)
-    task.add('tar_mod2', tar1_mod2_locs, ons=tar1_mod2_ons, offs=tar1_mod2_offs)
-    task.add('tar_mod2', tar2_mod2_locs, ons=tar2_mod2_ons, offs=tar2_mod2_offs)
-    task.add('fix_out', offs=sac_ons)
-    task.add('out', tar_mod1_locs, ons=sac_ons)
-    task.add_c_mask(pre_offs=sac_ons, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, tar1_mod2_ons),
-                   'tar1'     : (tar1_mod2_ons, tar1_mod2_offs),
-                   'delay1'   : (tar1_mod2_offs, tar2_mod2_ons),
-                   'tar2'     : (tar2_mod2_ons, tar2_mod2_offs),
-                   'delay2'   : (tar2_mod2_offs, sac_ons),
-                   'go1'      : (sac_ons, None)}
-
-    return task
 
 
 def delaymatchcategory_(config, mode, matchnogo, **kwargs):
@@ -1824,6 +1612,216 @@ def delaymatchcategory_original(config, mode, **kwargs):
 
     return task
 
+def timedgo(config, mode, **kwargs):
+    '''
+    Fixation point is always on
+    Saccade to the target location after a fixed interval following the target onset
+    Generate one batch of trials
+
+    The fixation is shown between (0, T)
+    The target is shown between (tar_on, T)
+    The time difference between tar_on and the supposed saccade time sac_on is fixed:
+    sac_on = tar_on + 500
+
+    The output should be fixation location for (0, sac_on)
+    Otherwise should be the target location
+
+    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    Optional parameters:
+    :param batch_size: Batch size (required for mode=='random')
+    :param tdim: dimension of time (required for mode=='sample')
+    :param param: a dictionary of parameters (required for mode=='explicit')
+    :return: 2 Tensor3 data array (Time, Batchsize, Units)
+    '''
+    dt = config['dt']
+    timed_interval = 1000
+
+    if mode == 'random': # Randomly generate parameters
+        batch_size = kwargs['batch_size']
+
+        # Fixation and target locations
+        tar_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
+
+        # Target onset and fixation offset
+        tar_ons  = (np.random.uniform(200,600)*np.ones(batch_size)/dt).astype(int)
+        sac_ons  = tar_ons + int(timed_interval/dt)
+
+        # each batch consists of sequences of equal length
+        tdim = max(sac_ons) + int(500/dt)
+
+    elif mode == 'sample':
+        tdim = int(kwargs['t_tot']/dt)
+        tar_ons   = [int(200/dt)]
+        sac_ons   = np.array([int((200+timed_interval)/dt)])
+        tar_locs  = [1.5*np.pi]
+        batch_size = 1
+
+    elif mode == 'test':
+        tdim = int(2000/dt)
+        a = 2**BS_EXPO
+        batch_size = 2**BS_EXPO
+        tar_ons   = int(500/dt)
+        sac_ons   = int(1000/dt)
+        tar_locs  = 2*np.pi*np.arange(a)/a
+
+    # time to check the saccade location
+    check_ons  = sac_ons + int(100/dt)
+
+    task = Task(config, tdim, batch_size)
+    task.add('fix_in')
+    task.add('tar', tar_locs, ons=tar_ons)
+    task.add('fix_out', offs=sac_ons)
+    task.add('out', tar_locs, ons=sac_ons)
+    task.add_c_mask(pre_offs=sac_ons, post_ons=check_ons)
+
+    task.epochs = {'fix1'     : (None, tar_ons),
+                   'tar1'     : (tar_ons, sac_ons),
+                   'go1'      : (sac_ons, None)}
+
+    return task
+
+def delaytimedgo(config, mode, **kwargs):
+    '''
+    Fixation point is always on
+    Saccade to the target location after a fixed interval following the target offset
+    Generate one batch of trials
+
+    The fixation is shown between (0, T)
+    The target is shown between (tar_on, tar_off)
+    The time difference between tar_off and the supposed saccade time sac_on is fixed:
+    sac_on = tar_off + 500
+
+    The output should be fixation location for (0, sac_on)
+    Otherwise should be the target location
+
+    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    Optional parameters:
+    :param batch_size: Batch size (required for mode=='random')
+    :param tdim: dimension of time (required for mode=='sample')
+    :param param: a dictionary of parameters (required for mode=='explicit')
+    :return: 2 Tensor3 data array (Time, Batchsize, Units)
+    '''
+    dt = config['dt']
+    timed_interval = 1000
+
+    if mode == 'random': # Randomly generate parameters
+        batch_size = kwargs['batch_size']
+
+        # Fixation and target locations
+        tar_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
+
+        # Target onset and fixation offset
+        tar_ons  = (np.random.uniform(200,600)*np.ones(batch_size)/dt).astype(int)
+        tar_offs = tar_ons + (np.random.uniform(200,400)*np.ones(batch_size)/dt).astype(int)
+        sac_ons  = tar_offs + int(timed_interval/dt)
+
+        # each batch consists of sequences of equal length
+        tdim = max(sac_ons) + int(500/dt)
+
+    elif mode == 'sample':
+        tdim = int(kwargs['t_tot']/dt)
+        tar_ons   = [int(200/dt)]
+        tar_offs  = [int(300/dt)]
+        sac_ons   = np.array([int((300+timed_interval)/dt)])
+        tar_locs  = [1.5*np.pi]
+        batch_size = 1
+
+    elif mode == 'test':
+        tdim = int(2500/dt)
+        a = 2**BS_EXPO
+        batch_size = 2**BS_EXPO
+        sac_ons   = int(2000/dt)
+        tar_locs  = 2*np.pi*np.arange(a)/a
+        tar_ons   = int(500/dt)
+        tar_offs  = int(1000/dt)
+
+    # time to check the saccade location
+    check_ons  = sac_ons + int(100/dt)
+
+    task = Task(config, tdim, batch_size)
+    task.add('fix_in')
+    task.add('tar', tar_locs, ons=tar_ons, offs=tar_offs)
+    task.add('fix_out', offs=sac_ons)
+    task.add('out', tar_locs, ons=sac_ons)
+    task.add_c_mask(pre_offs=sac_ons, post_ons=check_ons)
+
+    task.epochs = {'fix1'     : (None, tar_ons),
+                   'tar1'     : (tar_ons, tar_offs),
+                   'delay1'   : (tar_offs, sac_ons),
+                   'go1'      : (sac_ons, None)}
+
+    return task
+
+def intervalreproduction(config, mode, **kwargs):
+    '''
+    Reproduce a temporal interval
+    A stimulus in mod 2 is shown twice, with a certain time interval Dt
+    The model should go to the location of the location of the stimulus in mod 1 after time Dt
+    following the second appearance of the stimulus in mod 2
+
+    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    Optional parameters:
+    :param batch_size: Batch size (required for mode=='random')
+    :param tdim: dimension of time (required for mode=='sample')
+    :param param: a dictionary of parameters (required for mode=='explicit')
+    :return: 2 Tensor3 data array (Time, Batchsize, Units)
+    '''
+    dt = config['dt']
+    tar1_mod2_ons = int(200/dt)
+    if mode == 'random': # Randomly generate parameters
+        batch_size = kwargs['batch_size']
+        # each batch consists of sequences of equal length
+        interval  = int(np.random.uniform(500,1000)/dt)
+
+        # Location of target
+        tar_mod1_locs  = np.random.rand(batch_size)*2*np.pi
+
+        tar1_mod2_ons  = int(np.random.uniform(100,300)/dt)
+
+    elif mode == 'sample':
+        batch_size     = 1
+        tar_mod1_locs  = np.array([1.0*np.pi])
+        interval  = int(750/dt)
+
+    elif mode == 'test':
+        a = 2**BS_EXPO
+        batch_size = 2**BS_EXPO
+        tar_mod1_locs  = 2*np.pi*np.arange(a)/a
+        interval  = int(750/dt)
+
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        interval      = int(p['interval']/dt)
+        tar_mod1_locs = p['tar_mod1_locs']
+        batch_size    = len(tar_mod1_locs)
+
+
+    tar1_mod2_locs  = (tar_mod1_locs+np.pi)%(2*np.pi)
+    tar2_mod2_locs  = (tar_mod1_locs+np.pi/2)%(2*np.pi)
+    tar1_mod2_offs = tar1_mod2_ons + int(100/dt)
+    tar2_mod2_ons  = tar1_mod2_ons + interval
+    tar2_mod2_offs = tar2_mod2_ons + int(100/dt)
+    sac_ons        = tar2_mod2_ons + interval
+    tdim           = sac_ons + int(400/dt)
+    check_ons      = sac_ons + int(100/dt)
+
+    task = Task(config, tdim, batch_size)
+    task.add('fix_in')
+    task.add('tar_mod1', tar_mod1_locs)
+    task.add('tar_mod2', tar1_mod2_locs, ons=tar1_mod2_ons, offs=tar1_mod2_offs)
+    task.add('tar_mod2', tar2_mod2_locs, ons=tar2_mod2_ons, offs=tar2_mod2_offs)
+    task.add('fix_out', offs=sac_ons)
+    task.add('out', tar_mod1_locs, ons=sac_ons)
+    task.add_c_mask(pre_offs=sac_ons, post_ons=check_ons)
+
+    task.epochs = {'fix1'     : (None, tar1_mod2_ons),
+                   'tar1'     : (tar1_mod2_ons, tar1_mod2_offs),
+                   'delay1'   : (tar1_mod2_offs, tar2_mod2_ons),
+                   'tar2'     : (tar2_mod2_ons, tar2_mod2_offs),
+                   'delay2'   : (tar2_mod2_offs, sac_ons),
+                   'go1'      : (sac_ons, None)}
+
+    return task
 
 
 rule_mapping = {TEST_INIT               : test_init,
