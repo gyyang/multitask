@@ -1887,39 +1887,32 @@ rule_name    = {FIXATION                : 'Fixation',
 # Rule features
 #-----------------------------------------------------------------------------------------
 
-# Mod1, Mod2, Inh, Choice, Delay, Timed, Remap, Match = range(8)
-#
-# features = [Mod1, Mod2, Inh, Choice, Delay, Timed, Remap, Match]
-#
-# feature_names = {Mod1   : 'Mod 1',
-#                  Mod2   : 'Mod 2',
-#                  Inh    : 'Inh. Control',
-#                  Choice : 'Choice',
-#                  Delay  : 'Delay',
-#                  Timed  : 'Timed',
-#                  Remap  : 'Remap',
-#                  Match  : 'Match'}
-#
-# rule_features= {FIXATION            : [],
-#                 GO                  : [Mod1, Mod2],
-#                 DELAYGO             : [Mod1, Mod2, Inh, Delay],
-#                 CHOICE_MOD1         : [Mod1, Inh, Choice],
-#                 CHOICE_MOD2         : [Mod2, Inh, Choice],
-#                 CHOICEATTEND_MOD1   : [Mod1, Mod2, Inh, Choice],
-#                 CHOICEATTEND_MOD2   : [Mod1, Mod2, Inh, Choice],
-#                 CHOICE_INT          : [Mod1, Mod2, Inh, Choice],
-#                 CHOICEDELAY_MOD1    : [Mod1, Inh, Choice, Delay],
-#                 CHOICEDELAY_MOD1_COPY : [Mod1, Inh, Choice, Delay],
-#                 CHOICEDELAY_MOD2    : [Mod2, Inh, Choice, Delay],
-#                 TIMEDGO             : [Mod1, Mod2, Inh, Timed],
-#                 DELAYTIMEDGO        : [Mod1, Mod2, Inh, Timed, Delay],
-#                 INHGO               : [Mod1, Mod2, Inh],
-#                 REMAP               : [Mod1, Mod2, Remap],
-#                 DELAYREMAP          : [Mod1, Mod2, Inh, Delay, Remap],
-#                 INHREMAP            : [Mod1, Mod2, Inh, Remap],
-#                 DMSGO        : [Mod1, Mod2, Inh, Match, Delay],
-#                 DMSNOGO      : [Mod1, Mod2, Inh, Match, Delay],
-#                 INTREPRO            : [Mod1, Mod2, Inh, Timed, Delay]}
+
+Delay, Decision, InhControl, Anti, Match = features = range(5)
+
+feature_names = {Delay : 'Delay',
+                 Decision: 'Decision',
+                 InhControl: 'Inh Ctrl',
+                 Anti: 'Anti',
+                 Match: 'Match'}
+
+rule_features= {GO                  : [],
+                INHGO               : [InhControl],
+                DELAYGO             : [Delay],
+                CHOICE_MOD1         : [Decision],
+                CHOICE_MOD2         : [Decision],
+                CHOICEATTEND_MOD1   : [Decision],
+                CHOICEATTEND_MOD2   : [Decision],
+                CHOICE_INT          : [Decision],
+                CHOICEDELAY_MOD1    : [Delay, Decision],
+                CHOICEDELAY_MOD2    : [Delay, Decision],
+                REMAP               : [Anti],
+                INHREMAP            : [InhControl, Anti],
+                DELAYREMAP          : [Delay, Anti],
+                DMSGO               : [Delay, Match],
+                DMSNOGO             : [Delay, Match],
+                DMCGO               : [Delay, Match],
+                DMCNOGO             : [Delay, Match]}
 
 def generate_onebatch(rule, config, mode, noise_on=True, **kwargs):
     '''
