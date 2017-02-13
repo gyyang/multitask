@@ -1280,6 +1280,36 @@ def plot_betaweights(save_type):
     ssa.plot_betaweights(coefs, fancy_color=False)
     ssa.plot_betaweights(coefs, fancy_color=True)
 
+def quick_statespace(save_addon):
+    # Quick state space analysis from mode='test'
+    rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+    h_lastts = dict()
+    with Run(save_addon, sigma_rec=0, fast_eval=True) as R:
+        config = R.config
+
+        for rule in rules:
+            task = generate_onebatch(rule=rule, config=config, mode='test')
+            h = R.f_h(task.x)
+            lastt = task.epochs['tar1'][-1]
+            h_lastts[rule] = h[lastt,:,:]
+
+    from sklearn.decomposition import PCA
+    model = PCA(n_components=5)
+    model.fit(np.concatenate(h_lastts.values(), axis=0))
+    fig = plt.figure(figsize=(2,2))
+    ax = fig.add_axes([.3, .3, .6, .6])
+    for rule, color in zip(rules, ['red', 'blue']):
+        data_trans = model.transform(h_lastts[rule])
+        ax.scatter(data_trans[:, 0], data_trans[:, 1], s=1,
+                   label=rule_name[rule], color=color)
+    plt.tick_params(axis='both', which='major', labelsize=7)
+    ax.set_xlabel('PC 1', fontsize=7)
+    ax.set_ylabel('PC 2', fontsize=7)
+    lg = ax.legend(fontsize=7, ncol=1, bbox_to_anchor=(1,0.3),
+                   loc=1, frameon=False)
+    if save:
+        plt.savefig('figure/choiceatt_quickstatespace.pdf',transparent=True)
+
 ######################### Connectivity and Lesioning ##########################
 save_addon = 'allrule_weaknoise_400'
 # ua = UnitAnalysis(save_addon)
@@ -1310,3 +1340,6 @@ save_addon = 'allrule_weaknoise_400'
 # Plot units in time
 # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, z_score=False)
 # ssa.plot_units_intime()
+
+# Quick state space analysis 
+# quick_statespace(save_addon)
