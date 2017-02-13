@@ -55,9 +55,6 @@ def get_dist(original_dist): # Get the distance in periodic boundary conditions
 # Tasks
 #-----------------------------------------------------------------------------------------
 
-# BS_EXPO = 12 # 2-exponent for the batch-size during testing
-BS_EXPO = 6 # 2-exponent for the batch-size during testing
-
 class Task(object):
     def __init__(self, config, tdim, batch_size):
         '''
@@ -105,7 +102,7 @@ class Task(object):
             var = [var] * self.batch_size
         return var
 
-    def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1):
+    def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1, mods=None):
         '''
         Add an input or target output
         locs not needed for fix_in or fix_out loc_type
@@ -113,12 +110,14 @@ class Task(object):
         ons         = self.expand(ons)
         offs        = self.expand(offs)
         strengths   = self.expand(strengths)
+        mods        = self.expand(mods)
 
         for i in range(self.batch_size):
             if loc_type == 'fix_in':
                 self.x[ons[i]:offs[i],i,self.slices[loc_type]] = 1
-            elif 'tar_mod' in loc_type:
-                self.x[ons[i]:offs[i],i,self.slices[loc_type]] += self.add_x_loc(locs[i])*strengths[i]
+            elif loc_type == 'tar':
+                mod = 'tar_mod{:d}'.format(mods[i])
+                self.x[ons[i]:offs[i],i,self.slices[mod]] += self.add_x_loc(locs[i])*strengths[i]
             elif loc_type == 'fix_out':
                 # Notice this shouldn't be set at 1, because the output is logistic and saturates at 1
                 self.y[ons[i]:offs[i],i,self.slices[loc_type]] = 0.8
@@ -272,8 +271,8 @@ def go(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
+        a = 20
+        batch_size = a
         fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_mod   = 1
@@ -341,8 +340,8 @@ def inhgo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
+        a = 20
+        batch_size = a
         fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_ons   = int(500/dt)
@@ -422,16 +421,17 @@ def choicego_(config, mode, tar_mod, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
+        # Dense coverage of the stimulus space
         tdim = int(2500/dt)
-        a = 2**(BS_EXPO//3)
-        batch_size = 2**BS_EXPO
-        ind_tar_loc, ind_tar1_strength, ind_tar2_strength = np.unravel_index(range(batch_size),(a,a,a))
+        n_tar_loc, n_tar1_strength = batch_shape = 20, 5
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar1_strength = np.unravel_index(range(batch_size),batch_shape)
         fix_offs  = int(2000/dt)
 
-        tar1_locs = 2*np.pi*ind_tar_loc/a
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-        tar1_strengths = 0.4*ind_tar1_strength/a+0.8
-        tar2_strengths = 0.4*ind_tar2_strength/a+0.8
+        tar1_strengths = 0.4*ind_tar1_strength/n_tar1_strength+0.8
+        tar2_strengths = 2 - tar1_strengths
         tar_ons  = int(500/dt)
 
     elif mode == 'psychometric':
@@ -550,16 +550,16 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**(BS_EXPO//3)
-        batch_size = 2**BS_EXPO
-        ind_tar_loc, ind_tar_mod1_strength, ind_tar_mod2_strength = np.unravel_index(range(batch_size),(a,a,a))
+        n_tar_loc, n_tar_mod1_strength, n_tar_mod2_strength = batch_shape = 20, 5, 5
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar_mod1_strength, ind_tar_mod2_strength = np.unravel_index(range(batch_size),batch_shape)
         fix_offs  = int(2000/dt)
 
-        tar1_locs = 2*np.pi*ind_tar_loc/a
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-        tar1_mod1_strengths = 0.4*ind_tar_mod1_strength/a+0.8
+        tar1_mod1_strengths = 0.4*ind_tar_mod1_strength/n_tar_mod1_strength+0.8
         tar2_mod1_strengths = 2 - tar1_mod1_strengths
-        tar1_mod2_strengths = 0.4*ind_tar_mod2_strength/a+0.8
+        tar1_mod2_strengths = 0.4*ind_tar_mod2_strength/n_tar_mod2_strength+0.8
         tar2_mod2_strengths = 2 - tar1_mod2_strengths
         tar_ons  = int(500/dt)
 
@@ -675,15 +675,15 @@ def choicego_int(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**(BS_EXPO//3)
-        batch_size = 2**BS_EXPO
-        ind_tar_loc, ind_tar1_strength, ind_tar2_strength = np.unravel_index(range(batch_size),(a,a,a))
+        n_tar_loc, n_tar_mod1_strength = batch_shape = 20, 5
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar_mod1_strength = np.unravel_index(range(batch_size),batch_shape)
         fix_offs  = int(2000/dt)
 
-        tar1_locs = 2*np.pi*ind_tar_loc/a
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-        tar1_mod1_strengths = 0.4*ind_tar1_strength/a+0.8
-        tar2_mod1_strengths = 0.4*ind_tar2_strength/a+0.8
+        tar1_mod1_strengths = 0.4*ind_tar_mod1_strength/n_tar_mod1_strength+0.8
+        tar2_mod1_strengths = 2 - tar1_mod1_strengths
         tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
         tar_ons  = int(500/dt)
 
@@ -793,14 +793,15 @@ def choicedelaygo_(config, mode, tar_mod, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**(BS_EXPO//3)
-        batch_size = 2**BS_EXPO
-        ind_tar_loc, ind_tar1_strength, ind_tar2_strength = np.unravel_index(range(batch_size),(a,a,a))
+        n_tar_loc, n_tar1_strength = batch_shape = 20, 5
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar1_strength = np.unravel_index(range(batch_size),batch_shape)
+
         fix_offs  = int(2000/dt)
-        tar1_locs = 2*np.pi*ind_tar_loc/a
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-        tar1_strengths = 1.0*ind_tar1_strength/a+0.5
-        tar2_strengths = 1.0*ind_tar2_strength/a+0.5
+        tar1_strengths = 1.0*ind_tar1_strength/n_tar1_strength+0.5
+        tar2_strengths = 2 - tar1_strengths
         tar1_ons = int(500/dt)
         tar1_offs = int(800/dt)
         tar2_ons = int(1600/dt)
@@ -898,8 +899,8 @@ def delaygo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
+        a = 20
+        batch_size = a
         fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_ons   = int(500/dt)
@@ -1044,8 +1045,8 @@ def delayremapgo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
+        a = 20
+        batch_size = 20
         fix_offs  = int(2000/dt)
         tar_ons   = int(500/dt)
         tar_offs  = int(800/dt)
@@ -1184,8 +1185,8 @@ def remapgo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
+        a = 20
+        batch_size = a
         fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_mod   = 1
@@ -1253,8 +1254,8 @@ def inhremapgo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
+        a = 20
+        batch_size = a
         fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
         tar_ons   = int(500/dt)
@@ -1267,7 +1268,7 @@ def inhremapgo(config, mode, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod'+str(tar_mod), tar_locs, ons=tar_ons)
+    task.add('tar', tar_locs, ons=tar_ons, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
     task.add('out', tar_anti_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
@@ -1344,16 +1345,20 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
     elif mode == 'test':
         # Set this test so the model always respond
         tdim = int(2500/dt)
-        a = 2**BS_EXPO
-        batch_size = 2**BS_EXPO
-        tar1_locs = 2*np.pi*np.arange(a)/a
+        n_tar_loc, n_mod1, n_mod2 = batch_shape = 20, 2, 2
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_mod1, ind_mod2 = np.unravel_index(range(batch_size),batch_shape)
+
+        tar1_mod = ind_mod1 + 1
+        tar2_mod = ind_mod2 + 1
+
+        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         matchs = (1 - matchnogo)*np.ones(batch_size) # make sure the response is Go
         tar2_locs = (tar1_locs+np.pi*(1-matchs))%(2*np.pi)
+
         tar1_ons  = int(500/dt)
         tar1_offs = int(800/dt)
         tar2_ons  = int(2000/dt)
-        tar1_mod = 1
-        tar2_mod = 1
 
     elif mode == 'psychometric':
         p = kwargs['params']
@@ -1375,8 +1380,8 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
     task = Task(config, tdim, batch_size)
 
     task.add('fix_in')
-    task.add('tar_mod'+str(tar1_mod), tar1_locs, ons=tar1_ons, offs=tar1_offs)
-    task.add('tar_mod'+str(tar2_mod), tar2_locs, ons=tar2_ons)
+    task.add('tar', tar1_locs, ons=tar1_ons, offs=tar1_offs, mods=tar1_mod)
+    task.add('tar', tar2_locs, ons=tar2_ons, mods=tar2_mod)
 
     if hasattr(tar2_ons, '__iter__'):
         fix_out_offs = list(tar2_ons)
@@ -1540,17 +1545,23 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
 
     elif mode == 'test':
         # Set this test so the model always respond
-        a = 2**(BS_EXPO-1)
-        batch_size = 2**BS_EXPO
-        #tar1_locs = 2*np.pi*np.arange(a)/a ##TODO: Change it so it doesn't include boundary case!
-        tar1_locs = np.concatenate(((0.1+0.8*np.arange(a)/a),(1.1+0.8*np.arange(a)/a)))*np.pi
+        n_tar_loc, n_mod1, n_mod2 = batch_shape = 20, 2, 2
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_mod1, ind_mod2 = np.unravel_index(range(batch_size),batch_shape)
+
+        tar1_mod = ind_mod1 + 1
+        tar2_mod = ind_mod2 + 1
+
+        n_tar_loc2 = n_tar_loc/2
+        tar1_locs_ = np.concatenate(((0.1+0.8*np.arange(n_tar_loc2)/n_tar_loc2),
+                                    (1.1+0.8*np.arange(n_tar_loc2)/n_tar_loc2)))*np.pi
+        tar1_locs = [tar1_locs_[i] for i in ind_tar_loc]
         matchs = (1 - matchnogo)*np.ones(batch_size) # make sure the response is Go
         tar2_locs = (tar1_locs+np.pi*(1-matchs))%(2*np.pi)
+
         tar1_ons  = int(500/dt)
         tar1_offs = tar1_ons + int(300/dt)
         tar2_ons  = tar1_offs + int(1200/dt)
-        tar1_mod = 1
-        tar2_mod = 1
         tdim = tar2_ons + int(500/dt)
 
     elif mode == 'psychometric':
@@ -1576,8 +1587,8 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
     task = Task(config, tdim, batch_size)
 
     task.add('fix_in')
-    task.add('tar_mod'+str(tar1_mod), tar1_locs, ons=tar1_ons, offs=tar1_offs)
-    task.add('tar_mod'+str(tar2_mod), tar2_locs, ons=tar2_ons)
+    task.add('tar', tar1_locs, ons=tar1_ons, offs=tar1_offs, mods=tar1_mod)
+    task.add('tar', tar2_locs, ons=tar2_ons, mods=tar2_mod)
 
     if hasattr(tar2_ons, '__iter__'):
         fix_out_offs = list(tar2_ons)
