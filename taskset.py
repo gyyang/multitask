@@ -18,19 +18,22 @@ from run import Run, plot_singleneuron_intime
 
 save = True
 
-def get_dim(h):
+def get_dim(h, zero_mean=False):
     # Get effective dimension
+    # h : (n_samples, n_features)
 
     # Abbott, Rajan, Sompolinsky 2011
     # N_eff = (\sum \lambda_i)^2 / \sum (\lambda_i^2)
     # \lambda_i is the i-th eigenvalue
+
+    if zero_mean:
+        h = h - h.mean(axis=0) # Do not change it in-place
 
     _, s, _ = np.linalg.svd(h)
     l = s**2 # get eigenvalues
     N_eff = (np.sum(l)**2) / np.sum(l**2)
 
     return N_eff
-
 
 class TaskSetAnalysis(object):
     def __init__(self, save_addon, fast_eval=True):
@@ -125,7 +128,7 @@ class TaskSetAnalysis(object):
 
 
     def plot_taskspace(self, rules=None, epochs=None, dim_reduction_type='MDS',
-                       plot_text=True):
+                       plot_text=True, color_by_feature=False, feature=None):
         # Plot tasks in space
 
         # Only get last time points for each epoch
@@ -177,28 +180,47 @@ class TaskSetAnalysis(object):
 
         texts = list()
 
-        fig = plt.figure(figsize=(5,5))
+        if len(epochs) == 1:
+            figsize = (2,2)
+        else:
+            figsize = (4,4)
+
+        fig = plt.figure(figsize=figsize)
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
         for key, val in h_trans.iteritems():
             rule, epoch = key
+
+            if color_by_feature:
+                color = 'red' if feature in rule_features[rule] else 'black'
+                color = np.array(sns.xkcd_palette([color])[0])
+            else:
+                # Default coloring by rule_color
+                color = np.array(rule_color[rule])
+
+
             ax.plot(val[-1,dim0], val[-1,dim1], shape_mapping[epoch],
-                    color=rule_color[rule], mec=np.array(rule_color[rule])*0.5, mew=1.0)
+                    color=color, mec=color*0.5, mew=1.0, ms=5)
 
             if plot_text:
                 texts.append(ax.text(val[-1,dim0], val[-1,dim1], rule_name[rule],
-                                     fontsize=6, color=np.array(rule_color[rule])*0.5))
+                                     fontsize=6, color=color*0.5))
 
             if 'fix' not in epoch:
-                ax.plot(val[:,dim0], val[:,dim1], color=rule_color[rule], alpha=0.5)
+                ax.plot(val[:,dim0], val[:,dim1], color=color, alpha=0.5)
 
         ax.set_xlabel(dim_reduction_type + ' dimension {:d}'.format(dim0+1), fontsize=fs)
         ax.set_ylabel(dim_reduction_type + ' dimension {:d}'.format(dim1+1), fontsize=fs)
         ax.tick_params(axis='both', which='major', labelsize=fs)
-        # plt.locator_params(nbins=2)
+        # plt.locator_params(nbins=3)
         ax.spines["right"].set_visible(False)
         ax.spines["top"].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        # ax.xaxis.set_ticks_position('bottom')
+        # ax.yaxis.set_ticks_position('left')
+
+        if color_by_feature:
+            ax.set_title('{:s} vs. others'.format(feature_names[feature]), fontsize=fs)
 
         if plot_text:
             from adjustText import adjust_text
@@ -209,18 +231,21 @@ class TaskSetAnalysis(object):
         if epochs is not None:
             save_name = save_name + ''.join(epochs)
 
+        if color_by_feature:
+            save_name = save_name + '_' + feature_names[feature]
+
         if save:
             plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
 
 
-    def compute_dim(self):
+    def compute_dim(self, **kwargs):
         # compute dimensions of each epoch
         print('Computing dimensions of rule/epochs')
         self.dim_lastt_byepoch = OrderedDict()
         for key, val in self.h_lastt_byepoch.iteritems():
-            self.dim_lastt_byepoch[key] = get_dim(val)
+            self.dim_lastt_byepoch[key] = get_dim(val, **kwargs)
 
-    def compute_dim_pair(self):
+    def compute_dim_pair(self, **kwargs):
         # Compute dimension of each pair of epochs, and the dimension ratio
 
         print('Computing dimensions of pairs of rule/epochs')
@@ -231,21 +256,25 @@ class TaskSetAnalysis(object):
         for key1, val1 in self.h_lastt_byepoch.iteritems():
             for key2, val2 in self.h_lastt_byepoch.iteritems():
 
+                #TODO: TEMP
+                val1 = val1 - val1.mean(axis=0)
+                val2 = val2 - val2.mean(axis=0)
+
                 h_pair = np.concatenate((val1, val2), axis=0)
 
-                dim_pair = get_dim(h_pair)
+                dim_pair = get_dim(h_pair, **kwargs)
                 dim1, dim2 = self.dim_lastt_byepoch[key1], self.dim_lastt_byepoch[key2]
 
                 self.dimpair_lastt_byepoch[(key1, key2)] = dim_pair
                 self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
 
-
-
 def plot_taskspaces():
     save_addon = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(save_addon)
     tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'])
-    tsa.plot_taskspace(epochs=['tar1'])
+    tsa.plot_taskspace(epochs=['tar1'], plot_text=True)
+    for feature in features:
+        tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True, feature=feature)
 
     # rules = [INHGO, INHREMAP, DELAYGO, DELAYREMAP]
     # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
@@ -257,20 +286,21 @@ def plot_taskspaces():
     # epochs = ['tar1', 'delay1', 'go1']
     # epochs = None
 
-    
-    
+
+    # epochs = ['tar1', 'delay1', 'go1']
+
 def plot_dim():
     save_addon = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(save_addon)
     tsa.compute_dim()
-
+    
     epoch_names = tsa.dim_lastt_byepoch.keys()
     dims = tsa.dim_lastt_byepoch.values()
-
+    
     ind_sort = np.argsort(dims)
     tick_names = [rule_name[epoch_names[i][0]] +' '+ epoch_names[i][1] for i in ind_sort]
     dims = [dims[i] for i in ind_sort]
-
+    
     fig = plt.figure(figsize=(1.5,5))
     ax = fig.add_axes([0.6,0.15,0.35,0.8])
     ax.plot(dims,range(len(dims)), 'o-', color=sns.xkcd_palette(['cerulean'])[0], markersize=3)
@@ -285,8 +315,6 @@ def plot_dim():
     plt.locator_params(axis='x',nbins=3)
     plt.savefig('figure/temp.pdf', transparent=True)
     plt.show()
-
-
 
 def plot_dimpair():
     save_addon = 'allrule_weaknoise_400'
@@ -316,7 +344,7 @@ def plot_dimpair():
 
     fig = plt.figure(figsize=figsize)
     ax = fig.add_axes(rect)
-    cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+    # cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
     im = ax.imshow(2-2*dimratio_pair_matrix, aspect='equal', cmap='hot',
                    vmin=0,vmax=1.0,interpolation='nearest',origin='lower')
 
@@ -339,7 +367,8 @@ def plot_dimpair():
     plt.savefig('figure/temp.pdf',transparent=True)
 
 
-# plot_taskspaces()
+
+plot_taskspaces()
 
 # plot_dim()
 # plot_dimpair()
