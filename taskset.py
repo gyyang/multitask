@@ -215,18 +215,21 @@ class TaskSetAnalysis(object):
 
     def compute_dim(self):
         # compute dimensions of each epoch
-
+        print('Computing dimensions of rule/epochs')
         self.dim_lastt_byepoch = OrderedDict()
         for key, val in self.h_lastt_byepoch.iteritems():
             self.dim_lastt_byepoch[key] = get_dim(val)
 
     def compute_dim_pair(self):
         # Compute dimension of each pair of epochs, and the dimension ratio
+
+        print('Computing dimensions of pairs of rule/epochs')
+
         self.dimpair_lastt_byepoch = OrderedDict()
         self.dimpairratio_lastt_byepoch = OrderedDict()
 
-        for key1, val1 in h_all_byepoch.iteritems():
-            for key2, val2 in h_all_byepoch.iteritems():
+        for key1, val1 in self.h_lastt_byepoch.iteritems():
+            for key2, val2 in self.h_lastt_byepoch.iteritems():
 
                 h_pair = np.concatenate((val1, val2), axis=0)
 
@@ -254,6 +257,8 @@ def plot_taskspaces():
     # epochs = ['tar1', 'delay1', 'go1']
     # epochs = None
 
+    
+    
 def plot_dim():
     save_addon = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(save_addon)
@@ -281,6 +286,8 @@ def plot_dim():
     plt.savefig('figure/temp.pdf', transparent=True)
     plt.show()
 
+
+
 def plot_dimpair():
     save_addon = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(save_addon)
@@ -300,7 +307,7 @@ def plot_dimpair():
     dimratio_pair_matrix = np.zeros((len(epoch_names), len(epoch_names)))
     for i1, key1 in enumerate(epoch_names):
         for i2, key2 in enumerate(epoch_names):
-            dimratio_pair_matrix[i1, i2] = dimratio_pair_byepoch[(key1, key2)]
+            dimratio_pair_matrix[i1, i2] = tsa.dimpairratio_lastt_byepoch[(key1, key2)]
 
 
     figsize = (5,5)
