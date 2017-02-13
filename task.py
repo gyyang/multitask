@@ -343,12 +343,14 @@ def inhgo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 20
-        batch_size = a
-        fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
+        n_tar_loc, n_tar_mod = batch_shape = 20, 2
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
+
         tar_ons   = int(500/dt)
-        tar_mod   = 1
+        fix_offs  = int(2000/dt)
+        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar_mod   = ind_tar_mod + 1
 
     # time to check the saccade location
     check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
@@ -412,12 +414,14 @@ def delaygo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 20
-        batch_size = a
+        n_tar_loc, n_tar_mod = batch_shape = 20, 2
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
+
         fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
+        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
         tar_ons   = int(500/dt)
-        tar_mod   = 1
+        tar_mod   = ind_tar_mod + 1
         tar_offs  = int(700/dt)
 
     check_ons= fix_offs + int(100/dt)
@@ -1039,12 +1043,14 @@ def inhremapgo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 20
-        batch_size = a
-        fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
+        n_tar_loc, n_tar_mod = batch_shape = 20, 2
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
+
         tar_ons   = int(500/dt)
-        tar_mod   = 1
+        fix_offs  = int(2000/dt)
+        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
+        tar_mod   = ind_tar_mod + 1
 
     # time to check the saccade location
     check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
@@ -1112,13 +1118,15 @@ def delayremapgo(config, mode, **kwargs):
 
     elif mode == 'test':
         tdim = int(2500/dt)
-        a = 20
-        batch_size = 20
+        n_tar_loc, n_tar_mod = batch_shape = 20, 2
+        batch_size = np.prod(batch_shape)
+        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
+
         fix_offs  = int(2000/dt)
+        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
         tar_ons   = int(500/dt)
-        tar_offs  = int(800/dt)
-        tar_locs  = 2*np.pi*np.arange(a)/a
-        tar_mod   = 1
+        tar_mod   = ind_tar_mod + 1
+        tar_offs  = int(700/dt)
 
     # time to check the saccade location
     check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
