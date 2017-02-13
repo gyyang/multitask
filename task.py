@@ -282,7 +282,7 @@ def go(config, mode, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod'+str(tar_mod), tar_locs, ons=fix_offs)
+    task.add('tar', tar_locs, ons=fix_offs, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
     task.add('out', tar_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
@@ -352,7 +352,7 @@ def inhgo(config, mode, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod'+str(tar_mod), tar_locs, ons=tar_ons)
+    task.add('tar', tar_locs, ons=tar_ons, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
     task.add('out', tar_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
@@ -454,8 +454,8 @@ def choicego_(config, mode, tar_mod, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod'+str(tar_mod), tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_strengths)
-    task.add('tar_mod'+str(tar_mod), tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_strengths)
+    task.add('tar', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_strengths, mods=tar_mod)
+    task.add('tar', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_strengths, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
     tar_locs = [tar1_locs[i] if (tar1_strengths[i]>tar2_strengths[i])
                 else tar2_locs[i] for i in range(batch_size)]
@@ -589,10 +589,10 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod1', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod1_strengths)
-    task.add('tar_mod1', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod1_strengths)
-    task.add('tar_mod2', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod2_strengths)
-    task.add('tar_mod2', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod2_strengths)
+    task.add('tar', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod1_strengths, mods=1)
+    task.add('tar', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod1_strengths, mods=1)
+    task.add('tar', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod2_strengths, mods=2)
+    task.add('tar', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod2_strengths, mods=2)
     task.add('fix_out', offs=fix_offs)
     tar_locs = [tar1_locs[i] if (tar1_strengths[i]>tar2_strengths[i])
                 else tar2_locs[i] for i in range(batch_size)]
@@ -709,10 +709,10 @@ def choicego_int(config, mode, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod1', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod1_strengths)
-    task.add('tar_mod1', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod1_strengths)
-    task.add('tar_mod2', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod2_strengths)
-    task.add('tar_mod2', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod2_strengths)
+    task.add('tar', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod1_strengths, mods=1)
+    task.add('tar', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod1_strengths, mods=1)
+    task.add('tar', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod2_strengths, mods=2)
+    task.add('tar', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod2_strengths, mods=2)
     task.add('fix_out', offs=fix_offs)
     tar_locs = [tar1_locs[i] if (tar1_mod1_strengths[i]>tar2_mod1_strengths[i])
                 else tar2_locs[i] for i in range(batch_size)]
@@ -827,8 +827,8 @@ def choicedelaygo_(config, mode, tar_mod, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod'+str(tar_mod), tar1_locs, ons=tar1_ons, offs=tar1_offs, strengths=tar1_strengths)
-    task.add('tar_mod'+str(tar_mod), tar2_locs, ons=tar2_ons, offs=tar2_offs, strengths=tar2_strengths)
+    task.add('tar', tar1_locs, ons=tar1_ons, offs=tar1_offs, strengths=tar1_strengths, mods=tar_mod)
+    task.add('tar', tar2_locs, ons=tar2_ons, offs=tar2_offs, strengths=tar2_strengths, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
     tar_locs = [tar1_locs[i] if (tar1_strengths[i]>tar2_strengths[i])
                 else tar2_locs[i] for i in range(batch_size)]
@@ -911,7 +911,7 @@ def delaygo(config, mode, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod'+str(tar_mod), tar_locs, ons=tar_ons, offs=tar_offs)
+    task.add('tar', tar_locs, ons=tar_ons, offs=tar_offs, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
     task.add('out', tar_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
@@ -1060,7 +1060,7 @@ def delayremapgo(config, mode, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod'+str(tar_mod), tar_locs, ons=tar_ons, offs=tar_offs)
+    task.add('tar', tar_locs, ons=tar_ons, offs=tar_offs, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
     task.add('out', tar_anti_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
@@ -1189,6 +1189,7 @@ def remapgo(config, mode, **kwargs):
         batch_size = a
         fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*np.arange(a)/a
+
         tar_mod   = 1
 
     # time to check the saccade location
@@ -1198,7 +1199,7 @@ def remapgo(config, mode, **kwargs):
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
-    task.add('tar_mod'+str(tar_mod), tar_locs, ons=fix_offs)
+    task.add('tar', tar_locs, ons=fix_offs, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
     task.add('out', tar_anti_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
