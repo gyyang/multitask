@@ -96,7 +96,7 @@ class TaskSetAnalysis(object):
         self.save_addon = save_addon
 
     @staticmethod
-    def filter(h, rules=None, epochs=None, non_rules=None, non_epochs=None, get_lasttimepoint=False):
+    def filter(h, rules=None, epochs=None, non_rules=None, non_epochs=None, get_lasttimepoint=False, get_timeaverage=False):
         # h should be a dictionary
         # get a new dictionary containing keys from the list of rules and epochs
         # And avoid epochs from non_rules and non_epochs
@@ -121,6 +121,8 @@ class TaskSetAnalysis(object):
             if include_key:
                 if get_lasttimepoint:
                     h_new[key] = h[key][np.newaxis, -1, :]
+                elif get_timeaverage:
+                    h_new[key] = np.mean(h[key], axis=0, keepdims=True)
                 else:
                     h_new[key] = h[key]
 
@@ -128,11 +130,11 @@ class TaskSetAnalysis(object):
 
 
     def plot_taskspace(self, rules=None, epochs=None, dim_reduction_type='MDS',
-                       plot_text=True, color_by_feature=False, feature=None):
+                       plot_text=True, color_by_feature=False, feature=None, **kwargs):
         # Plot tasks in space
 
         # Only get last time points for each epoch
-        h = self.filter(self.h_stimavg_byepoch, epochs=epochs, rules=rules, get_lasttimepoint=True)
+        h = self.filter(self.h_stimavg_byepoch, epochs=epochs, rules=rules, **kwargs)
 
         # Concatenate across rules to create dataset
         data = np.concatenate(h.values(), axis=0)
@@ -268,13 +270,13 @@ class TaskSetAnalysis(object):
                 self.dimpair_lastt_byepoch[(key1, key2)] = dim_pair
                 self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
 
-def plot_taskspaces():
+def plot_taskspaces(**kwargs):
     save_addon = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(save_addon)
-    tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'])
-    tsa.plot_taskspace(epochs=['tar1'], plot_text=True)
+    tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
+    tsa.plot_taskspace(epochs=['tar1'], plot_text=True, **kwargs)
     for feature in features:
-        tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True, feature=feature)
+        tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True, feature=feature, **kwargs)
 
     # rules = [INHGO, INHREMAP, DELAYGO, DELAYREMAP]
     # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
@@ -367,8 +369,8 @@ def plot_dimpair():
     plt.savefig('figure/temp.pdf',transparent=True)
 
 
-
-plot_taskspaces()
+plot_taskspaces(get_lasttimepoint=True)
+# plot_taskspaces(get_timeaverage=True)
 
 # plot_dim()
 # plot_dimpair()
