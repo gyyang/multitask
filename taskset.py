@@ -16,7 +16,7 @@ import seaborn.apionly as sns
 from task import *
 from run import Run, plot_singleneuron_intime
 
-save = False
+save = True
 
 def get_dim(h, zero_mean=False):
     # Get effective dimension
@@ -50,6 +50,7 @@ class TaskSetAnalysis(object):
         # rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
         # rules = [DMSGO, DMSNOGO]
         # rules = [DMCGO, DMCNOGO]
+        # rules = [INHGO, INHREMAP, DELAYGO, DELAYREMAP]
         ########################## Running the network ################################
         n_rules = len(rules)
 
@@ -139,7 +140,7 @@ class TaskSetAnalysis(object):
     def plot_taskspace(self, rules=None, epochs=None, dim_reduction_type='MDS',
                        plot_text=True, color_by_feature=False, feature=None,
                        figsize=(4,4), markersize=5, plot_label=True,
-                       plot_special_point=True, **kwargs):
+                       plot_special_point=False, plot_arrow=False, **kwargs):
         # Plot tasks in space
 
         # Only get last time points for each epoch
@@ -193,6 +194,31 @@ class TaskSetAnalysis(object):
 
         fig = plt.figure(figsize=figsize)
         ax = fig.add_axes([0.05, 0.05, 0.75, 0.75])
+
+        if plot_arrow:
+            if rules == [INHGO, INHREMAP, DELAYGO, DELAYREMAP]:
+                arrow_starts = [h[(INHREMAP,'tar1')], h[(INHGO,'tar1')]]
+                arrow_ends   = [h[(DELAYREMAP,'tar1')],
+                                -(h[(INHREMAP,'tar1')] - h[(DELAYREMAP,'tar1')]) + h[(INHGO,'tar1')]]
+            elif rules == [DMCGO, DMCNOGO, DMSGO, DMSNOGO]:
+                arrow_starts = [h[(DMSGO,'tar1')], h[(DMCGO,'tar1')]]
+                arrow_ends   = [h[(DMSNOGO,'tar1')],
+                                -(h[(DMSGO,'tar1')] - h[(DMSNOGO,'tar1')]) + h[(DMCGO,'tar1')]]
+
+            elif rules == [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]:
+                arrow_starts = [h[(CHOICE_INT,'tar1')], h[(CHOICE_INT,'tar1')]]
+                arrow_ends   = [h[(CHOICEATTEND_MOD1,'tar1')], h[(CHOICEATTEND_MOD2,'tar1')]]
+            else:
+                ValueError('Arrows not provided')
+
+            for arrow_start, arrow_end in zip(arrow_starts, arrow_ends):
+                arrow_start = model.transform(arrow_start)
+                arrow_end   = model.transform(arrow_end)
+
+                ax.annotate("", xy=arrow_start[-1,:2], xytext=arrow_end[-1,:2],
+                    arrowprops=dict(arrowstyle="<-", ec='gray'))
+
+
         for key, val in h_trans.iteritems():
             rule, epoch = key
 
@@ -202,7 +228,6 @@ class TaskSetAnalysis(object):
             else:
                 # Default coloring by rule_color
                 color = np.array(rule_color[rule])
-
 
             ax.plot(val[-1,dim0], val[-1,dim1], shape_mapping[epoch],
                     color=color, mec=color*1, mew=1.0, ms=markersize)
@@ -228,21 +253,29 @@ class TaskSetAnalysis(object):
         # ax.yaxis.set_ticks_position('left')
 
         # Plot special points:
-        if rules == [INHGO, INHREMAP, DELAYGO, DELAYREMAP]:
-            special_point = -(h[(INHREMAP,'tar1')] - h[(DELAYREMAP,'tar1')]) + h[(INHGO,'tar1')]
-        elif rules == [DMCGO, DMCNOGO, DMSGO, DMSNOGO]:
-            special_point = -(h[(DMSGO,'tar1')] - h[(DMSNOGO,'tar1')]) + h[(DMCGO,'tar1')]
-        elif rules == [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]:
-            special_point = np.concatenate(
-                ((h[(CHOICEATTEND_MOD1,'tar1')] + h[(CHOICE_INT,'tar1')])/2,
-                (h[(CHOICEATTEND_MOD2,'tar1')] + h[(CHOICE_INT,'tar1')])/2), axis=0)
-        else:
-            plot_special_point = False
+        if plot_special_point:
+            if rules == [INHGO, INHREMAP, DELAYGO, DELAYREMAP]:
+                special_point = -(h[(INHREMAP,'tar1')] - h[(DELAYREMAP,'tar1')]) + h[(INHGO,'tar1')]
+
+            elif rules == [DMCGO, DMCNOGO, DMSGO, DMSNOGO]:
+                special_point = -(h[(DMSGO,'tar1')] - h[(DMSNOGO,'tar1')]) + h[(DMCGO,'tar1')]
+
+            elif rules == [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]:
+                special_point = np.concatenate(
+                    ((h[(CHOICEATTEND_MOD1,'tar1')] + h[(CHOICE_INT,'tar1')])/2,
+                    (h[(CHOICEATTEND_MOD2,'tar1')] + h[(CHOICE_INT,'tar1')])/2), axis=0)
+
+            else:
+                ValueError('Special points not provided')
 
         if plot_special_point:
+            assert dim_reduction_type == 'PCA'
             special_point_trans = model.transform(special_point)
             ax.plot(special_point_trans[:,dim0], special_point_trans[:,dim1], '*',
                     color=sns.xkcd_palette(['black'])[0], markersize=4)
+
+
+
 
         if color_by_feature:
             ax.set_title('{:s} vs. others'.format(feature_names[feature]), fontsize=fs)
@@ -310,10 +343,12 @@ def plot_taskspaces(save_addon, **kwargs):
     rules_list = [[INHGO, INHREMAP, DELAYGO, DELAYREMAP],
                   [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT],
                   [DMCGO, DMCNOGO, DMSGO, DMSNOGO]]
+
     for i, rules in enumerate(rules_list):
         tsa.plot_taskspace(rules=rules, epochs=['tar1'], plot_text=True,
                            save_append='type'+str(i), figsize=(1.5,1.5),
-                           markersize=3, plot_label=False, dim_reduction_type='PCA', **kwargs)
+                           markersize=3, plot_label=False, dim_reduction_type='PCA',
+                           plot_special_point=True, plot_arrow=True, **kwargs)
 
     # epochs = ['tar1', 'delay1', 'go1']
 
@@ -402,9 +437,18 @@ plot_taskspaces(save_addon, get_lasttimepoint=True)
 # plot_dimpair()
 
 
+# tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
+
+# tsa.plot_taskspace(epochs=['tar1'], plot_text=True, figsize=(3.5,3.5), **kwargs)
+
+# for feature in features:
+#     tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True,
+#                        feature=feature, figsize=(1.0,1.0), markersize=2, plot_label=False, **kwargs)
+
+
 
 def temp():
-    save_addon = 'allrule_weaknoise_400'
+    save_addon = 'allrule_weaknoise_360'
     tsa = TaskSetAnalysis(save_addon)
 
     epochs = ['tar1']
@@ -425,31 +469,104 @@ def temp():
         v2_u = unit_vector(v2)
         return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
-    shuffle_angle = True
+    shuffle = False
     h2 = OrderedDict()
     for key in h_keys:
         h2[key] = h[key][-1]
-        if shuffle_angle:
-            h2[key] = np.random.permutation(h2[key])
+        if shuffle:
+            # h2[key] = np.random.permutation(h2[key])
+            h2[key] = h2[key] * np.random.uniform(0.5,1.5)
 
     vec_diffs = list()
-    for i in range(n_epochs-1):
-        for j in range(i+1, n_epochs):
-            hi = h2[h_keys[i]]
-            hj = h2[h_keys[j]]
+    vec_ids = list()
+    for i in range(n_epochs):
+        for j in range(n_epochs):
+            if i != j:
+                hi = h2[h_keys[i]]
+                hj = h2[h_keys[j]]
 
-            vec_diffs.append(hi-hj)
+                vec_diffs.append(hi-hj)
+                vec_ids.append([i, j])
 
     n_diff = len(vec_diffs)
-    tmps = list()
+
 
     from scipy.stats import linregress
+    from numpy.linalg import norm
 
-    for i in range(n_diff-1):
-        for j in range(i+1, n_diff):
-            # tmps.append(angle_between(vec_diffs[i], vec_diffs[j]))
-            slope, intercept, r_value, p_value, std_err = linregress(vec_diffs[i],vec_diffs[j])
-            tmps.append(r_value)
+    #==============================================================================
+    # tmps = list()
+    # tmp_ids = list()
+    # for i in range(n_diff-1):
+    #     for j in range(i+1, n_diff):
+    #         # tmps.append(angle_between(vec_diffs[i], vec_diffs[j]))
+    #
+    #         # slope, intercept, r_value, p_value, std_err = linregress(vec_diffs[i],vec_diffs[j])
+    #         # tmps.append(p_value)
+    #
+    #         # tmps.append(norm(vec_diffs[i]-vec_diffs[j]))
+    #         tmps.append(norm(vec_diffs[i]-vec_diffs[j])/np.sqrt(norm(vec_diffs[i])*norm(vec_diffs[i])))
+    #         tmp_ids.append(vec_ids[i] + vec_ids[j])
+    # tmps = np.array(tmps)
+    # # _ = plt.hist(tmps, bins=200)
+    #
+    #
+    # hist, bins_edge = np.histogram(tmps, bins=200)
+    # plt.plot((bins_edge[:-1]+bins_edge[1:])/2, hist)
+    # # plt.plot((bins_edge0[:-1]+bins_edge0[1:])/2, hist0, 'red')
+    #
+    #
+    # ind_sort = np.argsort(tmps)
+    # for i in ind_sort[:100]:
+    #     print('')
+    #     print('{:0.4f}'.format(tmps[i])),
+    #     for j in tmp_ids[i]:
+    #         print('{:15s}'.format(rule_name[h_keys[j][0]])),
+    #
+    #
+    # aa = h2[(INHGO,'tar1')]-h2[(INHREMAP,'tar1')]
+    # bb = h2[(DELAYGO,'tar1')]-h2[(DELAYREMAP,'tar1')]
+    #
+    # aa = h2[(DMCGO,'tar1')]-h2[(DMCNOGO,'tar1')]
+    # bb = h2[(DMSGO,'tar1')]-h2[(DMSNOGO,'tar1')]
+    #
+    # aa = h2[(CHOICE_INT,'tar1')]-h2[(CHOICE_MOD2,'tar1')]
+    # bb = h2[(CHOICE_INT,'tar1')]-h2[(CHOICEATTEND_MOD2,'tar1')]
+    #==============================================================================
 
-    _ = plt.hist(tmps)
+
+    tmps = list()
+    tmp_ids = list()
+    for i in range(n_epochs):
+        ki = h_keys[i]
+        hi = h2[ki]
+        for j in range(i+1, n_epochs):
+            kj = h_keys[j]
+            hj = h2[kj]
+            for k in range(j+1, n_epochs):
+                kk = h_keys[k]
+                hk = h2[kk]
+                for l in range(k+1, n_epochs):
+                    kl = h_keys[l]
+                    hl = h2[kl]
+                    hij = hi - hj
+                    hkl = hk - hl
+                    tmp = norm(hij - hkl)/np.sqrt(norm(hij)*norm(hkl))
+                    tmps.append(tmp)
+                    # tmp_ids.append([h_keys[m][0] for m in [i,j,k,l]])
+                    tmp_ids.append([ki[0],kj[0],kk[0],kl[0]])
+
+    ind_sort = np.argsort(tmps)
+    for i in ind_sort[:10]:
+        print('')
+        print('{:0.4f}'.format(tmps[i])),
+        for j in tmp_ids[i]:
+            print('{:15s}'.format(rule_name[j])),
+
+    for i in ind_sort[:10]:
+        rules = tmp_ids[i]
+        tsa.plot_taskspace(rules=rules, epochs=['tar1'], plot_text=True, figsize=(1.5,1.5),
+                           markersize=3, plot_label=False, dim_reduction_type='PCA', get_lasttimepoint=True)
+
+
 
