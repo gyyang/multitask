@@ -16,7 +16,7 @@ import seaborn.apionly as sns
 from task import *
 from run import Run, plot_singleneuron_intime
 
-save = True
+save = False
 
 def get_dim(h, zero_mean=False):
     # Get effective dimension
@@ -97,11 +97,17 @@ class TaskSetAnalysis(object):
 
     @staticmethod
     def filter(h, rules=None, epochs=None, non_rules=None, non_epochs=None,
-               get_lasttimepoint=True, get_timeaverage=False, **kwargs):
+               get_lasttimepoint=False, get_timeaverage=False, **kwargs):
         # h should be a dictionary
         # get a new dictionary containing keys from the list of rules and epochs
         # And avoid epochs from non_rules and non_epochs
         # h_new = OrderedDict([(key, val) for key, val in h.iteritems() if key[1] in epochs])
+
+        if get_lasttimepoint:
+            print('Analyzing last time points of epochs')
+        if get_timeaverage:
+            print('Analyzing time-averaged activities of epochs')
+
         h_new = OrderedDict()
         for key in h:
             rule, epoch = key
@@ -226,12 +232,16 @@ class TaskSetAnalysis(object):
             special_point = -(h[(INHREMAP,'tar1')] - h[(DELAYREMAP,'tar1')]) + h[(INHGO,'tar1')]
         elif rules == [DMCGO, DMCNOGO, DMSGO, DMSNOGO]:
             special_point = -(h[(DMSGO,'tar1')] - h[(DMSNOGO,'tar1')]) + h[(DMCGO,'tar1')]
+        elif rules == [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]:
+            special_point = np.concatenate(
+                ((h[(CHOICEATTEND_MOD1,'tar1')] + h[(CHOICE_INT,'tar1')])/2,
+                (h[(CHOICEATTEND_MOD2,'tar1')] + h[(CHOICE_INT,'tar1')])/2), axis=0)
         else:
             plot_special_point = False
 
         if plot_special_point:
             special_point_trans = model.transform(special_point)
-            ax.plot(special_point_trans[-1,dim0], special_point_trans[-1,dim1], '*',
+            ax.plot(special_point_trans[:,dim0], special_point_trans[:,dim1], '*',
                     color=sns.xkcd_palette(['black'])[0], markersize=4)
 
         if color_by_feature:
@@ -287,8 +297,7 @@ class TaskSetAnalysis(object):
                 self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
 
 
-def plot_taskspaces(**kwargs):
-    save_addon = 'allrule_weaknoise_400'
+def plot_taskspaces(save_addon, **kwargs):
     tsa = TaskSetAnalysis(save_addon)
     # tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
 
@@ -303,8 +312,8 @@ def plot_taskspaces(**kwargs):
                   [DMCGO, DMCNOGO, DMSGO, DMSNOGO]]
     for i, rules in enumerate(rules_list):
         tsa.plot_taskspace(rules=rules, epochs=['tar1'], plot_text=True,
-                           save_append='type'+str(i), figsize=(1.0,1.0),
-                           markersize=2, plot_label=False, dim_reduction_type='PCA', **kwargs)
+                           save_append='type'+str(i), figsize=(1.5,1.5),
+                           markersize=3, plot_label=False, dim_reduction_type='PCA', **kwargs)
 
     # epochs = ['tar1', 'delay1', 'go1']
 
@@ -385,13 +394,62 @@ def plot_dimpair():
     plt.tick_params(axis='both', which='major', labelsize=7)
     plt.savefig('figure/temp.pdf',transparent=True)
 
-
-plot_taskspaces(get_lasttimepoint=True)
-# plot_taskspaces(get_timeaverage=True)
+save_addon = 'allrule_weaknoise_400'
+plot_taskspaces(save_addon, get_lasttimepoint=True)
+# plot_taskspaces(save_addon, get_timeaverage=True)
 
 # plot_dim()
 # plot_dimpair()
 
 
 
-    
+def temp():
+    save_addon = 'allrule_weaknoise_400'
+    tsa = TaskSetAnalysis(save_addon)
+
+    epochs = ['tar1']
+    rules = None
+
+    h = tsa.filter(tsa.h_stimavg_byepoch, epochs=epochs, rules=rules, get_lasttimepoint=True)
+
+    h_keys = h.keys()
+    n_epochs = len(h_keys)
+
+    def unit_vector(vector):
+        """ Returns the unit vector of the vector.  """
+        return vector / np.linalg.norm(vector)
+
+    def angle_between(v1, v2):
+        """ Returns the angle in radians between vectors 'v1' and 'v2'::"""
+        v1_u = unit_vector(v1)
+        v2_u = unit_vector(v2)
+        return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+    shuffle_angle = True
+    h2 = OrderedDict()
+    for key in h_keys:
+        h2[key] = h[key][-1]
+        if shuffle_angle:
+            h2[key] = np.random.permutation(h2[key])
+
+    vec_diffs = list()
+    for i in range(n_epochs-1):
+        for j in range(i+1, n_epochs):
+            hi = h2[h_keys[i]]
+            hj = h2[h_keys[j]]
+
+            vec_diffs.append(hi-hj)
+
+    n_diff = len(vec_diffs)
+    tmps = list()
+
+    from scipy.stats import linregress
+
+    for i in range(n_diff-1):
+        for j in range(i+1, n_diff):
+            # tmps.append(angle_between(vec_diffs[i], vec_diffs[j]))
+            slope, intercept, r_value, p_value, std_err = linregress(vec_diffs[i],vec_diffs[j])
+            tmps.append(r_value)
+
+    _ = plt.hist(tmps)
+
