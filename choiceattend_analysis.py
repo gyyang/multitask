@@ -1312,12 +1312,12 @@ def quick_statespace(save_addon):
 
 ######################### Connectivity and Lesioning ##########################
 save_addon = 'allrule_weaknoise_400'
-# ua = UnitAnalysis(save_addon)
+ua = UnitAnalysis(save_addon)
 # ua.plot_inout_connectivity(conn_type='rec')
 # ua.plot_inout_connectivity(conn_type='rule')
 # ua.plot_inout_connectivity(conn_type='output')
 # ua.prettyplot_hist_varprop()
-# ua.plot_performance_choicetasks()
+ua.plot_performance_choicetasks()
 
 # rule = CHOICEATTEND_MOD1
 # ua.plot_performance_2D(rule=rule)
@@ -1341,5 +1341,5 @@ save_addon = 'allrule_weaknoise_400'
 # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, z_score=False)
 # ssa.plot_units_intime()
 
-# Quick state space analysis 
+# Quick state space analysis
 # quick_statespace(save_addon)
