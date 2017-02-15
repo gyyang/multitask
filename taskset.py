@@ -96,7 +96,8 @@ class TaskSetAnalysis(object):
         self.save_addon = save_addon
 
     @staticmethod
-    def filter(h, rules=None, epochs=None, non_rules=None, non_epochs=None, get_lasttimepoint=False, get_timeaverage=False):
+    def filter(h, rules=None, epochs=None, non_rules=None, non_epochs=None,
+               get_lasttimepoint=True, get_timeaverage=False, **kwargs):
         # h should be a dictionary
         # get a new dictionary containing keys from the list of rules and epochs
         # And avoid epochs from non_rules and non_epochs
@@ -130,7 +131,9 @@ class TaskSetAnalysis(object):
 
 
     def plot_taskspace(self, rules=None, epochs=None, dim_reduction_type='MDS',
-                       plot_text=True, color_by_feature=False, feature=None, **kwargs):
+                       plot_text=True, color_by_feature=False, feature=None,
+                       figsize=(4,4), markersize=5, plot_label=True,
+                       plot_special_point=True, **kwargs):
         # Plot tasks in space
 
         # Only get last time points for each epoch
@@ -168,27 +171,22 @@ class TaskSetAnalysis(object):
             i_start = i_end
 
 
-        shape_mapping = {'tar1' : 's',
-                         'tar2' : 's',
+        shape_mapping = {'tar1' : 'o',
+                         'tar2' : 'o',
                          'delay1' : 'v',
                          'delay2' : 'd',
-                         'go1'  : 'o',
+                         'go1'  : 's',
                          'fix1' : 'p'}
 
         from performance import rule_color
 
-        fs = 7 # fontsize
+        fs = 6 # fontsize
         dim0, dim1 = (0, 1) # plot dimensions
 
         texts = list()
 
-        if len(epochs) == 1:
-            figsize = (2,2)
-        else:
-            figsize = (4,4)
-
         fig = plt.figure(figsize=figsize)
-        ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+        ax = fig.add_axes([0.05, 0.05, 0.75, 0.75])
         for key, val in h_trans.iteritems():
             rule, epoch = key
 
@@ -201,7 +199,7 @@ class TaskSetAnalysis(object):
 
 
             ax.plot(val[-1,dim0], val[-1,dim1], shape_mapping[epoch],
-                    color=color, mec=color*0.5, mew=1.0, ms=5)
+                    color=color, mec=color*1, mew=1.0, ms=markersize)
 
             if plot_text:
                 texts.append(ax.text(val[-1,dim0], val[-1,dim1], rule_name[rule],
@@ -210,16 +208,31 @@ class TaskSetAnalysis(object):
             if 'fix' not in epoch:
                 ax.plot(val[:,dim0], val[:,dim1], color=color, alpha=0.5)
 
-        ax.set_xlabel(dim_reduction_type + ' dimension {:d}'.format(dim0+1), fontsize=fs)
-        ax.set_ylabel(dim_reduction_type + ' dimension {:d}'.format(dim1+1), fontsize=fs)
+        if plot_label:
+            ax.set_xlabel(dim_reduction_type + ' dim. {:d}'.format(dim0+1), fontsize=fs)
+            ax.set_ylabel(dim_reduction_type + ' dim. {:d}'.format(dim1+1), fontsize=fs)
         ax.tick_params(axis='both', which='major', labelsize=fs)
         # plt.locator_params(nbins=3)
         ax.spines["right"].set_visible(False)
         ax.spines["top"].set_visible(False)
         ax.set_xticks([])
         ax.set_yticks([])
+        ax.margins(0.1)
         # ax.xaxis.set_ticks_position('bottom')
         # ax.yaxis.set_ticks_position('left')
+
+        # Plot special points:
+        if rules == [INHGO, INHREMAP, DELAYGO, DELAYREMAP]:
+            special_point = -(h[(INHREMAP,'tar1')] - h[(DELAYREMAP,'tar1')]) + h[(INHGO,'tar1')]
+        elif rules == [DMCGO, DMCNOGO, DMSGO, DMSNOGO]:
+            special_point = -(h[(DMSGO,'tar1')] - h[(DMSNOGO,'tar1')]) + h[(DMCGO,'tar1')]
+        else:
+            plot_special_point = False
+
+        if plot_special_point:
+            special_point_trans = model.transform(special_point)
+            ax.plot(special_point_trans[-1,dim0], special_point_trans[-1,dim1], '*',
+                    color=sns.xkcd_palette(['black'])[0], markersize=4)
 
         if color_by_feature:
             ax.set_title('{:s} vs. others'.format(feature_names[feature]), fontsize=fs)
@@ -235,6 +248,9 @@ class TaskSetAnalysis(object):
 
         if color_by_feature:
             save_name = save_name + '_' + feature_names[feature]
+
+        if 'save_append' in kwargs:
+            save_name = save_name + kwargs['save_append']
 
         if save:
             plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
@@ -270,24 +286,25 @@ class TaskSetAnalysis(object):
                 self.dimpair_lastt_byepoch[(key1, key2)] = dim_pair
                 self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
 
+
 def plot_taskspaces(**kwargs):
     save_addon = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(save_addon)
-    tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
-    tsa.plot_taskspace(epochs=['tar1'], plot_text=True, **kwargs)
-    for feature in features:
-        tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True, feature=feature, **kwargs)
+    # tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
 
-    # rules = [INHGO, INHREMAP, DELAYGO, DELAYREMAP]
-    # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
-    # rules = [DMCGO, DMCNOGO, DMSGO, DMSNOGO]
-    # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT, CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
-    # rules = None
+    # tsa.plot_taskspace(epochs=['tar1'], plot_text=True, figsize=(3.5,3.5), **kwargs)
 
-    # epochs = ['tar1']
-    # epochs = ['tar1', 'delay1', 'go1']
-    # epochs = None
+    # for feature in features:
+    #     tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True,
+    #                        feature=feature, figsize=(1.0,1.0), markersize=2, plot_label=False, **kwargs)
 
+    rules_list = [[INHGO, INHREMAP, DELAYGO, DELAYREMAP],
+                  [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT],
+                  [DMCGO, DMCNOGO, DMSGO, DMSNOGO]]
+    for i, rules in enumerate(rules_list):
+        tsa.plot_taskspace(rules=rules, epochs=['tar1'], plot_text=True,
+                           save_append='type'+str(i), figsize=(1.0,1.0),
+                           markersize=2, plot_label=False, dim_reduction_type='PCA', **kwargs)
 
     # epochs = ['tar1', 'delay1', 'go1']
 
@@ -374,3 +391,7 @@ plot_taskspaces(get_lasttimepoint=True)
 
 # plot_dim()
 # plot_dimpair()
+
+
+
+    
