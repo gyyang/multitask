@@ -1187,7 +1187,8 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
         # A list of locations of targets
         # Since tar1 is always shown first, it's important that we completely randomize their relative positions
         matchs    = np.random.choice([0,1],(batch_size,)) # match or not?
-        tar_dist  = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
+        # tar_dist range between 1/18*pi and (2-1/18*pi), corresponding to 10 degree to 350 degree
+        tar_dist  = np.random.uniform(np.pi/18,np.pi*35./18.,(batch_size,))*np.random.choice([-1,1],(batch_size,))
         tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
         tar2_locs = (tar1_locs+tar_dist*(1-matchs))%(2*np.pi)
 
@@ -1231,7 +1232,7 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
         p = kwargs['params']
         tar1_locs = p['tar1_locs']
         tar2_locs = p['tar2_locs']
-        matchs = get_dist(tar1_locs-tar2_locs)<0.05*np.pi
+        matchs = get_dist(tar1_locs-tar2_locs)<np.pi/36. # 5 degree
         batch_size = len(tar1_locs)
 
         tdim = int(2500/dt)
@@ -1313,8 +1314,8 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
         # each batch consists of sequences of equal length
 
         # Use only mod 1 for input
-        tar1_mod  = 1 #TODO: May want to change this to both categories
-        tar2_mod  = 1
+        tar1_mod  = np.random.choice([1,2])
+        tar2_mod  = np.random.choice([1,2])
         # A list of locations of targets
         # Since tar1 is always shown first, it's important that we completely randomize their relative positions
         # tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
