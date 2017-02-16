@@ -596,121 +596,33 @@ save_addon = 'allrule_weaknoise_400'
 
 
 
-save_addon = 'allrule_weaknoise_400'
-import tensorflow as tf
-from network import get_perf
-
-n_rep = 1
-n_tar_loc = 20 # increase repeat by increasing this
-batch_size = n_rep * n_tar_loc**2
-batch_shape = (n_rep, n_tar_loc,n_tar_loc)
-ind_rep, ind_tar_loc1, ind_tar_loc2 = np.unravel_index(range(batch_size),batch_shape)
-
-# Looping target location
-tar1_locs = 2*np.pi*ind_tar_loc1/n_tar_loc
-tar2_locs = 2*np.pi*ind_tar_loc2/n_tar_loc
-
-params = {'tar1_locs' : tar1_locs,
-          'tar2_locs' : tar2_locs}
-
-rule = DMSGO
-# rule = DMCGO
-
-rule_y = np.array([rule])
-
-with Run(save_addon, fast_eval=True) as R:
-    config = R.config
-    nx, nh, ny = config['shape']
-    n_ring = config['N_RING']
-
-    # rule_X = np.array([INHGO, DELAYGO, INHREMAP])
-    rule_X = np.array([DMSNOGO, DMSGO, DMCNOGO])
-
-    w_rule_X = w_rec_[2*n_ring+1+rule_X, :]
-    w_rule_y = w_rec_[2*n_ring+1+rule_y, :]
-    beta = np.dot(w_rule_y, np.linalg.pinv(w_rule_X))
-    # beta = np.array([-1,1,1])
-    beta = np.array([0,1,0])
-    w_rec_[2*n_ring+1+rule, :] = np.dot(beta, w_rule_X)
-    
-
-    change_w_rec = tf.trainable_variables()[3].assign(w_rec_)
-    R.run(change_w_rec)
-
-    task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
-    y_sample = R.f_y_from_x(task.x)
-    perf = get_perf(y_sample, task.y_loc)
-    
-print(perf.mean())
-    
-if rule in [DMSGO, DMCGO]:
-    match_response = y_sample[-1, :, 0] < 0.5 # Last time point, fixation unit, match if go
-elif rule in [DMSNOGO, DMCNOGO]:
-    match_response = y_sample[-1, :, 0] > 0.5
-match_response = match_response.reshape(batch_shape)
-match_response = match_response.mean(axis=0)
-
-kwargs = dict()
-fs = 6
-fig = plt.figure(figsize=(1.5,1.5))
-ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
-im = ax.imshow(match_response, cmap='BrBG', origin='lower',
-               aspect='auto', interpolation='nearest', vmin=0, vmax=1)
-ax.set_xlabel('Mod 2 loc.', fontsize=fs, labelpad=-3)
-plt.xticks([0, n_tar_loc-1], ['0', '360'],
-           rotation=0, va='center', fontsize=fs)
-if 'ylabel' in kwargs and kwargs['ylabel']==False:
-    plt.yticks([])
-else:
-    ax.set_ylabel('Mod 1 loc.', fontsize=fs, labelpad=-3)
-    plt.yticks([0, n_tar_loc-1], [0, 360],
-               rotation=0, va='center', fontsize=fs)
-ax.tick_params('both', length=0)
-for loc in ['bottom','top','left','right']:
-    ax.spines[loc].set_visible(False)
-
-if 'colorbar' in kwargs and kwargs['colorbar']==False:
-    pass
-else:
-    ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
-    cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
-    cb.outline.set_linewidth(0.5)
-    cb.set_label('Prop. of match', fontsize=fs, labelpad=-3)
-    plt.tick_params(axis='both', which='major', labelsize=fs)
-
-# plt.savefig('figure/'+rule_name[rule].replace(' ','')+
-#             '_perf2D_lesion'+str(lesion_group)+
-#             self.save_addon+'.pdf', transparent=True)
-plt.show()
-
-
-
 #==============================================================================
-# from network import get_perf
-# import tensorflow as tf
-# 
 # save_addon = 'allrule_weaknoise_400'
-# rule = DMCGO
-# # rule = DELAYREMAP
+# import tensorflow as tf
+# from network import get_perf
+# 
+# n_rep = 1
+# n_tar_loc = 20 # increase repeat by increasing this
+# batch_size = n_rep * n_tar_loc**2
+# batch_shape = (n_rep, n_tar_loc,n_tar_loc)
+# ind_rep, ind_tar_loc1, ind_tar_loc2 = np.unravel_index(range(batch_size),batch_shape)
+# 
+# # Looping target location
+# tar1_locs = 2*np.pi*ind_tar_loc1/n_tar_loc
+# tar2_locs = 2*np.pi*ind_tar_loc2/n_tar_loc
+# 
+# params = {'tar1_locs' : tar1_locs,
+#           'tar2_locs' : tar2_locs}
+# 
+# rule = DMSGO
+# # rule = DMCGO
 # 
 # rule_y = np.array([rule])
-# 
 # 
 # with Run(save_addon, fast_eval=True) as R:
 #     config = R.config
 #     nx, nh, ny = config['shape']
 #     n_ring = config['N_RING']
-# 
-#     # This gives w_input and w_rec
-#     w_rec_ = R.run(tf.trainable_variables()[3])
-#     # w_rec_[2*n_ring+1+rule, :] = 0
-# 
-# #==============================================================================
-# #     w_rec_[2*n_ring+1+rule, :] = (
-# #         + w_rec_[2*n_ring+1+DMSGO, :]
-# #         - w_rec_[2*n_ring+1+DMSNOGO, :]
-# #         + w_rec_[2*n_ring+1+DMCNOGO, :])
-# #==============================================================================
 # 
 #     # rule_X = np.array([INHGO, DELAYGO, INHREMAP])
 #     rule_X = np.array([DMSNOGO, DMSGO, DMCNOGO])
@@ -721,55 +633,107 @@ plt.show()
 #     # beta = np.array([-1,1,1])
 #     beta = np.array([0,1,0])
 #     w_rec_[2*n_ring+1+rule, :] = np.dot(beta, w_rule_X)
-#     # w_rec_[2*n_ring+1+rule, :] = np.dot(np.array([-1,1,1]),w_rec_[2*n_ring+1+rule_X, :])
-#     # w_rec_[2*n_ring+1+rule, :] = (
-#     #     - w_rec_[2*n_ring+1+INHGO, :]
-#     #     + w_rec_[2*n_ring+1+DELAYGO, :]
-#     #     + w_rec_[2*n_ring+1+INHREMAP, :])
-# 
-#     # w_rec_[2*n_ring+1+rule, :] = w_rec_[2*n_ring+1+INHREMAP, :]
-# 
-#     # w_rec_[2*n_ring+1+rule, :] = w_rec_[2*n_ring+1+REMAP, :]
-# 
-#     # w_rec_[2*n_ring+1+rule, :] = w_rec_[2*n_ring+1+DMSGO, :]
-# 
+#     
 # 
 #     change_w_rec = tf.trainable_variables()[3].assign(w_rec_)
 #     R.run(change_w_rec)
 # 
-#     batch_size_test = 2000
-#     n_rep = 20
-#     batch_size_test_rep = int(batch_size_test/n_rep)
-#     c_rep = list()
-#     perf_rep = list()
-#     for i_rep in range(n_rep):
-#         task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep)
-#         h = R.f_h(task.x)
-#         y_hat = R.f_y(h)
-#         perf = get_perf(y_hat, task.y_loc)
-#         perf_rep.append(perf.mean())
+#     task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+#     y_sample = R.f_y_from_x(task.x)
+#     perf = get_perf(y_sample, task.y_loc)
 #     
-# print(np.mean(perf_rep))
+# print(perf.mean())
+#     
+# if rule in [DMSGO, DMCGO]:
+#     match_response = y_sample[-1, :, 0] < 0.5 # Last time point, fixation unit, match if go
+# elif rule in [DMSNOGO, DMCNOGO]:
+#     match_response = y_sample[-1, :, 0] > 0.5
+# match_response = match_response.reshape(batch_shape)
+# match_response = match_response.mean(axis=0)
+# 
+# kwargs = dict()
+# fs = 6
+# fig = plt.figure(figsize=(1.5,1.5))
+# ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
+# im = ax.imshow(match_response, cmap='BrBG', origin='lower',
+#                aspect='auto', interpolation='nearest', vmin=0, vmax=1)
+# ax.set_xlabel('Mod 2 loc.', fontsize=fs, labelpad=-3)
+# plt.xticks([0, n_tar_loc-1], ['0', '360'],
+#            rotation=0, va='center', fontsize=fs)
+# if 'ylabel' in kwargs and kwargs['ylabel']==False:
+#     plt.yticks([])
+# else:
+#     ax.set_ylabel('Mod 1 loc.', fontsize=fs, labelpad=-3)
+#     plt.yticks([0, n_tar_loc-1], [0, 360],
+#                rotation=0, va='center', fontsize=fs)
+# ax.tick_params('both', length=0)
+# for loc in ['bottom','top','left','right']:
+#     ax.spines[loc].set_visible(False)
+# 
+# if 'colorbar' in kwargs and kwargs['colorbar']==False:
+#     pass
+# else:
+#     ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
+#     cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
+#     cb.outline.set_linewidth(0.5)
+#     cb.set_label('Prop. of match', fontsize=fs, labelpad=-3)
+#     plt.tick_params(axis='both', which='major', labelsize=fs)
+# 
+# # plt.savefig('figure/'+rule_name[rule].replace(' ','')+
+# #             '_perf2D_lesion'+str(lesion_group)+
+# #             self.save_addon+'.pdf', transparent=True)
+# plt.show()
 #==============================================================================
 
 
 
-#==============================================================================
-# with Run(save_addon, fast_eval=True) as R:
-#     config = R.config
-#     nx, nh, ny = config['shape']
-#     n_ring = config['N_RING']
-#     w_in = R.w_in
-# 
-# rule_y = np.array([DMCNOGO])
-# rule_X = np.array([DMSGO, DMSNOGO, DMCGO])
-# 
-# rule_y = np.array([DELAYREMAP])
-# rule_X = np.array([INHGO, DELAYGO, INHREMAP])
-# 
-# w_rule_y = w_in[:, 2*n_ring+1+rule_y]
-# w_rule_X = w_in[:, 2*n_ring+1+rule_X]
-# 
-# beta = np.dot(np.linalg.pinv(w_rule_X), w_rule_y)
-# np.linalg.norm(np.dot(w_rule_X, beta) - w_rule_y)
-#==============================================================================
+
+
+
+def run_network_replacerule(save_addon, rule, rule_X, beta):
+    '''
+    Run the network but with replaced rule input weight
+    :param rule: the rule to run
+    :param rule_X: A numpy array of rules, whose values will be used to replace
+    :param beta: the weights for each rule_X vector used.
+    If beta='fit', use the best linear fit
+
+    The rule input connection will be replaced by
+    sum_i rule_connection(rule_X_i) * beta_i
+    '''
+    from network import get_perf
+    from run import replacerule
+
+    with Run(save_addon, fast_eval=True) as R:
+        config = R.config
+
+        beta = replacerule(R, rule, rule_X, beta)
+
+        # Get performance
+        batch_size_test = 2000
+        n_rep = 20
+        batch_size_test_rep = int(batch_size_test/n_rep)
+        perf_rep = list()
+        for i_rep in range(n_rep):
+            task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep)
+            h = R.f_h(task.x)
+            y_hat = R.f_y(h)
+            perf = get_perf(y_hat, task.y_loc)
+            perf_rep.append(perf.mean())
+
+    return np.mean(perf_rep)
+
+
+save_addon = 'allrule_weaknoise_400'
+
+rule = DELAYREMAP
+rule_X = np.array([INHGO, DELAYGO, INHREMAP])
+beta = np.array([-1,1,1])
+
+# rule = DMCGO
+# rule_X = np.array([DMSNOGO, DMSGO, DMCNOGO])
+# beta = np.array([-1,1,1])
+# beta = np.array([0,1,0])
+
+perf = run_network_replacerule(save_addon, rule, rule_X, beta)
+print(perf)
