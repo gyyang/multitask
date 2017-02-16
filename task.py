@@ -1202,8 +1202,8 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
         tar2_mod = 1
         matchs    = np.array([0])
         tar_dist = 0.5*np.pi
-        tar1_locs = [0.5*np.pi]
-        tar2_locs = [(0.5*np.pi+tar_dist*(1-matchs))%(2*np.pi)]
+        tar1_locs = np.array([0.5*np.pi])
+        tar2_locs = np.array([(0.5*np.pi+tar_dist*(1-matchs))%(2*np.pi)])
         tar1_ons = np.array([int(300/dt)])
         tar1_offs = tar1_ons + int(200/dt)
         tar2_ons = tar1_offs + int(1000/dt)
@@ -1331,7 +1331,7 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
     elif mode == 'sample':
         tar1_mod = 1
         tar2_mod = 1
-        tar1_locs = np.array([1.25*np.pi])
+        tar1_locs = np.array([0.25*np.pi])
         tar2_locs = np.array([0.25*np.pi])
         tar1_ons = np.array([int(300/dt)])
         tar1_offs = tar1_ons + int(200/dt)
@@ -1351,7 +1351,7 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
         n_tar_loc2 = n_tar_loc/2
         tar1_locs_ = np.concatenate(((0.1+0.8*np.arange(n_tar_loc2)/n_tar_loc2),
                                     (1.1+0.8*np.arange(n_tar_loc2)/n_tar_loc2)))*np.pi
-        tar1_locs = [tar1_locs_[i] for i in ind_tar_loc]
+        tar1_locs = np.array([tar1_locs_[i] for i in ind_tar_loc])
         matchs = (1 - matchnogo)*np.ones(batch_size) # make sure the response is Go
         tar2_locs = (tar1_locs+np.pi*(1-matchs))%(2*np.pi)
 
