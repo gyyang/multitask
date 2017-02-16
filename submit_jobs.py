@@ -115,9 +115,9 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 # Submit a job
 #=========================================================================================
 
-if False:
-    nunits = range(20,501,20)[::-1]
-    s_list = [1, 2, 4, 5, 7, 8]
+if True:
+    nunits = range(20,501,10)[::-1]
+    s_list = [0]
     for nunit in nunits:
         for s in s_list:
             jobname = 'job_{:d}_{:d}'.format(s, nunit)
@@ -168,7 +168,7 @@ if False:
 
 
 # Train OIC & DMC
-if True:
+if False:
     nunits = range(20,301,10)[::-1]
     s = 12
     training_iters=500000
