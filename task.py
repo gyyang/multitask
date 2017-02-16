@@ -64,12 +64,17 @@ class Task(object):
         :param batch_size:
         :return:
         '''
+        ## TEMPORARY FOR BACKWARD COMPATIBILITY
+        if 'num_ring' not in config:
+            config['num_ring'] = 2 # default number
+        if 'rule_start' not in config:
+            config['rule_start'] = 1+config['num_ring']*config['N_RING']
+
+
         self.float_type = 'float32' # This should be the default
         self.config     = config
         self.dt         = self.config['dt']
         N_RING          = self.config['N_RING']
-        if 'num_ring' not in self.config:
-            self.config['num_ring'] = 2 # default number
         num_ring        = self.config['num_ring']
 
         self.slices     = {'fix_in'     : 0,

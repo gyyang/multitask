@@ -159,6 +159,44 @@ class Run(Session):
         save_path = self.saver.save(self, os.path.join('data', self.config['save_addon']+'.ckpt'))
         print("Model saved in file: %s" % save_path)
 
+def replacerule(R, rule, rule_X, beta):
+    '''
+    Run the network but with replaced rule input weight
+    :param rule: the rule to run
+    :param rule_X: A numpy array of rules, whose values will be used to replace
+    :param beta: the weights for each rule_X vector used.
+    If beta='fit', use the best linear fit
+
+    The rule input connection will be replaced by
+    sum_i rule_connection(rule_X_i) * beta_i
+    '''
+
+    ## TEMPORARY FOR BACKWARD COMPATIBILITY
+    if 'num_ring' not in R.config:
+            R.config['num_ring'] = 2 # default number
+
+    if 'rule_start' not in R.config:
+        R.config['rule_start'] = 1+R.config['num_ring']*R.config['N_RING']
+
+    # Get current connectivity
+    # This gives w_input and w_rec
+    w_rec_ = R.run(tf.trainable_variables()[3])
+
+    # Update connectivity
+    rule_y = np.array([rule])
+    w_rule_X = w_rec_[R.config['rule_start']+rule_X, :]
+    w_rule_y = w_rec_[R.config['rule_start']+rule_y, :]
+
+    if beta is 'fit':
+        # Best linear fit
+        beta = np.dot(w_rule_y, np.linalg.pinv(w_rule_X))
+
+    w_rec_[R.config['rule_start']+rule, :] = np.dot(beta, w_rule_X)
+    change_w_rec = tf.trainable_variables()[3].assign(w_rec_)
+    R.run(change_w_rec)
+
+    return beta
+
 def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
 
     fs = 7
