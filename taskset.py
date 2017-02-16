@@ -429,7 +429,7 @@ def plot_dimpair():
     plt.tick_params(axis='both', which='major', labelsize=7)
     plt.savefig('figure/temp.pdf',transparent=True)
 
-def temp():
+def temp_quantify_composition():
     save_addon = 'allrule_weaknoise_360'
     tsa = TaskSetAnalysis(save_addon)
 
@@ -593,5 +593,52 @@ save_addon = 'allrule_weaknoise_400'
 # for feature in features:
 #     tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True,
 #                        feature=feature, figsize=(1.0,1.0), markersize=2, plot_label=False, **kwargs)
+
+
+
+from network import get_perf
+import tensorflow as tf
+
+save_addon = 'allrule_weaknoise_400'
+rule = DMCGO
+# rule = DELAYREMAP
+with Run(save_addon, fast_eval=True) as R:
+    config = R.config
+    nx, nh, ny = config['shape']
+    n_ring = config['N_RING']
+
+    # This gives w_input and w_rec
+    w_rec_ = R.run(tf.trainable_variables()[3])
+    # w_rec_[2*n_ring+1+rule, :] = 0
+
+#==============================================================================
+#     w_rec_[2*n_ring+1+rule, :] = (
+#         + w_rec_[2*n_ring+1+DMSGO, :]
+#         - w_rec_[2*n_ring+1+DMSNOGO, :]
+#         + w_rec_[2*n_ring+1+DMCNOGO, :])
+#==============================================================================
+
+    # w_rec_[2*n_ring+1+rule, :] = (
+    #     - w_rec_[2*n_ring+1+INHGO, :]
+    #     + w_rec_[2*n_ring+1+DELAYGO, :]
+    #     + w_rec_[2*n_ring+1+INHREMAP, :])
+
+    # w_rec_[2*n_ring+1+rule, :] = w_rec_[2*n_ring+1+INHREMAP, :]
+
+    # w_rec_[2*n_ring+1+rule, :] = w_rec_[2*n_ring+1+REMAP, :]
+
+    w_rec_[2*n_ring+1+rule, :] = w_rec_[2*n_ring+1+DMSGO, :]
+
+
+    change_w_rec = tf.trainable_variables()[3].assign(w_rec_)
+    R.run(change_w_rec)
+
+    # task = generate_onebatch(rule=rule, config=config, mode='test')
+    task = generate_onebatch(rule=rule, config=config, mode='random', batch_size=1000)
+    h = R.f_h(task.x)
+    y_hat = R.f_y(h)
+    perf = get_perf(y_hat, task.y_loc)
+    
+print(perf.mean())
 
 
