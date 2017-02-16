@@ -20,9 +20,12 @@ fast_eval = True
 
 class Run(Session):
     '''
-    Run the trained network
+    A class for running the network.
+    This modified class is initialized with the model sctructure.
+    It is less flexible than raw tensorflow,
+    but more convenient if you want to reuse the same model over and over again.
     '''
-    def __init__(self, save_addon, sigma_rec=None, lesion_units=None, fast_eval=False):
+    def __init__(self, restore=None, config=None, sigma_rec=None, lesion_units=None, fast_eval=False):
         '''
         save_addon: add on for loading and saving
         inh_id    : Ids of units to inhibit inputs or outputs
@@ -35,19 +38,28 @@ class Run(Session):
         # Initialize tensorflow session
         super(Run, self).__init__() # initialize Session()
 
-        print('Analyzing network ' + save_addon)
+        ## TEMPORARY SOLUTIONS
+        if restore is not None:
+            save_addon = restore
+            assert config is None
+            print('Loading network ' + save_addon)
+            # Load config
+            with open(os.path.join('data','config'+save_addon+'.pkl'),'rb') as f:
+                config = pickle.load(f)
 
-        # Load config
-        with open(os.path.join('data','config'+save_addon+'.pkl'),'rb') as f:
-            config = pickle.load(f)
+            # Only if restoring previous models
+            if fast_eval: # Evaluate at a bigger time step
+                config['dt']    = 10
+                print('Currently using fast evaluation')
+            else:
+                config['dt']    = 1
 
-
-        # Evaluate at a bigger time step
-        if fast_eval:
-            config['dt']    = 10
-            print('Currently using fast evaluation')
+            # Temporary for backward-compatibility
+            if 'activation' not in config:
+                config['activation'] = 'softplus'
         else:
-            config['dt']    = 1
+            assert config is not None
+
 
         config['alpha'] = config['dt']/TAU
 
@@ -61,16 +73,20 @@ class Run(Session):
         # tf Graph input
         x = tf.placeholder("float", [None, None, n_input]) # time * batch * n_input
 
-        # Define weights
-        w_out = tf.Variable(tf.random_normal([n_hidden, n_output]))
-        b_out = tf.Variable(tf.random_normal([n_output]))
+        # TEMPORARY: From train.py
+        y = tf.placeholder("float", [None, n_output])
+        c_mask = tf.placeholder("float", [None, n_output])
 
-        # Initial state
-        h_init = tf.Variable(tf.zeros([1, n_hidden]))
+        # Define weights
+        w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_output)))
+        b_out = tf.Variable(tf.zeros([n_output]))
+
+        # Initial state (requires tensorflow later than 0.10)
+        h_init = tf.Variable(0.3*tf.ones([1, n_hidden]))
         h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
 
         # Recurrent activity
-        cell = LeakyRNNCell(n_hidden, config['alpha'], sigma_rec=config['sigma_rec'])
+        cell = LeakyRNNCell(n_hidden, config['alpha'], sigma_rec=config['sigma_rec'], activation=config['activation'])
         h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc),
                                     dtype=tf.float32, time_major=True) # time_major is important
 
@@ -78,11 +94,18 @@ class Run(Session):
         # Output
         y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, n_hidden)), w_out) + b_out)
 
+        # Loss
+        cost = tf.reduce_mean(tf.square((y-y_hat)*c_mask))
+        optimizer = tf.train.AdamOptimizer(learning_rate=config['learning_rate']).minimize(cost)
+
         init = tf.initialize_all_variables()
         self.run(init)
+
         # Restore variable
         saver = tf.train.Saver()
-        saver.restore(self, os.path.join('data', config['save_addon']+'.ckpt'))
+
+        if restore is not None:
+            saver.restore(self, os.path.join('data', config['save_addon']+'.ckpt'))
 
         if lesion_units is not None:
             try:
@@ -106,13 +129,17 @@ class Run(Session):
             lesion_w_out = tf.trainable_variables()[0].assign(w_out)
             self.run(lesion_w_out)
 
-        self.f_h = lambda x0 : self.run(h, feed_dict={x : x0})
-        self.f_y = lambda h0 : self.run(y_hat, feed_dict={h : h0}).reshape(
-            (h0.shape[0],h0.shape[1],n_output))
+
+        self.f_h        = lambda x0 : self.run(h, feed_dict={x : x0})
+        self.f_y        = lambda h0 : self.run(y_hat, feed_dict={h : h0}).reshape((h0.shape[0],h0.shape[1],n_output))
         self.f_y_from_x = lambda x0 : self.f_y(self.f_h(x0))
-        self.f_y_loc = lambda y0 : popvec(y0[...,1:])
+        self.f_y_loc    = lambda y0 : popvec(y0[...,1:])
         self.f_y_loc_from_x = lambda x0 : self.f_y_loc(self.f_y(self.f_h(x0)))
-        self.f_cost  = lambda y0, y_hat0, c_mask0: np.mean(np.sum((c_mask0*(y_hat0-y0))**2),axis=0)
+        self.f_cost     = lambda y0, y_hat0, c_mask0: np.mean(np.sum((c_mask0*(y_hat0-y0))**2),axis=0)
+
+        self.train_one_step = lambda x0, y0, c_mask0 : self.run(optimizer, feed_dict={x: x0,
+                                               y: y0,
+                                               c_mask: c_mask0})
 
         # Notice this weight is originally used as r*W, so transpose them
         self.params = self.run(tf.trainable_variables())
@@ -124,8 +151,13 @@ class Run(Session):
         self.b_rec = self.params[4]
 
         self.config = config
+        self.saver  = saver
 
         self.test_ran = False
+
+    def save(self):
+        save_path = self.saver.save(self, os.path.join('data', self.config['save_addon']+'.ckpt'))
+        print("Model saved in file: %s" % save_path)
 
 def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
 
@@ -427,9 +459,11 @@ if __name__ == "__main__":
         CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
         REMAP, INHREMAP, DELAYREMAP,\
         DMSGO, DMSNOGO, DMCGO, DMCNOGO]
+
+    rules = [CHOICE_MOD1, CHOICE_MOD2]
     for rule in rules:
         pass
-        # sample_plot(save_addon='allrule_weaknoise_400', rule=rule, save=True)
+        sample_plot(save_addon='allrule_weaknoise_400', rule=rule, save=False)
 
     # plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
     #                          epoch=None, save=False, ylabel_firstonly=True)

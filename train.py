@@ -8,16 +8,14 @@ from __future__ import division
 
 import os
 import time
-import numpy as np
-import matplotlib.pyplot as plt
 import pickle
 import errno
 
 import tensorflow as tf
-from tensorflow.python.ops import rnn, rnn_cell
 
+from run import Run
 from task import *
-from network import LeakyRNNCell, get_perf
+from network import get_perf
 
 def mkdir_p(path):
     """
@@ -31,7 +29,8 @@ def mkdir_p(path):
         else:
             raise
 
-def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon=None):
+def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
+          batch_size_train=50, batch_size_test=2000, display_step=1000, save_addon=None):
     '''
     Training the network
     :param HDIM: Number of recurrent units
@@ -117,18 +116,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
     else:
         save_addon = save_addon_type + '_' + save_addon
 
-    # Parameters
-    batch_size_train = 50
-    batch_size_test = 2000
-    display_step = 1000
-
-    # learning_rate = 0.001
-    # training_iters = 500000
-    # batch_size_train = 100
-    # batch_size_test = 200
-    # display_step = 200
-
     config = {'h_type'      : 'leaky_rec',
+              'activation'  : activation,
               'alpha'       : 0.2, # \Delta t/tau
               'dt'          : 0.2*TAU,
               'sigma_rec'   : sigma_rec,
@@ -148,38 +137,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
         print('{:20s} = '.format(key) + str(val))
 
     # Network Parameters
-    nx, nh, ny = config['shape']
-
-    # tf Graph input
-    x = tf.placeholder("float", [None, None, nx]) # (time, batch, nx)
-    y = tf.placeholder("float", [None, ny])
-    c_mask = tf.placeholder("float", [None, ny])
-
-    # Define weights
-    wy = tf.Variable(tf.random_normal([nh, ny], stddev=0.4/np.sqrt(nh)))
-    by = tf.Variable(tf.zeros([ny]))
-
-    # Initial state (requires tensorflow later than 0.10)
-    h_init = tf.Variable(0.3*tf.ones([1, nh]))
-    h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
-
-    # Recurrent activity
-    cell = LeakyRNNCell(nh, config['alpha'], sigma_rec=config['sigma_rec'], activation=activation)
-    h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc),
-                                dtype=tf.float32, time_major=True) # time_major is important
-
-    # Output
-    y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, nh)), wy) + by)
-
-    # Loss
-    cost = tf.reduce_mean(tf.square((y-y_hat)*c_mask))
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
-
-    # Initializing the variables
-    init = tf.initialize_all_variables()
-
-    # Add ops to save and restore all the variables.
-    saver = tf.train.Saver()
+    n_input, n_hidden, n_output = config['shape']
 
     # Store results
     trials     = []
@@ -189,8 +147,10 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
     # Launch the graph
     t_start = time.time()
-    with tf.Session() as sess:
-        sess.run(init)
+
+    # Use customized session that launches the graph as well
+    with Run(config=config) as R:
+
         step = 1
         # Keep training until reach max iterations
         while step * batch_size_train < training_iters:
@@ -198,9 +158,10 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
                 # Training
                 rule = np.random.choice(rules, p=rule_weights/rule_weights.sum())
                 task = generate_onebatch(rule, config, 'random', batch_size=batch_size_train)
-                sess.run(optimizer, feed_dict={x: task.x,
-                                               y: task.y.reshape((-1,ny)),
-                                               c_mask: task.c_mask.reshape((-1,ny))})
+
+                R.train_one_step(task.x,
+                                 task.y.reshape((-1,n_output)),
+                                 task.c_mask.reshape((-1,n_output)))
 
                 # Validation
                 if step % display_step == 0:
@@ -208,6 +169,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
                     times.append(time.time()-t_start)
                     print('Trial {:7d}'.format(trials[-1]) +
                           '  | Time {:0.2f} s'.format(times[-1]))
+
                     for rule in rules:
                         n_rep = 20
                         batch_size_test_rep = int(batch_size_test/n_rep)
@@ -215,8 +177,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
                         perf_rep = list()
                         for i_rep in range(n_rep):
                             task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep)
-                            y_hat_test = sess.run(y_hat, feed_dict={x: task.x})
-                            y_hat_test = y_hat_test.reshape((-1,batch_size_test_rep,ny))
+                            y_hat_test = R.f_y_from_x(task.x)
 
                             # Cost is first summed over time, and averaged across batch and units
                             # We did the averaging over time through c_mask
@@ -237,8 +198,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
         mkdir_p('data')
 
         # Saving the model
-        save_path = saver.save(sess, os.path.join('data', config['save_addon']+'.ckpt'))
-        print("Model saved in file: %s" % save_path)
+        R.save()
 
         config['trials']     = trials
         config['times']      = times
@@ -261,4 +221,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000, save_addon
 
 if __name__ == '__main__':
     pass
-    train(HDIM=30, s=0, save_addon='test', training_iters=300000)
+    train(HDIM=37, s=6, save_addon='test', training_iters=300000, batch_size_train=50, batch_size_test=200, display_step=100)
