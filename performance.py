@@ -917,12 +917,79 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
         plt.savefig(savename+'.pdf', transparent=True)
     # plt.show()
 
+################ Psychometric - Delay Matching Tasks ##########################
+
+def psychometric_delaymatching(save_addon, rule):
+    with Run(save_addon, fast_eval=True) as R:
+        psychometric_delaymatching_fromsession(R, rule)
+
+def psychometric_delaymatching_fromsession(R, rule):
+    # Input is a Run session
+    n_rep = 1
+    n_tar_loc = 10 # increase repeat by increasing this
+    batch_size = n_rep * n_tar_loc**2
+    batch_shape = (n_rep, n_tar_loc,n_tar_loc)
+    ind_rep, ind_tar_loc1, ind_tar_loc2 = np.unravel_index(range(batch_size),batch_shape)
+
+    # Looping target location
+    tar1_locs = 2*np.pi*ind_tar_loc1/n_tar_loc
+    tar2_locs = 2*np.pi*ind_tar_loc2/n_tar_loc
+
+    params = {'tar1_locs' : tar1_locs,
+              'tar2_locs' : tar2_locs}
+
+    # rule = DMSGO
+    # rule = DMCGO
+    task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+    y_sample = R.f_y_from_x(task.x)
+
+    if rule in [DMSGO, DMCGO]:
+        match_response = y_sample[-1, :, 0] < 0.5 # Last time point, fixation unit, match if go
+    elif rule in [DMSNOGO, DMCNOGO]:
+        match_response = y_sample[-1, :, 0] > 0.5
+    match_response = match_response.reshape(batch_shape)
+    match_response = match_response.mean(axis=0)
+
+    kwargs = dict()
+    fs = 6
+    fig = plt.figure(figsize=(1.5,1.5))
+    ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
+    im = ax.imshow(match_response, cmap='BrBG', origin='lower',
+                   aspect='auto', interpolation='nearest', vmin=0, vmax=1)
+    ax.set_xlabel('Test loc.', fontsize=fs, labelpad=-3)
+    plt.xticks([0, n_tar_loc-1], ['0', '360'],
+               rotation=0, va='center', fontsize=fs)
+    if 'ylabel' in kwargs and kwargs['ylabel']==False:
+        plt.yticks([])
+    else:
+        ax.set_ylabel('Sample loc.', fontsize=fs, labelpad=-3)
+        plt.yticks([0, n_tar_loc-1], [0, 360],
+                   rotation=0, va='center', fontsize=fs)
+    # plt.title(rule_name[rule] + '\n' + lesion_group_name, fontsize=fs)
+    ax.tick_params('both', length=0)
+    for loc in ['bottom','top','left','right']:
+        ax.spines[loc].set_visible(False)
+
+    if 'colorbar' in kwargs and kwargs['colorbar']==False:
+        pass
+    else:
+        ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
+        cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
+        cb.outline.set_linewidth(0.5)
+        cb.set_label('Prop. of match', fontsize=fs, labelpad=-3)
+        plt.tick_params(axis='both', which='major', labelsize=fs)
+
+    # plt.savefig('figure/'+rule_name[rule].replace(' ','')+
+    #             '_perf2D_lesion'+str(lesion_group)+
+    #             self.save_addon+'.pdf', transparent=True)
+    plt.show()
+
 
 if __name__ == '__main__':
     pass
-    # plot_trainingprogress('allrule_weaknoise_400')
+    # plot_trainingprogress('allrule_softplus_200')
     # plot_trainingprogress('oicdmconly_strongnoise_200')
-    plot_finalperformance('allrule_weaknoise')
+    # plot_finalperformance('allrule_softplus')
     # plot_finalperformance('oicdmconly_strongnoise')
     # plot_finalperformance_lr()
     
@@ -936,7 +1003,7 @@ if __name__ == '__main__':
     # save_addon = 'allrule_weaknoise_360' # This works in all three rules
     # save_addon = 'allrule_weaknoise_480' # This works as well
     # save_addon = 'allrule_weaknoise_500'
-    save_addon = 'allrule_weaknoise_400'
+    save_addon = 'allrule_softplus_200'
     # save_addon = 'attendonly_weaknoise_500'
     # for rule in [CHOICEATTEND_MOD1]:
     for rule in [CHOICE_MOD1, CHOICEATTEND_MOD1, CHOICE_INT]:
@@ -952,3 +1019,7 @@ if __name__ == '__main__':
     # psychometric_choiceattend_varytime('attendonly_weaknoise_200')
     # psychometric_choiceint_varytime('allrule_weaknoise_200')
     # psychometric_delaychoice_varytime(save_addon, savename_append=save_addon)
+
+    for rule in [DMSGO, DMSNOGO, DMCGO, DMCNOGO]:
+        pass
+        # psychometric_delaymatching(save_addon, rule)
