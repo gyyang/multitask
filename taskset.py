@@ -16,7 +16,7 @@ import seaborn.apionly as sns
 from task import *
 from run import Run, plot_singleneuron_intime
 
-save = True
+save = False
 
 def get_dim(h, zero_mean=False):
     # Get effective dimension
@@ -429,24 +429,6 @@ def plot_dimpair():
     plt.tick_params(axis='both', which='major', labelsize=7)
     plt.savefig('figure/temp.pdf',transparent=True)
 
-save_addon = 'allrule_weaknoise_400'
-plot_taskspaces(save_addon, get_lasttimepoint=True)
-# plot_taskspaces(save_addon, get_timeaverage=True)
-
-# plot_dim()
-# plot_dimpair()
-
-
-# tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
-
-# tsa.plot_taskspace(epochs=['tar1'], plot_text=True, figsize=(3.5,3.5), **kwargs)
-
-# for feature in features:
-#     tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True,
-#                        feature=feature, figsize=(1.0,1.0), markersize=2, plot_label=False, **kwargs)
-
-
-
 def temp():
     save_addon = 'allrule_weaknoise_360'
     tsa = TaskSetAnalysis(save_addon)
@@ -568,5 +550,48 @@ def temp():
         tsa.plot_taskspace(rules=rules, epochs=['tar1'], plot_text=True, figsize=(1.5,1.5),
                            markersize=3, plot_label=False, dim_reduction_type='PCA', get_lasttimepoint=True)
 
+def plot_weight_rule_PCA():
+    save_addon = 'allrule_weaknoise_480'
+    with Run(save_addon, sigma_rec=0) as R:
+        w_in  = R.w_in # for later sorting
+        w_out = R.w_out
+        config = R.config
+    nx, nh, ny = config['shape']
+    n_ring = config['N_RING']
+
+    rules_list = [[INHGO, INHREMAP, DELAYGO, DELAYREMAP],
+                      [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT],
+                      [DMCGO, DMCNOGO, DMSGO, DMSNOGO]]
+
+    for rules in rules_list:
+        w_rules = w_in[:, 2*n_ring+1+np.array(rules)]
+
+        from sklearn.decomposition import PCA
+        model = PCA(n_components=5)
+
+        # Transform data
+        data_trans = model.fit_transform(w_rules.T)
+
+        plt.figure(figsize=(3,3))
+        for i, rule in enumerate(rules):
+            plt.scatter(data_trans[i,0],data_trans[i,1])
+            plt.text(data_trans[i,0],data_trans[i,1], rule_name[rule])
+            plt.axis('equal')
+
+save_addon = 'allrule_weaknoise_400'
+# plot_taskspaces(save_addon, get_lasttimepoint=True)
+# plot_taskspaces(save_addon, get_timeaverage=True)
+
+# plot_dim()
+# plot_dimpair()
+
+
+# tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
+
+# tsa.plot_taskspace(epochs=['tar1'], plot_text=True, figsize=(3.5,3.5), **kwargs)
+
+# for feature in features:
+#     tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True,
+#                        feature=feature, figsize=(1.0,1.0), markersize=2, plot_label=False, **kwargs)
 
 
