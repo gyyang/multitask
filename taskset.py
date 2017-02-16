@@ -550,8 +550,8 @@ def temp_quantify_composition():
         tsa.plot_taskspace(rules=rules, epochs=['tar1'], plot_text=True, figsize=(1.5,1.5),
                            markersize=3, plot_label=False, dim_reduction_type='PCA', get_lasttimepoint=True)
 
-def plot_weight_rule_PCA():
-    save_addon = 'allrule_weaknoise_480'
+def plot_weight_rule_PCA(save_addon):
+    # save_addon = 'allrule_weaknoise_480'
     with Run(save_addon, sigma_rec=0) as R:
         w_in  = R.w_in # for later sorting
         w_out = R.w_out
@@ -578,118 +578,6 @@ def plot_weight_rule_PCA():
             plt.text(data_trans[i,0],data_trans[i,1], rule_name[rule])
             plt.axis('equal')
 
-save_addon = 'allrule_weaknoise_400'
-# plot_taskspaces(save_addon, get_lasttimepoint=True)
-# plot_taskspaces(save_addon, get_timeaverage=True)
-
-# plot_dim()
-# plot_dimpair()
-
-
-# tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
-
-# tsa.plot_taskspace(epochs=['tar1'], plot_text=True, figsize=(3.5,3.5), **kwargs)
-
-# for feature in features:
-#     tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True,
-#                        feature=feature, figsize=(1.0,1.0), markersize=2, plot_label=False, **kwargs)
-
-
-
-#==============================================================================
-# save_addon = 'allrule_weaknoise_400'
-# import tensorflow as tf
-# from network import get_perf
-# 
-# n_rep = 1
-# n_tar_loc = 20 # increase repeat by increasing this
-# batch_size = n_rep * n_tar_loc**2
-# batch_shape = (n_rep, n_tar_loc,n_tar_loc)
-# ind_rep, ind_tar_loc1, ind_tar_loc2 = np.unravel_index(range(batch_size),batch_shape)
-# 
-# # Looping target location
-# tar1_locs = 2*np.pi*ind_tar_loc1/n_tar_loc
-# tar2_locs = 2*np.pi*ind_tar_loc2/n_tar_loc
-# 
-# params = {'tar1_locs' : tar1_locs,
-#           'tar2_locs' : tar2_locs}
-# 
-# rule = DMSGO
-# # rule = DMCGO
-# 
-# rule_y = np.array([rule])
-# 
-# with Run(save_addon, fast_eval=True) as R:
-#     config = R.config
-#     nx, nh, ny = config['shape']
-#     n_ring = config['N_RING']
-# 
-#     # rule_X = np.array([INHGO, DELAYGO, INHREMAP])
-#     rule_X = np.array([DMSNOGO, DMSGO, DMCNOGO])
-# 
-#     w_rule_X = w_rec_[2*n_ring+1+rule_X, :]
-#     w_rule_y = w_rec_[2*n_ring+1+rule_y, :]
-#     beta = np.dot(w_rule_y, np.linalg.pinv(w_rule_X))
-#     # beta = np.array([-1,1,1])
-#     beta = np.array([0,1,0])
-#     w_rec_[2*n_ring+1+rule, :] = np.dot(beta, w_rule_X)
-#     
-# 
-#     change_w_rec = tf.trainable_variables()[3].assign(w_rec_)
-#     R.run(change_w_rec)
-# 
-#     task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
-#     y_sample = R.f_y_from_x(task.x)
-#     perf = get_perf(y_sample, task.y_loc)
-#     
-# print(perf.mean())
-#     
-# if rule in [DMSGO, DMCGO]:
-#     match_response = y_sample[-1, :, 0] < 0.5 # Last time point, fixation unit, match if go
-# elif rule in [DMSNOGO, DMCNOGO]:
-#     match_response = y_sample[-1, :, 0] > 0.5
-# match_response = match_response.reshape(batch_shape)
-# match_response = match_response.mean(axis=0)
-# 
-# kwargs = dict()
-# fs = 6
-# fig = plt.figure(figsize=(1.5,1.5))
-# ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
-# im = ax.imshow(match_response, cmap='BrBG', origin='lower',
-#                aspect='auto', interpolation='nearest', vmin=0, vmax=1)
-# ax.set_xlabel('Mod 2 loc.', fontsize=fs, labelpad=-3)
-# plt.xticks([0, n_tar_loc-1], ['0', '360'],
-#            rotation=0, va='center', fontsize=fs)
-# if 'ylabel' in kwargs and kwargs['ylabel']==False:
-#     plt.yticks([])
-# else:
-#     ax.set_ylabel('Mod 1 loc.', fontsize=fs, labelpad=-3)
-#     plt.yticks([0, n_tar_loc-1], [0, 360],
-#                rotation=0, va='center', fontsize=fs)
-# ax.tick_params('both', length=0)
-# for loc in ['bottom','top','left','right']:
-#     ax.spines[loc].set_visible(False)
-# 
-# if 'colorbar' in kwargs and kwargs['colorbar']==False:
-#     pass
-# else:
-#     ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
-#     cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
-#     cb.outline.set_linewidth(0.5)
-#     cb.set_label('Prop. of match', fontsize=fs, labelpad=-3)
-#     plt.tick_params(axis='both', which='major', labelsize=fs)
-# 
-# # plt.savefig('figure/'+rule_name[rule].replace(' ','')+
-# #             '_perf2D_lesion'+str(lesion_group)+
-# #             self.save_addon+'.pdf', transparent=True)
-# plt.show()
-#==============================================================================
-
-
-
-
-
-
 def run_network_replacerule(save_addon, rule, rule_X, beta):
     '''
     Run the network but with replaced rule input weight
@@ -707,7 +595,11 @@ def run_network_replacerule(save_addon, rule, rule_X, beta):
     with Run(save_addon, fast_eval=True) as R:
         config = R.config
 
-        beta = replacerule(R, rule, rule_X, beta)
+        if beta is None: # Do nothing
+            print('Original rule input')
+        else:
+            beta = replacerule(R, rule, rule_X, beta)
+            print(beta)
 
         # Get performance
         batch_size_test = 2000
@@ -723,17 +615,102 @@ def run_network_replacerule(save_addon, rule, rule_X, beta):
 
     return np.mean(perf_rep)
 
+def compute_and_plot_replacerule_performance(save_addon, setup):
+    '''
+    Compute the performance of one task given a replaced rule input
+    :param save_addon:
+    :param setup:
+    :return:
+    '''
+    # save_addon = 'allrule_softplus_220'
+    # setup = 2
+    if setup == 1:
+        rule = DELAYREMAP
+        rule_X = np.array([INHREMAP, DELAYGO, INHGO])
 
-save_addon = 'allrule_weaknoise_400'
+        betas = list()
+        betas.append(None)
+        betas.append(np.array([1,0,0]))
+        betas.append(np.array([1,1,-1]))
+        betas.append('fit')
 
-rule = DELAYREMAP
-rule_X = np.array([INHGO, DELAYGO, INHREMAP])
-beta = np.array([-1,1,1])
+        perfs = list()
+        for beta in betas:
+            perf = run_network_replacerule(save_addon, rule, rule_X, beta)
+            perfs.append(perf)
 
-# rule = DMCGO
-# rule_X = np.array([DMSNOGO, DMSGO, DMCNOGO])
-# beta = np.array([-1,1,1])
-# beta = np.array([0,1,0])
+        names = list()
+        names.append(rule_name[DELAYREMAP])
+        names.append(rule_name[INHREMAP])
+        names.append(' '+rule_name[INHREMAP]+' \n+ '+rule_name[DELAYGO]+' \n- '+rule_name[INHGO])
+        names.append('fit')
 
-perf = run_network_replacerule(save_addon, rule, rule_X, beta)
-print(perf)
+    elif setup == 2:
+        rule = DMCNOGO
+        rule_X = np.array([DMSNOGO, DMCGO, DMSGO])
+
+        betas = list()
+        betas.append(None)
+        betas.append(np.array([1,0,0]))
+        betas.append(np.array([1,1,-1]))
+        betas.append('fit')
+
+        perfs = list()
+        for beta in betas:
+            perf = run_network_replacerule(save_addon, rule, rule_X, beta)
+            perfs.append(perf)
+
+        names = list()
+        names.append(rule_name[DMCNOGO])
+        names.append(rule_name[DMSNOGO])
+        names.append(' '+rule_name[DMSNOGO]+' \n+ '+rule_name[DMCGO]+' \n- '+rule_name[DMSGO])
+        names.append('fit')
+
+
+    save = True
+
+    fs = 7
+    width = 0.2
+    fig = plt.figure(figsize=(2.0,1.5))
+    ax = fig.add_axes([0.17,0.4,0.8,0.45])
+    b0 = ax.bar(np.arange(len(perfs))-width/2, perfs,
+           width=width, color=sns.xkcd_palette(['dark blue'])[0], edgecolor='none')
+    ax.set_xticks(np.arange(len(perfs)))
+    ax.set_xticklabels(names, rotation=0)
+    ax.set_xlabel('Rule input', fontsize=fs, labelpad=3)
+    # ax.set_ylabel('performance', fontsize=fs)
+    ax.set_title('Performance on '+rule_name[rule], fontsize=fs)
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+    plt.locator_params(axis='y',nbins=2)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    ax.set_ylim([0, 1])
+    # ax.set_xlim([-0.8, len(rules_perf)-0.2])
+    if save:
+        plt.savefig('figure/replacerule_perf_{:d}.pdf'.format(setup), transparent=True)
+    plt.show()
+
+
+# save_addon = 'allrule_weaknoise_400'
+save_addon = 'allrule_softplus_240'
+plot_taskspaces(save_addon, get_lasttimepoint=True)
+plot_weight_rule_PCA(save_addon)
+
+# plot_dim()
+# plot_dimpair()
+
+
+# tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
+
+# tsa.plot_taskspace(epochs=['tar1'], plot_text=True, figsize=(3.5,3.5), **kwargs)
+
+# for feature in features:
+#     tsa.plot_taskspace(epochs=['tar1'], plot_text=False, color_by_feature=True,
+#                        feature=feature, figsize=(1.0,1.0), markersize=2, plot_label=False, **kwargs)
+
+
+
+
+
