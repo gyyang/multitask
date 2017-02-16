@@ -73,7 +73,6 @@ class Task(object):
         num_ring        = self.config['num_ring']
 
         self.slices     = {'fix_in'     : 0,
-                           'rule_start' : 1+num_ring*N_RING,
                            'fix_out'    : 0,
                            'out'        : slice(1, N_RING+1)
                            }
@@ -165,7 +164,7 @@ class Task(object):
         self.c_mask[:, :, 0] *= 2 # Fixation is important
 
     def add_rule(self, rule, on=None, off=None):
-        self.x[on:off,:,self.slices['rule_start']+rule] = 1. # Have rule input
+        self.x[on:off,:,self.config['rule_start']+rule] = 1. # Have rule input
 
     def add_x_loc(self, x_loc):
         dist = get_dist(x_loc-self.pref) # periodic boundary
