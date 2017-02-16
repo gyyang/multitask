@@ -872,12 +872,12 @@ class StateSpaceAnalysis(object):
                 else:
                     color = 'gray'
                 # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
-                ax.plot(coefs[group][:,j], coefs[group][:,i], 'o', color=color, ms=1.5, mec='white', mew=0.2)
+                ax.plot(coefs[group][:,i], coefs[group][:,j], 'o', color=color, ms=1.5, mec='white', mew=0.2)
 
             ax.plot([-2, 2], [0, 0], color='gray')
             ax.plot([0, 0], [-2, 2], color='gray')
-            ax.set_xlabel(regr_names[j], fontsize=fs)
-            ax.set_ylabel(regr_names[i], fontsize=fs)
+            ax.set_xlabel(regr_names[i], fontsize=fs)
+            ax.set_ylabel(regr_names[j], fontsize=fs)
             ax.set_xlim([-2, 2])
             ax.set_ylim([-2, 2])
 
