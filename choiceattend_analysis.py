@@ -136,85 +136,9 @@ class UnitAnalysis(object):
                 rule_name[rules[1]].replace(' ','')+
                 save_addon+'.pdf', transparent=True)
 
-    def get_performance(self, rule, lesion_group, n_coh=8, n_tar_loc=20):
-        if lesion_group is None:
-            lesion_units = None
-        elif lesion_group == '1+2':
-            lesion_units = np.concatenate((self.ind_lesions_orig['1'],self.ind_lesions_orig['2']))
-        else:
-            lesion_units = self.ind_lesions_orig[lesion_group]
-
-        # Generate task parameters for choice tasks
-        coh_range = 0.2
-        cohs = np.linspace(-coh_range, coh_range, n_coh)
-
-        batch_size = n_tar_loc * n_coh**2
-        batch_shape = (n_tar_loc,n_coh,n_coh)
-        ind_tar_loc, ind_tar_mod1, ind_tar_mod2 = np.unravel_index(range(batch_size),batch_shape)
-
-        # Looping target location
-        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-
-        tar_mod1_cohs = cohs[ind_tar_mod1]
-        tar_mod2_cohs = cohs[ind_tar_mod2]
-
-        if rule in [CHOICE_MOD1, CHOICE_MOD2]:
-            params = {'tar1_locs' : tar1_locs,
-                      'tar2_locs' : tar2_locs,
-                      'tar1_strengths' : 1 + tar_mod1_cohs, # Just use mod 1 value
-                      'tar2_strengths' : 1 - tar_mod1_cohs,
-                      'tar_time'    : 800
-                      }
-        elif rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
-            params = {'tar1_locs' : tar1_locs,
-                      'tar2_locs' : tar2_locs,
-                      'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
-                      'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
-                      'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
-                      'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-                      'tar_time'    : 800
-                      }
-        elif rule == CHOICE_INT:
-            params = {'tar1_locs' : tar1_locs,
-                      'tar2_locs' : tar2_locs,
-                      'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
-                      'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
-                      'tar1_mod2_strengths' : 1 + tar_mod1_cohs, # Same as Mod 1
-                      'tar2_mod2_strengths' : 1 - tar_mod1_cohs,
-                      'tar_time'    : 800
-                      }
-        else:
-            raise ValueError('Unsupported rule')
-
-        with Run(self.save_addon, lesion_units=lesion_units, fast_eval=self.fast_eval) as R:
-            task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
-            y_sample = R.f_y_from_x(task.x)
-            y_sample_loc = R.f_y_loc(y_sample)
-
-        perf = get_perf(y_sample, task.y_loc)
-        print('Performance {:0.3f}'.format(np.mean(perf)))
-
-        # Compute the overall performance.
-        # Importantly, discard trials where no decision was made to one of the choices
-        loc_cor = task.y_loc[-1] # last time point, correct locations
-        loc_err = (loc_cor+np.pi)%(2*np.pi)
-        choose_cor = (get_dist(y_sample_loc[-1] - loc_cor) < 0.3*np.pi).sum()
-        choose_err = (get_dist(y_sample_loc[-1] - loc_err) < 0.3*np.pi).sum()
-        perf = choose_cor/(choose_cor+choose_err)
-
-        # Compute the proportion of choosing choice 1, while maintaining the batch_shape
-        tar1_locs_ = np.reshape(tar1_locs, batch_shape)
-        tar2_locs_ = np.reshape(tar2_locs, batch_shape)
-
-        y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
-        choose1 = (get_dist(y_sample_loc - tar1_locs_) < 0.3*np.pi).sum(axis=0)
-        choose2 = (get_dist(y_sample_loc - tar2_locs_) < 0.3*np.pi).sum(axis=0)
-        prop1s = choose1/(choose1 + choose2)
-
-        return perf, prop1s, cohs
-
     def plot_performance_choicetasks(self):
+        from performance import psychometric_choicefamily_2D
+
         # Rules for performance
         rules_perf = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
         lesion_group_list = [None, '1', '2', '12']
@@ -223,8 +147,15 @@ class UnitAnalysis(object):
         for lesion_group in lesion_group_list:
             perf_stores[lesion_group] = list()
 
+            if lesion_group is None:
+                lesion_units = None
+            elif lesion_group == '1+2':
+                lesion_units = np.concatenate((self.ind_lesions_orig['1'],self.ind_lesions_orig['2']))
+            else:
+                lesion_units = self.ind_lesions_orig[lesion_group]
+
             for rule in rules_perf:
-                perf, prop1s, cohs = self.get_performance(rule=rule, lesion_group=lesion_group, n_tar_loc=20)
+                perf, prop1s, cohs = psychometric_choicefamily_2D(self.save_addon, rule, lesion_units=lesion_units, n_coh=8, n_tar_loc=20)
                 perf_stores[lesion_group].append(perf)
 
             perf_stores[lesion_group] = np.array(perf_stores[lesion_group])
@@ -256,47 +187,22 @@ class UnitAnalysis(object):
         plt.show()
 
     def plot_performance_2D(self, rule, lesion_group=None, **kwargs):
+        from performance import psychometric_choicefamily_2D, plot_psychometric_choicefamily_2D
 
-        perf, prop1s, cohs = self.get_performance(rule=rule, lesion_group=lesion_group)
-
-        self._plot_performance_2D(prop1s, cohs, rule, lesion_group, **kwargs)
-
-    def _plot_performance_2D(self, prop1s, cohs, rule, lesion_group=None, **kwargs):
-        n_coh = len(cohs)
-
-        fs = 6
-        fig = plt.figure(figsize=(1.5,1.5))
-        ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
-        im = ax.imshow(prop1s, cmap='BrBG', origin='lower',
-                       aspect='auto', interpolation='nearest', vmin=0, vmax=1)
-        ax.set_xlabel('Mod 2 coh.', fontsize=fs, labelpad=-3)
-        plt.xticks([0, n_coh-1], [cohs[0], cohs[-1]],
-                   rotation=0, va='center', fontsize=fs)
-        if 'ylabel' in kwargs and kwargs['ylabel']==False:
-            plt.yticks([])
+        if lesion_group is None:
+            lesion_units = None
+        elif lesion_group == '1+2':
+            lesion_units = np.concatenate((self.ind_lesions_orig['1'],self.ind_lesions_orig['2']))
         else:
-            ax.set_ylabel('Mod 1 coh.', fontsize=fs, labelpad=-3)
-            plt.yticks([0, n_coh-1], [cohs[0], cohs[-1]],
-                       rotation=0, va='center', fontsize=fs)
-        plt.title(rule_name[rule] + '\n' + self.lesion_group_names[lesion_group], fontsize=fs)
-        ax.tick_params('both', length=0)
-        for loc in ['bottom','top','left','right']:
-            ax.spines[loc].set_visible(False)
+            lesion_units = self.ind_lesions_orig[lesion_group]
 
-        if 'colorbar' in kwargs and kwargs['colorbar']==False:
-            pass
-        else:
-            ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
-            cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
-            cb.outline.set_linewidth(0.5)
-            cb.set_label('Prop. of choice 1', fontsize=fs, labelpad=-3)
-            plt.tick_params(axis='both', which='major', labelsize=fs)
+        perf, prop1s, cohs = psychometric_choicefamily_2D(self.save_addon, rule, lesion_units=lesion_units, n_coh=8, n_tar_loc=20)
 
-        if save:
-            plt.savefig('figure/'+rule_name[rule].replace(' ','')+
-                        '_perf2D_lesion'+str(lesion_group)+
-                        self.save_addon+'.pdf', transparent=True)
-        plt.show()
+        title = rule_name[rule] + '\n' + self.lesion_group_names[lesion_group]
+        save_name = rule_name[rule].replace(' ','')+\
+                    '_perf2D_lesion'+str(lesion_group)+\
+                    self.save_addon+'.pdf'
+        plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=title, save_name=save_name, **kwargs)
 
     def plot_fullconnectivity(self):
         # Plot connectivity
@@ -1311,16 +1217,16 @@ def quick_statespace(save_addon):
         plt.savefig('figure/choiceatt_quickstatespace.pdf',transparent=True)
 
 ######################### Connectivity and Lesioning ##########################
-save_addon = 'allrule_weaknoise_400'
+save_addon = 'allrule_softplus_400'
 ua = UnitAnalysis(save_addon)
 # ua.plot_inout_connectivity(conn_type='rec')
 # ua.plot_inout_connectivity(conn_type='rule')
 # ua.plot_inout_connectivity(conn_type='output')
 # ua.prettyplot_hist_varprop()
-ua.plot_performance_choicetasks()
+# ua.plot_performance_choicetasks()
 
-# rule = CHOICEATTEND_MOD1
-# ua.plot_performance_2D(rule=rule)
+rule = CHOICEATTEND_MOD1
+ua.plot_performance_2D(rule=rule)
 # for lesion_group in ['1', '2', '12', '1+2']:
 #     ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
 
