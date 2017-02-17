@@ -29,7 +29,7 @@ def mkdir_p(path):
         else:
             raise
 
-def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
+def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
           batch_size_train=50, batch_size_test=2000, display_step=1000, save_addon=None):
     '''
     Training the network
@@ -70,6 +70,13 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
         save_addon_type = 'delaychoiceonly_relu'
     elif s == 12:
         save_addon_type = 'oicdmconly_softplus'
+    elif s == 13:
+        save_addon_type = 'matchfamily_softplus'
+    elif s == 14:
+        save_addon_type = 'choicefamily_softplus'
+    elif s == 15:
+        save_addon_type = 'goantifamily_softplus'
+
 
     tf.reset_default_graph()
 
@@ -90,6 +97,12 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
         rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
     elif 'choiceonly' in save_addon_type:
         rules = [CHOICE_MOD1, CHOICE_MOD2]
+    elif 'matchfamily' in save_addon_type:
+        rules = [DMSGO, DMSNOGO, DMCGO, DMCNOGO]
+    elif 'choicefamily' in save_addon_type:
+        rules = [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
+    elif 'goantifamily' in save_addon_type:
+        rules = [GO, INHGO, DELAYGO, REMAP, INHREMAP, DELAYREMAP]
     elif 'oicdmconly' in save_addon_type:
         rules = [OIC, DMC]
 
@@ -222,4 +235,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
 
 if __name__ == '__main__':
     pass
-    train(HDIM=37, s=6, save_addon='test', training_iters=300000, batch_size_train=50, batch_size_test=200, display_step=100)
+    train(HDIM=37, s=2, save_addon='test', training_iters=300000, batch_size_train=50, batch_size_test=200, display_step=100)
