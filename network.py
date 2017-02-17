@@ -29,7 +29,7 @@ class LeakyRNNCell(RNNCell):
         elif activation == 'tanh':
             self._activation = tf.tanh
         elif activation == 'relu':
-            self._activation == tf.nn.relu
+            self._activation = tf.nn.relu
         else:
             raise ValueError('Unknown activation')
         self._alpha = alpha
