@@ -8,7 +8,7 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-setup_type = 'new'
+setup_type = 'newset'
 
 if setup_type == 'standard':
 
@@ -45,9 +45,9 @@ elif setup_type == 'newset':
     N_RULE          = 20
 
     GO, INHGO, DELAYGO,\
+    REMAP, INHREMAP, DELAYREMAP,\
     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
     CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAYATTEND_INT,\
-    REMAP, INHREMAP, DELAYREMAP,\
     DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
 
     CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = DMC = -2 # dummy
@@ -151,11 +151,7 @@ class Task(object):
         :param sigma:
         :return:
         '''
-        self.x += np.random.randn(*self.x.shape)*SIGMA*np.sqrt(2/dt*TAU)
-
-    def add_c_mask_tempdisabled(self, pre_offs, post_ons):
-        pre_on   = int(50/self.dt) # never check the first 50ms
-        self.c_mask[pre_on:,:,:] = 100
+        self.x += np.random.randn(*self.x.shape)*self.config['sigma_x']*np.sqrt(2/dt*TAU)
 
     def add_c_mask(self, pre_offs, post_ons):
         '''
@@ -179,8 +175,7 @@ class Task(object):
             # Scale the cost mask of the pre-response period by a factor
             self.c_mask[pre_on:pre_offs[i], i, :] = (self.tdim-post_ons[i])/(pre_offs[i]-pre_on)
 
-        #self.c_mask[:, :, 0] *= self.N_RING # Fixation is important
-        self.c_mask[:, :, 0] *= 2 # Fixation is important
+        self.c_mask[:, :, 0] *= self.N_RING # Fixation is important
 
     def add_rule(self, rule, on=None, off=None, strength=1.):
         self.x[on:off,:,self.config['rule_start']+rule] = strength # Have rule input

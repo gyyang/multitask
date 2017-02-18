@@ -85,14 +85,12 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
     N_RING = 16
 
     sigma_rec = 0.05
+    sigma_x   = 0.01
 
     if 'allrule' in save_addon_type:
         # Rules
-        rules = [GO, INHGO, DELAYGO,\
-        CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-        CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
-        REMAP, INHREMAP, DELAYREMAP,\
-        DMSGO, DMSNOGO, DMCGO, DMCNOGO]
+        rules = range(N_RULE)
+
     elif 'attendonly' in save_addon_type:
         rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
     elif 'delaychoiceonly' in save_addon_type: # This has to be before choiceonly
@@ -118,7 +116,6 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
     elif 'relu' in save_addon_type:
         activation = 'relu'
 
-
     rule_weights = np.ones(len(rules))
 
     if 'allrule' in save_addon_type:
@@ -136,6 +133,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
               'alpha'       : 0.2, # \Delta t/tau
               'dt'          : 0.2*TAU,
               'sigma_rec'   : sigma_rec,
+              'sigma_x'     : sigma_x,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'num_ring'    : num_ring,
@@ -237,4 +235,4 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
 
 if __name__ == '__main__':
     pass
-    train(HDIM=37, s=2, save_addon='test', training_iters=300000, batch_size_train=50, batch_size_test=200, display_step=100)
+    train(HDIM=37, s=0, save_addon='test', training_iters=300000, batch_size_train=50, batch_size_test=200, display_step=100)
