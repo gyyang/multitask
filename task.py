@@ -40,18 +40,15 @@ elif setup_type == 'OICDMC':
 
     TEST_INIT = -1
 
-elif setup_type == 'new':
+elif setup_type == 'newset':
 
-    N_RULE          = 17
+    N_RULE          = 20
 
     GO, INHGO, DELAYGO,\
     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
+    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAYATTEND_INT,\
     REMAP, INHREMAP, DELAYREMAP,\
     DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
-
-    CHOICEDELAYATTEND_MOD1 = 100
-    CHOICEDELAYATTEND_MOD2 = 101
 
     CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = DMC = -2 # dummy
 
@@ -2159,6 +2156,7 @@ rule_mapping = {TEST_INIT               : test_init,
                 CHOICEDELAY_MOD1_COPY   : choicedelaygo_mod1,
                 CHOICEDELAYATTEND_MOD1  : choicegodelay_attend_mod1,
                 CHOICEDELAYATTEND_MOD2  : choicegodelay_attend_mod2,
+                CHOICEDELAYATTEND_INT   : choicegodelay_int,
                 TIMEDGO                 : timedgo,
                 REMAP                   : remapgo,
                 DELAYTIMEDGO            : delaytimedgo,
@@ -2187,6 +2185,7 @@ rule_name    = {FIXATION                : 'Fixation',
                 CHOICEDELAY_MOD1_COPY   : 'Del DM 1*',
                 CHOICEDELAYATTEND_MOD1  : 'Context Del DM 1',
                 CHOICEDELAYATTEND_MOD2  : 'Context Del DM 2',
+                CHOICEDELAYATTEND_INT   : 'MultiSen Del DM',
                 TIMEDGO                 : 'Timed Go',
                 DELAYTIMEDGO            : 'Timed Delay Go',
                 REMAP                   : 'Anti',
