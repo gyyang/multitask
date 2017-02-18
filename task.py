@@ -1216,7 +1216,6 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
 
     elif mode == 'test':
         # Set this test so the model always respond
-        tdim = int(2500/dt)
         n_tar_loc, n_mod1, n_mod2 = batch_shape = 20, 2, 2
         batch_size = np.prod(batch_shape)
         ind_tar_loc, ind_mod1, ind_mod2 = np.unravel_index(range(batch_size),batch_shape)
@@ -1229,8 +1228,9 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
         tar2_locs = (tar1_locs+np.pi*(1-matchs))%(2*np.pi)
 
         tar1_ons  = int(500/dt)
-        tar1_offs = int(800/dt)
-        tar2_ons  = int(2000/dt)
+        tar1_offs = tar1_ons + int(500/dt)
+        tar2_ons  = tar1_offs + int(1200/dt)
+        tdim = tar2_ons + int(500/dt)
 
     elif mode == 'psychometric':
         p = kwargs['params']
@@ -1361,7 +1361,7 @@ def delaymatchcategory_(config, mode, matchnogo, **kwargs):
         tar2_locs = (tar1_locs+np.pi*(1-matchs))%(2*np.pi)
 
         tar1_ons  = int(500/dt)
-        tar1_offs = tar1_ons + int(300/dt)
+        tar1_offs = tar1_ons + int(500/dt)
         tar2_ons  = tar1_offs + int(1200/dt)
         tdim = tar2_ons + int(500/dt)
 

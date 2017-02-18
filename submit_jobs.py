@@ -116,8 +116,8 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 #=========================================================================================
 
 if True:
-    nunits = range(20,501,10)[::-1]
-    s_list = [0]
+    nunits = range(20,501,20)[::-1]
+    s_list = [13, 14, 15]
     for nunit in nunits:
         for s in s_list:
             jobname = 'job_{:d}_{:d}'.format(s, nunit)

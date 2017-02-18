@@ -182,7 +182,8 @@ def plot_finalperformance(save_type):
     ax.set_xlabel('Number of Recurrent Units $N$ (100)',fontsize=7)
     ax.set_ylabel('Training time (hours)',fontsize=7)
     ax.tick_params(axis='both', which='major', labelsize=7)
-    plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
+    if save:
+        plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
     plt.show()
 
 def plot_finalperformance_lr():
@@ -374,6 +375,16 @@ def psychometric_choiceattend(save_addon, **kwargs):
 def psychometric_choiceattend_(save_addon, rule, **kwargs):
     print('Starting standard analysis of the {:s} task...'.format(rule_name[rule]))
     with Run(save_addon, fast_eval=fast_eval) as R:
+
+        print('Using temporary rule setup')
+        from run import replacerule
+        rule_X = np.array([CHOICE_INT, CHOICE_MOD1])
+        # beta = np.array([1,0])
+        # beta = np.array([-1,2])
+        beta = np.array([0,1])
+        # beta = np.array([0,2])
+        # beta = np.array([-4,5])
+        beta = replacerule(R, rule, rule_X, beta)
 
         from task import get_dist
 
@@ -586,9 +597,11 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     plt.show()
     return fits
 
-def psychometric_choicefamily_2D(save_addon, rule, lesion_units=None, n_coh=8, n_tar_loc=20):
+def psychometric_choicefamily_2D(save_addon, rule, lesion_units=None,
+                                 n_coh=8, n_tar_loc=20, coh_range=0.2):
     # Generate task parameters for choice tasks
-    coh_range = 0.2
+    # coh_range = 0.2
+    # coh_range = 0.05
     cohs = np.linspace(-coh_range, coh_range, n_coh)
 
     batch_size = n_tar_loc * n_coh**2
@@ -602,36 +615,55 @@ def psychometric_choicefamily_2D(save_addon, rule, lesion_units=None, n_coh=8, n
     tar_mod1_cohs = cohs[ind_tar_mod1]
     tar_mod2_cohs = cohs[ind_tar_mod2]
 
-    if rule in [CHOICE_MOD1, CHOICE_MOD2]:
-        params = {'tar1_locs' : tar1_locs,
-                  'tar2_locs' : tar2_locs,
-                  'tar1_strengths' : 1 + tar_mod1_cohs, # Just use mod 1 value
-                  'tar2_strengths' : 1 - tar_mod1_cohs,
-                  'tar_time'    : 800
-                  }
-    elif rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
-        params = {'tar1_locs' : tar1_locs,
-                  'tar2_locs' : tar2_locs,
-                  'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
-                  'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
-                  'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
-                  'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-                  'tar_time'    : 800
-                  }
-    elif rule == CHOICE_INT:
-        params = {'tar1_locs' : tar1_locs,
-                  'tar2_locs' : tar2_locs,
-                  'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
-                  'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
-                  'tar1_mod2_strengths' : 1 + tar_mod1_cohs, # Same as Mod 1
-                  'tar2_mod2_strengths' : 1 - tar_mod1_cohs,
-                  'tar_time'    : 800
-                  }
-    else:
-        raise ValueError('Unsupported rule')
+    params_dict = dict()
+    params_dict[CHOICE_MOD1] = \
+         {'tar1_locs' : tar1_locs,
+          'tar2_locs' : tar2_locs,
+          'tar1_strengths' : 1 + tar_mod1_cohs, # Just use mod 1 value
+          'tar2_strengths' : 1 - tar_mod1_cohs,
+          'tar_time'    : 800
+          }
+    params_dict[CHOICE_MOD2] = params_dict[CHOICE_MOD1]
+
+    params_dict[CHOICEATTEND_MOD1] = \
+         {'tar1_locs' : tar1_locs,
+          'tar2_locs' : tar2_locs,
+          'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+          'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+          'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
+          'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
+          'tar_time'    : 800
+          }
+    params_dict[CHOICEATTEND_MOD2] = params_dict[CHOICEATTEND_MOD1]
+
+    params_dict[CHOICE_INT] = \
+         {'tar1_locs' : tar1_locs,
+          'tar2_locs' : tar2_locs,
+          'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+          'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+          'tar1_mod2_strengths' : 1 + tar_mod1_cohs, # Same as Mod 1
+          'tar2_mod2_strengths' : 1 - tar_mod1_cohs,
+          'tar_time'    : 800
+          }
 
     with Run(save_addon, lesion_units=lesion_units, fast_eval=True) as R:
+
+        params = params_dict[rule]
         task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+
+        print('Using temporary rule setup')
+        # params = params_dict[CHOICEATTEND_MOD1]
+        # task  = generate_onebatch(CHOICEATTEND_MOD1, R.config, 'psychometric', params=params, add_rule=rule)
+
+        from run import replacerule
+        rule_X = np.array([CHOICE_INT, CHOICE_MOD1])
+        # beta = np.array([1,0])
+        # beta = np.array([-1,2])
+        # beta = np.array([0,1])
+        # beta = np.array([0,2])
+        # beta = np.array([-4,5])
+        # beta = replacerule(R, rule, rule_X, beta)
+
         y_sample = R.f_y_from_x(task.x)
         y_sample_loc = R.f_y_loc(y_sample)
 
@@ -657,7 +689,7 @@ def psychometric_choicefamily_2D(save_addon, rule, lesion_units=None, n_coh=8, n
 
     return perf, prop1s, cohs
 
-def plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=None, **kwargs):
+def _plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=None, **kwargs):
     n_coh = len(cohs)
 
     fs = 6
@@ -697,6 +729,11 @@ def plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=None, **kwargs):
         plt.savefig(os.path.join('figure', save_name), transparent=True)
 
     plt.show()
+
+def plot_psychometric_choicefamily_2D(save_addon, rule, **kwargs):
+    perf, prop1s, cohs = psychometric_choicefamily_2D(save_addon, rule, **kwargs)
+    _plot_psychometric_choicefamily_2D(prop1s, cohs, rule)
+
 
 ################ Psychometric - Varying Stim Time #############################
 
@@ -1098,9 +1135,9 @@ def psychometric_delaymatching_fromsession(R, rule):
 
 if __name__ == '__main__':
     pass
-    # plot_trainingprogress('goantifamily_softplus_200')
+    # plot_trainingprogress('allrule_tanh_340')
     # plot_trainingprogress('oicdmconly_strongnoise_200')
-    # plot_finalperformance('goantifamily_softplus')
+    plot_finalperformance('allrule_relu')
     # plot_finalperformance('oicdmconly_strongnoise')
     # plot_finalperformance_lr()
     
@@ -1114,13 +1151,21 @@ if __name__ == '__main__':
     # save_addon = 'allrule_weaknoise_360' # This works in all three rules
     # save_addon = 'allrule_weaknoise_480' # This works as well
     # save_addon = 'allrule_weaknoise_500'
-    save_addon = 'allrule_softplus_200'
+    # save_addon = 'allrule_weaknoise_400'
+    save_addon = 'allrule_softplus_380'
+    # save_addon = 'choicefamily_softplus_220'
     # save_addon = 'attendonly_weaknoise_500'
     # for rule in [CHOICEATTEND_MOD1]:
     for rule in [CHOICE_MOD1, CHOICEATTEND_MOD1, CHOICE_INT]:
         pass
         # compute_choicefamily_varytime(save_addon, rule)
         # plot_choicefamily_varytime(save_addon, rule)
+
+    for rule in [CHOICEATTEND_MOD1]:
+        pass
+        # plot_psychometric_choicefamily_2D(save_addon, rule, n_tar_loc=200, coh_range = 0.02)
+
+    # psychometric_choiceattend_(save_addon, CHOICEATTEND_MOD1)
 
     # compute_psychometric_choice_varytime(save_addon, savename_append=save_addon)
     # plot_psychometric_choice_varytime(savename_append=save_addon)

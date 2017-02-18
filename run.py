@@ -8,7 +8,6 @@ import os
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
-import seaborn.apionly as sns
 import tensorflow as tf
 from tensorflow.python.ops import rnn
 from tensorflow.python.client.session import Session
@@ -50,7 +49,7 @@ class Run(Session):
             # Only if restoring previous models
             if fast_eval: # Evaluate at a bigger time step
                 config['dt']    = 10
-                print('Currently using fast evaluation')
+                # print('Currently using fast evaluation')
             else:
                 config['dt']    = 1
 
@@ -198,7 +197,7 @@ def replacerule(R, rule, rule_X, beta):
     return beta
 
 def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
-
+    import seaborn.apionly as sns
     fs = 7
 
     with Run(save_addon) as R:
@@ -288,6 +287,7 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
     plt.show()
 
 def schematic_plot(save_addon):
+    import seaborn.apionly as sns
     fontsize = 6
 
     rule = CHOICE_MOD1
@@ -432,6 +432,7 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
     :param ylabel_firstonly: if True, only plot ylabel for the first rule in rules
     :return:
     '''
+    import seaborn.apionly as sns
     try:
         _ = iter(rules)
     except TypeError:

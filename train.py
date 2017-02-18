@@ -2,6 +2,8 @@
 2016/06/03 @ Guangyu Robert Yang
 
 Main training loop and network structure
+
+This code runs with tensorflow 0.11
 """
 
 from __future__ import division
