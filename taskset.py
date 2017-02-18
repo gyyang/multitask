@@ -36,13 +36,15 @@ def get_dim(h, zero_mean=False):
     return N_eff
 
 class TaskSetAnalysis(object):
-    def __init__(self, save_addon, fast_eval=True):
+    def __init__(self, save_addon, rules=None, fast_eval=True):
         ########################## Running the network ################################
-        rules = [GO, INHGO, DELAYGO,\
-                CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-                CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
-                REMAP, INHREMAP, DELAYREMAP,\
-                DMSGO, DMSNOGO, DMCGO, DMCNOGO]
+        if rules is None:
+            # Default value
+            rules = [GO, INHGO, DELAYGO,\
+                    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+                    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
+                    REMAP, INHREMAP, DELAYREMAP,\
+                    DMSGO, DMSNOGO, DMCGO, DMCNOGO]
 
         # rules = [CHOICE_MOD1, CHOICE_MOD2]
         # rules = [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
@@ -66,6 +68,15 @@ class TaskSetAnalysis(object):
 
             for rule in rules:
                 task = generate_onebatch(rule=rule, config=config, mode='test')
+
+                #TODO: TEMPORARY For Debugging
+                # if rule in [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]:
+                #     print('Using temporary rule setup')
+                #     task = generate_onebatch(rule=CHOICEATTEND_MOD1, config=config, mode='test', add_rule=rule)
+                # elif rule in [DMSGO, DMSNOGO, DMCGO, DMCNOGO]:
+                #     print('Using temporary rule setup')
+                #     task = generate_onebatch(rule=DMSGO, config=config, mode='test', add_rule=rule)
+
                 h = R.f_h(task.x)
 
                 # Average across stimulus conditions
@@ -331,7 +342,7 @@ class TaskSetAnalysis(object):
 
 
 def plot_taskspaces(save_addon, **kwargs):
-    tsa = TaskSetAnalysis(save_addon)
+
     # tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
 
     # tsa.plot_taskspace(epochs=['tar1'], plot_text=True, figsize=(3.5,3.5), **kwargs)
@@ -345,6 +356,7 @@ def plot_taskspaces(save_addon, **kwargs):
                   [DMCGO, DMCNOGO, DMSGO, DMSNOGO]]
 
     for i, rules in enumerate(rules_list):
+        tsa = TaskSetAnalysis(save_addon, rules=rules)
         tsa.plot_taskspace(rules=rules, epochs=['tar1'], plot_text=True,
                            save_append='type'+str(i), figsize=(1.5,1.5),
                            markersize=3, plot_label=False, dim_reduction_type='PCA',
@@ -572,7 +584,7 @@ def plot_weight_rule_PCA(save_addon):
         # Transform data
         data_trans = model.fit_transform(w_rules.T)
 
-        plt.figure(figsize=(3,3))
+        plt.figure(figsize=(2,2))
         for i, rule in enumerate(rules):
             plt.scatter(data_trans[i,0],data_trans[i,1])
             plt.text(data_trans[i,0],data_trans[i,1], rule_name[rule])
@@ -599,6 +611,7 @@ def run_network_replacerule(save_addon, rule, rule_X, beta):
             print('Original rule input')
         else:
             beta = replacerule(R, rule, rule_X, beta)
+            beta = beta.flatten()
             print(beta)
 
         # Get performance
@@ -613,7 +626,7 @@ def run_network_replacerule(save_addon, rule, rule_X, beta):
             perf = get_perf(y_hat, task.y_loc)
             perf_rep.append(perf.mean())
 
-    return np.mean(perf_rep)
+    return np.mean(perf_rep), beta
 
 def compute_and_plot_replacerule_performance(save_addon, setup):
     '''
@@ -624,26 +637,40 @@ def compute_and_plot_replacerule_performance(save_addon, setup):
     '''
     # save_addon = 'allrule_softplus_220'
     # setup = 2
-    if setup == 1:
+    if setup == 0:
+        rule = DELAYREMAP
+        rule_X = np.array([REMAP, DELAYGO, GO])
+
+        betas = list()
+        betas.append(None)
+        betas.append(np.array([1,0,0]))
+        betas.append(np.array([1,1,0]))
+        betas.append(np.array([1,1,-1]))
+        # betas.append('fit')
+
+        names = list()
+        names.append(rule_name[DELAYREMAP])
+        names.append(rule_name[REMAP])
+        names.append(' '+rule_name[REMAP]+' \n+ '+rule_name[DELAYGO])
+        names.append(' '+rule_name[REMAP]+' \n+ '+rule_name[DELAYGO]+' \n- '+rule_name[GO])
+        # names.append('fit')
+    elif setup == 1:
         rule = DELAYREMAP
         rule_X = np.array([INHREMAP, DELAYGO, INHGO])
 
         betas = list()
         betas.append(None)
         betas.append(np.array([1,0,0]))
+        betas.append(np.array([1,1,0]))
         betas.append(np.array([1,1,-1]))
-        betas.append('fit')
-
-        perfs = list()
-        for beta in betas:
-            perf = run_network_replacerule(save_addon, rule, rule_X, beta)
-            perfs.append(perf)
+        # betas.append('fit')
 
         names = list()
         names.append(rule_name[DELAYREMAP])
         names.append(rule_name[INHREMAP])
+        names.append(' '+rule_name[INHREMAP]+' \n+ '+rule_name[DELAYGO])
         names.append(' '+rule_name[INHREMAP]+' \n+ '+rule_name[DELAYGO]+' \n- '+rule_name[INHGO])
-        names.append('fit')
+        # names.append('fit')
 
     elif setup == 2:
         rule = DMCNOGO
@@ -655,10 +682,21 @@ def compute_and_plot_replacerule_performance(save_addon, setup):
         betas.append(np.array([1,1,-1]))
         betas.append('fit')
 
-        perfs = list()
-        for beta in betas:
-            perf = run_network_replacerule(save_addon, rule, rule_X, beta)
-            perfs.append(perf)
+        names = list()
+        names.append(rule_name[DMCNOGO])
+        names.append(rule_name[DMSNOGO])
+        names.append(' '+rule_name[DMSNOGO]+' \n+ '+rule_name[DMCGO]+' \n- '+rule_name[DMSGO])
+        names.append('fit')
+
+    elif setup == 3:
+        rule = DMSGO
+        rule_X = np.array([DMSNOGO, DMCGO, DMSGO])
+
+        betas = list()
+        betas.append(None)
+        betas.append(np.array([1,0,0]))
+        betas.append(np.array([1,1,-1]))
+        betas.append('fit')
 
         names = list()
         names.append(rule_name[DMCNOGO])
@@ -666,6 +704,30 @@ def compute_and_plot_replacerule_performance(save_addon, setup):
         names.append(' '+rule_name[DMSNOGO]+' \n+ '+rule_name[DMCGO]+' \n- '+rule_name[DMSGO])
         names.append('fit')
 
+    elif setup == 4:
+        rule = CHOICEATTEND_MOD1
+        rule_X = np.array([CHOICE_INT, CHOICE_MOD1])
+
+        betas = list()
+        betas.append(None)
+        betas.append(np.array([1,0]))
+        betas.append(np.array([0,1]))
+        betas.append(np.array([-1,2]))
+        betas.append('fit')
+
+        names = list()
+        names.append(rule_name[CHOICEATTEND_MOD1])
+        names.append(rule_name[CHOICE_INT])
+        names.append(rule_name[CHOICE_MOD1])
+        names.append(' 2'+rule_name[CHOICE_MOD1]+' \n+ -'+rule_name[CHOICE_INT])
+        names.append('fit')
+
+
+
+    perfs = list()
+    for beta in betas:
+        perf, _ = run_network_replacerule(save_addon, rule, rule_X, beta)
+        perfs.append(perf)
 
     save = True
 
@@ -694,13 +756,32 @@ def compute_and_plot_replacerule_performance(save_addon, setup):
 
 
 # save_addon = 'allrule_weaknoise_400'
-save_addon = 'allrule_softplus_240'
-plot_taskspaces(save_addon, get_lasttimepoint=True)
-plot_weight_rule_PCA(save_addon)
+save_addon = 'allrule_softplus_340'
+# save_addon = 'allrule_relu_340'
+# save_addon = 'allrule_tanh_340'
+# save_addon = 'goantifamily_softplus_40'
 
+# plot_taskspaces(save_addon, get_lasttimepoint=True)
+# plot_weight_rule_PCA(save_addon)
+for setup in [0, 1]:
+    compute_and_plot_replacerule_performance(save_addon, setup)
 # plot_dim()
 # plot_dimpair()
 
+# save_addon = 'choicefamily_softplus_340'
+# rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2]
+# rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
+# rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+
+# save_addon = 'goantifamily_softplus_140'
+# rules = [INHGO, DELAYGO, INHREMAP, DELAYREMAP]
+# tsa = TaskSetAnalysis(save_addon, rules=rules)
+# tsa.plot_taskspace(rules=rules,
+#                    epochs=['tar1'], plot_text=True,
+#                            save_append='type'+str(4), figsize=(1.5,1.5),
+#                            markersize=3, plot_label=False, dim_reduction_type='PCA',
+#                            plot_special_point=False, plot_arrow=False, get_lasttimepoint=True)
+# plot_weight_rule_PCA(save_addon)
 
 # tsa.plot_taskspace(epochs=['tar1', 'delay1', 'go1'], **kwargs)
 
@@ -712,5 +793,51 @@ plot_weight_rule_PCA(save_addon)
 
 
 
+#==============================================================================
+# from run import replacerule
+# rule = DMCNOGO
+# rule_X = np.array([DMSNOGO, DMCGO, DMSGO])
+# 
+# betas = list()
+# betas.append(None)
+# betas.append(np.array([1,0,0]))
+# betas.append(np.array([1,1,-1]))
+# betas.append('fit')
+# 
+# beta = betas[3]
+# 
+# with Run(save_addon, fast_eval=True) as R:
+#     config = R.config
+# 
+#     if beta is None: # Do nothing
+#         print('Original rule input')
+#     else:
+#         beta = replacerule(R, rule, rule_X, beta)
+#         print(beta)
+# 
+#     import performance
+#     performance.psychometric_delaymatching_fromsession(R, rule)
+#==============================================================================
 
 
+# save_addon = 'allrule_softplus_300'
+# rule = DMCNOGO
+# rule_X = np.array([DMSNOGO, DMCGO, DMSGO])
+# # rule_X = np.array([GO, INHGO, DELAYGO,\
+# #                 CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+# #                 CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
+# #                 REMAP, INHREMAP, DELAYREMAP,\
+# #                 DMSGO, DMSNOGO, DMCGO])
+#
+# rule_X = np.array([GO, INHGO, DELAYGO,\
+#                 CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+#                 CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
+#                 REMAP, INHREMAP, DELAYREMAP,\
+#                 DMSGO, DMSNOGO, DMCGO])
+#
+# beta = 'fit'
+# # beta = None
+# perf, beta = run_network_replacerule(save_addon, rule, rule_X, beta)
+# print(perf)
+# for rule, b in zip(rule_X, beta):
+#     print('{:15s} : {:0.3f}'.format(rule_name[rule], b))
