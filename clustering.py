@@ -16,8 +16,11 @@ import seaborn.apionly as sns
 from task import *
 from run import Run, plot_singleneuron_intime
 
+save = False
+
 ########################## Running the network ################################
-save_addon = 'allrule_weaknoise_400'
+# save_addon = 'allrule_weaknoise_400'
+save_addon = 'allrule_relu_400'
 data_type = 'rule'
 
 rules = [GO, INHGO, DELAYGO,\
@@ -140,8 +143,8 @@ for l in range(n_cluster):
             color=sns.color_palette('deep', n_cluster)[l])
 ax.set_xlim([0, len(labels)])
 ax.axis('off')
-
-plt.savefig('figure/feature_map_by'+data_type+'.pdf', transparent=True)
+if save:
+    plt.savefig('figure/feature_map_by'+data_type+'.pdf', transparent=True)
 plt.show()
 
 # Plot similarity matrix
@@ -170,7 +173,8 @@ ax1.set_xlim([0, len(labels)])
 ax2.set_ylim([0, len(labels)])
 ax1.axis('off')
 ax2.axis('off')
-plt.savefig('figure/feature_similarity_by'+data_type+'.pdf', transparent=True)
+if save:
+    plt.savefig('figure/feature_similarity_by'+data_type+'.pdf', transparent=True)
 plt.show()
 
 
@@ -190,7 +194,8 @@ ax.spines["right"].set_visible(False)
 ax.spines["top"].set_visible(False)
 ax.xaxis.set_ticks_position('bottom')
 ax.yaxis.set_ticks_position('left')
-plt.savefig('figure/exampleunit_variance.pdf', transparent=True)
+if save:
+    plt.savefig('figure/exampleunit_variance.pdf', transparent=True)
 plt.show()
 
 # Plot single example neuron in time
@@ -245,5 +250,6 @@ ax1.set_xlim([0, len(labels)])
 ax2.set_ylim([0, len(labels)])
 ax1.axis('off')
 ax2.axis('off')
-plt.savefig('figure/connectivity_by'+data_type+'.pdf', transparent=True)
+if save:
+    plt.savefig('figure/connectivity_by'+data_type+'.pdf', transparent=True)
 plt.show()

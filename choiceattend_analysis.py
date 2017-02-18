@@ -21,7 +21,7 @@ from run import Run
 from network import get_perf
 from slowpoints import search_slowpoints
 
-save = True # TEMP
+save = False # TEMP
 
 def generate_surrogate_data():
     # Generate surrogate data
@@ -187,7 +187,7 @@ class UnitAnalysis(object):
         plt.show()
 
     def plot_performance_2D(self, rule, lesion_group=None, **kwargs):
-        from performance import psychometric_choicefamily_2D, plot_psychometric_choicefamily_2D
+        from performance import psychometric_choicefamily_2D, _plot_psychometric_choicefamily_2D
 
         if lesion_group is None:
             lesion_units = None
@@ -202,7 +202,7 @@ class UnitAnalysis(object):
         save_name = rule_name[rule].replace(' ','')+\
                     '_perf2D_lesion'+str(lesion_group)+\
                     self.save_addon+'.pdf'
-        plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=title, save_name=save_name, **kwargs)
+        _plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=title, save_name=save_name, **kwargs)
 
     def plot_fullconnectivity(self):
         # Plot connectivity

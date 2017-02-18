@@ -16,7 +16,7 @@ import seaborn.apionly as sns
 from task import *
 from run import Run
 
-save = True
+save = False
 
 def compute_variance(save_addon, data_type, rules,
                      random_rotation=False, fast_eval=False):
@@ -148,7 +148,7 @@ def compute_hist_varprop(save_type, rules):
 
     return hists, bins_edge, hdims
 
-def _plot_hist_varprop(hist_plot, bins_edge, hist_example=None):
+def _plot_hist_varprop(hist_plot, bins_edge, rules, hist_example=None):
     fs = 6
     fig = plt.figure(figsize=(1.5,1.2))
     ax = fig.add_axes([0.2,0.3,0.6,0.5])
@@ -196,7 +196,7 @@ def plot_hist_varprop(save_type, rules, hdim_example=None):
         hist_example = hists[hdims.index(hdim_example)]
 
     hist_plot = hist_med
-    _plot_hist_varprop(hist_plot, bins_edge, hist_example=hist_example)
+    _plot_hist_varprop(hist_plot, bins_edge, rules=rules, hist_example=hist_example)
 
 
 
@@ -358,12 +358,15 @@ if __name__ == '__main__':
     # compute_variance(save_addon, data_type, rules, random_rotation=True, fast_eval=True)
 
 
-    save_type = 'allrule_weaknoise'
+    # save_type = 'allrule_weaknoise'
+    save_type = 'allrule_softplus'
+    # save_type = 'allrule_tanh'
+    # save_type = 'allrule_relu'
     # plot_hist_varprop(save_type, rules=[DMSGO, DMCGO], hdim_example=400)
     # plot_hist_varprop_all('allrule_weaknoise')
-    # plot_hist_varprop_selection(save_type, hdim_example=400)
+    plot_hist_varprop_selection(save_type, hdim_example=400)
 
 
     # Study OIC & DMC
-    rules = [OIC, DMC]
-    plot_hist_varprop('oicdmconly_strongnoise', rules=rules, hdim_example=200)
+    # rules = [OIC, DMC]
+    # plot_hist_varprop('oicdmconly_strongnoise', rules=rules, hdim_example=200)
