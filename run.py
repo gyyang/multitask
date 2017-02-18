@@ -158,6 +158,43 @@ class Run(Session):
         save_path = self.saver.save(self, os.path.join('data', self.config['save_addon']+'.ckpt'))
         print("Model saved in file: %s" % save_path)
 
+def test_init():
+    N_RING = 16
+    num_ring = 2
+    HDIM = 300
+    config = {'h_type'      : 'leaky_rec',
+              'activation'  : 'tanh',
+              'alpha'       : 0.2, # \Delta t/tau
+              'dt'          : 0.2*TAU,
+              'sigma_rec'   : 0.05,
+              'sigma_x'     : 0.01,
+              'HDIM'        : HDIM,
+              'N_RING'      : N_RING,
+              'num_ring'    : num_ring,
+              'rule_start'  : 1+num_ring*N_RING,
+              'shape'       : (1+num_ring*N_RING+N_RULE, HDIM, N_RING+1),
+              'save_addon'  : 'test',
+              'rules'       : [DMCGO],
+              'rule_weights': None,
+              'learning_rate': 0.001,
+              'training_iters' : 100,
+              'batch_size_train' : 10,
+              'batch_size_test' : 10}
+
+    task = generate_onebatch(rule=DMCGO, config=config, mode='sample', t_tot=1000)
+    with Run(config=config) as R:
+        h_sample = R.f_h(task.x)
+        y_sample = R.f_y(h_sample)
+
+    plt.plot(task.x[:,0,:])
+    plt.show()
+
+    plt.plot(h_sample[:,0,:])
+    plt.show()
+
+    plt.plot(y_sample[:,0,:])
+    plt.show()
+
 def replacerule(R, rule, rule_X, beta):
     '''
     Run the network but with replaced rule input weight
@@ -202,7 +239,11 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
 
     with Run(save_addon) as R:
         config = R.config
-        task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=2000)
+        # task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=2000)
+        print('Using temporary rule setup!')
+        task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=2000,
+                                 add_rule=[CHOICEDELAY_MOD2, CHOICEATTEND_MOD2, CHOICE_INT],
+                                 rule_strength=[1., 1., -1.])
         x_sample = task.x
         h_sample = R.f_h(x_sample)
         y_sample = R.f_y(h_sample)
@@ -499,12 +540,14 @@ if __name__ == "__main__":
         REMAP, INHREMAP, DELAYREMAP,\
         DMSGO, DMSNOGO, DMCGO, DMCNOGO]
 
-    rules = [CHOICE_MOD1, CHOICE_MOD2]
+    rules = [CHOICEDELAYATTEND_MOD2]
     for rule in rules:
         pass
-        sample_plot(save_addon='allrule_weaknoise_400', rule=rule, save=False)
+        # sample_plot(save_addon='allrule_softplus_400', rule=rule, save=False)
 
     # plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
     #                          epoch=None, save=False, ylabel_firstonly=True)
+
+    test_init()
     pass
 
