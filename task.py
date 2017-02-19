@@ -8,7 +8,7 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-setup_type = 'newset'
+setup_type = 'standard'
 
 if setup_type == 'standard':
 
@@ -20,6 +20,7 @@ if setup_type == 'standard':
     REMAP, INHREMAP, DELAYREMAP,\
     DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
 
+    CHOICEDELAYATTEND_MOD1 = CHOICEDELAYATTEND_MOD2 = CHOICEDELAYATTEND_INT =\
     CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = DMC = -2 # dummy
 
     TEST_INIT = -1
@@ -36,6 +37,7 @@ elif setup_type == 'OICDMC':
     REMAP, INHREMAP, DELAYREMAP,\
     DMSGO, DMSNOGO, DMCGO, DMCNOGO = [-2] * 17
 
+    CHOICEDELAYATTEND_MOD1 = CHOICEDELAYATTEND_MOD2 = CHOICEDELAYATTEND_INT =\
     CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
 
     TEST_INIT = -1
@@ -83,6 +85,8 @@ class Task(object):
             config['num_ring'] = 2 # default number
         if 'rule_start' not in config:
             config['rule_start'] = 1+config['num_ring']*config['N_RING']
+        if 'sigma_x' not in config:
+            config['sigma_x'] = 0.01
 
 
         self.float_type = 'float32' # This should be the default
@@ -292,6 +296,16 @@ def go(config, mode, **kwargs):
         tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
         tar_mod   = ind_tar_mod + 1
 
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar_locs = p['tar_locs']
+        batch_size = len(tar_locs)
+
+        # Time of targets on/off
+        fix_offs = int(1000/dt)
+        tdim = int(400/dt) + fix_offs
+        tar_mod   = 1
+
 
 
     # time to check the saccade location
@@ -365,6 +379,18 @@ def inhgo(config, mode, **kwargs):
         tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
         tar_mod   = ind_tar_mod + 1
 
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar_locs = p['tar_locs']
+        tar_time = int(p['tar_time']/dt)
+        batch_size = len(tar_locs)
+
+        # Time of targets on/off
+        tar_ons   = int(300/dt)
+        fix_offs  = tar_ons + tar_time
+        tdim      = int(400/dt) + fix_offs
+        tar_mod   = 1
+
     # time to check the saccade location
     check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
 
@@ -437,6 +463,19 @@ def delaygo(config, mode, **kwargs):
         tar_mod   = ind_tar_mod + 1
         tar_offs  = int(1000/dt)
 
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar_locs = p['tar_locs']
+        # Time of targets on/off
+        tar_ons    = int(p['tar_ons']/dt)
+        tar_offs   = int(p['tar_offs']/dt)
+        delay_time = int(p['delay_time']/dt)
+        fix_offs   = tar_offs + delay_time
+        tdim       = int(400/dt) + fix_offs
+        tar_mod    = 1
+
+        batch_size = len(tar_locs)
+
     check_ons= fix_offs + int(100/dt)
 
     task = Task(config, tdim, batch_size)
@@ -503,6 +542,16 @@ def remapgo(config, mode, **kwargs):
         fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
         tar_mod   = ind_tar_mod + 1
+
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar_locs = p['tar_locs']
+        batch_size = len(tar_locs)
+
+        # Time of targets on/off
+        fix_offs = int(1000/dt)
+        tdim = int(400/dt) + fix_offs
+        tar_mod   = 1
 
     # time to check the saccade location
     check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
@@ -574,6 +623,18 @@ def inhremapgo(config, mode, **kwargs):
         fix_offs  = int(2000/dt)
         tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
         tar_mod   = ind_tar_mod + 1
+
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar_locs = p['tar_locs']
+        tar_time = int(p['tar_time']/dt)
+        batch_size = len(tar_locs)
+
+        # Time of targets on/off
+        tar_ons   = int(300/dt)
+        fix_offs  = tar_ons + tar_time
+        tdim      = int(400/dt) + fix_offs
+        tar_mod   = 1
 
     # time to check the saccade location
     check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
@@ -650,6 +711,19 @@ def delayremapgo(config, mode, **kwargs):
         tar_ons   = int(500/dt)
         tar_mod   = ind_tar_mod + 1
         tar_offs  = int(1000/dt)
+
+    elif mode == 'psychometric':
+        p = kwargs['params']
+        tar_locs = p['tar_locs']
+        # Time of targets on/off
+        tar_ons    = int(p['tar_ons']/dt)
+        tar_offs   = int(p['tar_offs']/dt)
+        delay_time = int(p['delay_time']/dt)
+        fix_offs   = tar_offs + delay_time
+        tdim       = int(400/dt) + fix_offs
+        tar_mod    = 1
+
+        batch_size = len(tar_locs)
 
     # time to check the saccade location
     check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
