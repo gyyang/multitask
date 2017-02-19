@@ -95,7 +95,23 @@ class Run(Session):
 
         # Loss
         cost = tf.reduce_mean(tf.square((y-y_hat)*c_mask))
-        optimizer = tf.train.AdamOptimizer(learning_rate=config['learning_rate']).minimize(cost)
+
+        # optimizer = tf.train.AdamOptimizer(learning_rate=config['learning_rate']).minimize(cost)
+
+
+        # Create an optimizer.
+        opt = tf.train.AdamOptimizer(learning_rate=config['learning_rate'])
+
+        # Compute the gradients for a list of variables.
+        grads_and_vars = opt.compute_gradients(cost, tf.trainable_variables())
+
+        # grads_and_vars is a list of tuples (gradient, variable).  Do whatever you
+        # need to the 'gradient' part, for example cap them, etc.
+        # capped_grads_and_vars = [(MyCapper(gv[0]), gv[1]) for gv in grads_and_vars]
+        capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in grads_and_vars]
+
+        # Ask the optimizer to apply the capped gradients.
+        optimizer = opt.apply_gradients(capped_gvs)
 
         init = tf.initialize_all_variables()
         self.run(init)
@@ -134,11 +150,13 @@ class Run(Session):
         self.f_y_from_x = lambda x0 : self.f_y(self.f_h(x0))
         self.f_y_loc    = lambda y0 : popvec(y0[...,1:])
         self.f_y_loc_from_x = lambda x0 : self.f_y_loc(self.f_y(self.f_h(x0)))
-        self.f_cost     = lambda y0, y_hat0, c_mask0: np.mean(np.sum((c_mask0*(y_hat0-y0))**2),axis=0)
+        self.f_cost     = lambda y0, y_hat0, c_mask0 : np.mean(np.sum((c_mask0*(y_hat0-y0))**2),axis=0)
 
-        self.train_one_step = lambda x0, y0, c_mask0 : self.run(optimizer, feed_dict={x: x0,
-                                               y: y0,
-                                               c_mask: c_mask0})
+        self.f_grad     = lambda x0, y0, c_mask0 : self.run(
+            grads_and_vars, feed_dict={x: x0, y: y0, c_mask: c_mask0})
+
+        self.train_one_step = lambda x0, y0, c_mask0 : self.run(
+            optimizer, feed_dict={x: x0, y: y0, c_mask: c_mask0})
 
         # Notice this weight is originally used as r*W, so transpose them
         self.params = self.run(tf.trainable_variables())
@@ -163,7 +181,7 @@ def test_init():
     num_ring = 2
     HDIM = 300
     config = {'h_type'      : 'leaky_rec',
-              'activation'  : 'tanh',
+              'activation'  : 'softplus',
               'alpha'       : 0.2, # \Delta t/tau
               'dt'          : 0.2*TAU,
               'sigma_rec'   : 0.05,
@@ -183,8 +201,12 @@ def test_init():
 
     task = generate_onebatch(rule=DMCGO, config=config, mode='sample', t_tot=1000)
     with Run(config=config) as R:
+        n_input, n_hidden, n_output = config['shape']
         h_sample = R.f_h(task.x)
         y_sample = R.f_y(h_sample)
+        grads_and_vars = R.f_grad(task.x,
+                       task.y.reshape((-1,n_output)),
+                       task.c_mask.reshape((-1,n_output)))
 
     plt.plot(task.x[:,0,:])
     plt.show()
@@ -540,14 +562,13 @@ if __name__ == "__main__":
         REMAP, INHREMAP, DELAYREMAP,\
         DMSGO, DMSNOGO, DMCGO, DMCNOGO]
 
-    rules = [CHOICEDELAYATTEND_MOD2]
+    rules = [CHOICEATTEND_MOD2]
     for rule in rules:
         pass
-        # sample_plot(save_addon='allrule_softplus_400', rule=rule, save=False)
+        # sample_plot(save_addon='allrule_softplus_test', rule=rule, save=False)
 
     # plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
     #                          epoch=None, save=False, ylabel_firstonly=True)
 
-    test_init()
+    # test_init()
     pass
-
