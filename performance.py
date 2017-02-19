@@ -634,7 +634,12 @@ def psychometric_choicefamily_2D(save_addon, rule, lesion_units=None,
           'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
           'tar_time'    : 800
           }
+
     params_dict[CHOICEATTEND_MOD2] = params_dict[CHOICEATTEND_MOD1]
+
+    params_dict[CHOICEDELAYATTEND_MOD1] = params_dict[CHOICEATTEND_MOD1]
+    params_dict[CHOICEDELAYATTEND_MOD1]['tar_time'] = 00
+    params_dict[CHOICEDELAYATTEND_MOD2] = params_dict[CHOICEDELAYATTEND_MOD1]
 
     params_dict[CHOICE_INT] = \
          {'tar1_locs' : tar1_locs,
@@ -646,23 +651,25 @@ def psychometric_choicefamily_2D(save_addon, rule, lesion_units=None,
           'tar_time'    : 800
           }
 
+    params_dict[CHOICEDELAYATTEND_MOD1] = \
+         {'tar1_locs' : tar1_locs,
+          'tar2_locs' : tar2_locs,
+          'tar1_mod1_strengths' : 1 + tar_mod1_cohs,
+          'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
+          'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
+          'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
+          'tar_time'    : 800
+          }
+
     with Run(save_addon, lesion_units=lesion_units, fast_eval=True) as R:
 
         params = params_dict[rule]
-        task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+        # task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
 
         print('Using temporary rule setup')
-        # params = params_dict[CHOICEATTEND_MOD1]
-        # task  = generate_onebatch(CHOICEATTEND_MOD1, R.config, 'psychometric', params=params, add_rule=rule)
-
-        from run import replacerule
-        rule_X = np.array([CHOICE_INT, CHOICE_MOD1])
-        # beta = np.array([1,0])
-        # beta = np.array([-1,2])
-        # beta = np.array([0,1])
-        # beta = np.array([0,2])
-        # beta = np.array([-4,5])
-        # beta = replacerule(R, rule, rule_X, beta)
+        task  = generate_onebatch(rule, R.config, 'psychometric', params=params,
+                                  add_rule=[CHOICEDELAY_MOD2, CHOICEATTEND_MOD2, CHOICE_INT],
+                                  rule_strength=[0., 1., -0.])
 
         y_sample = R.f_y_from_x(task.x)
         y_sample_loc = R.f_y_loc(y_sample)
@@ -1132,12 +1139,89 @@ def psychometric_delaymatching_fromsession(R, rule):
     #             self.save_addon+'.pdf', transparent=True)
     plt.show()
 
+################ Psychometric - Anti Tasks ####################################
+
+def psychometric_goantifamily_2D(save_addon, rule, title=None, **kwargs):
+    n_rep = 20
+    n_tar_loc = 20 # increase repeat by increasing this
+    batch_size = n_rep * n_tar_loc
+    batch_shape = (n_rep, n_tar_loc)
+    ind_rep, ind_tar_loc = np.unravel_index(range(batch_size),batch_shape)
+
+    # Looping target location
+    tar_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+
+    if rule in [GO, REMAP]:
+        params = {'tar_locs' : tar_locs}
+    elif rule in [INHGO, INHREMAP]:
+        params = {'tar_locs' : tar_locs,
+                  'tar_time' : 1000}
+    elif rule in [DELAYGO, DELAYREMAP]:
+        params = {'tar_locs' : tar_locs,
+                  'tar_ons'  : 500,
+                  'tar_offs' : 800,
+                  'delay_time' : 1000}
+    else:
+        raise ValueError('Not supported rule value')
+
+    with Run(save_addon, fast_eval=True) as R:
+        task  = generate_onebatch(rule, R.config, 'psychometric', params=params)
+        # response locations at last time points
+        y_hat_loc = R.f_y_loc_from_x(task.x)[-1]
+
+    y_hat_loc = np.reshape(y_hat_loc, batch_shape)
+    tar_locs_ = np.reshape(tar_locs, batch_shape)[0,:]
+    bins = np.concatenate((tar_locs_, np.array([2*np.pi])))
+    responses = np.zeros((n_tar_loc, n_tar_loc))
+
+    # Looping over input locations
+    for i in range(n_tar_loc):
+        hist, bins_edge = np.histogram(y_hat_loc[:,i], bins=bins)
+        responses[:,i] = hist/n_rep
+
+
+    fs = 6
+    fig = plt.figure(figsize=(1.5,1.5))
+    ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
+    im = ax.imshow(responses, cmap='hot', origin='lower',
+                   aspect='auto', interpolation='nearest', vmin=0, vmax=1)
+    ax.set_xlabel('input loc.', fontsize=fs, labelpad=-3)
+    plt.xticks([0, n_tar_loc-1], ['0', '360'],
+               rotation=0, va='center', fontsize=fs)
+    ax.set_ylabel('output loc.', fontsize=fs, labelpad=-3)
+    plt.yticks([0, n_tar_loc-1], ['0', '360'],
+               rotation=0, va='center', fontsize=fs)
+    if title is not None:
+        ax.set_title(title, fontsize=fs)
+    ax.tick_params('both', length=0)
+    for loc in ['bottom','top','left','right']:
+        ax.spines[loc].set_visible(False)
+
+    if 'colorbar' in kwargs and kwargs['colorbar']==False:
+        pass
+    else:
+        ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
+        cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
+        cb.outline.set_linewidth(0.5)
+        cb.set_label('Prop. of responses', fontsize=fs, labelpad=-3)
+        plt.tick_params(axis='both', which='major', labelsize=fs)
+
+    if save:
+        if 'save_name' not in kwargs:
+            save_name = rule_name[rule].replace(' ','')+'_perf2D.pdf'
+        else:
+            save_name = kwargs['save_name']
+        plt.savefig(os.path.join('figure', save_name), transparent=True)
+
+    plt.show()
+
+
 
 if __name__ == '__main__':
     pass
     # plot_trainingprogress('allrule_tanh_340')
     # plot_trainingprogress('oicdmconly_strongnoise_200')
-    plot_finalperformance('allrule_relu')
+    # plot_finalperformance('allrule_relu')
     # plot_finalperformance('oicdmconly_strongnoise')
     # plot_finalperformance_lr()
     
@@ -1161,9 +1245,9 @@ if __name__ == '__main__':
         # compute_choicefamily_varytime(save_addon, rule)
         # plot_choicefamily_varytime(save_addon, rule)
 
-    for rule in [CHOICEATTEND_MOD1]:
+    for rule in [CHOICEDELAYATTEND_MOD2]:
         pass
-        # plot_psychometric_choicefamily_2D(save_addon, rule, n_tar_loc=200, coh_range = 0.02)
+        # plot_psychometric_choicefamily_2D(save_addon, rule, n_tar_loc=20, coh_range = 0.6)
 
     # psychometric_choiceattend_(save_addon, CHOICEATTEND_MOD1)
 
@@ -1179,3 +1263,8 @@ if __name__ == '__main__':
     for rule in [DMSGO, DMSNOGO, DMCGO, DMCNOGO]:
         pass
         # psychometric_delaymatching(save_addon, rule)
+
+    save_addon = 'allrule_softplus_300'
+    for rule in [GO, INHGO, DELAYGO, REMAP, INHREMAP, DELAYREMAP]:
+        psychometric_goantifamily_2D(save_addon, rule)
+
