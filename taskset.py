@@ -70,7 +70,7 @@ class TaskSetAnalysis(object):
                 task = generate_onebatch(rule=rule, config=config, mode='test')
 
                 #TODO: TEMPORARY For Debugging
-                # if rule in [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]:
+                # if rule in [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT, CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]:
                 #     print('Using temporary rule setup')
                 #     task = generate_onebatch(rule=CHOICEATTEND_MOD1, config=config, mode='test', add_rule=rule)
                 # elif rule in [DMSGO, DMSNOGO, DMCGO, DMCNOGO]:
@@ -590,7 +590,7 @@ def plot_weight_rule_PCA(save_addon):
             plt.text(data_trans[i,0],data_trans[i,1], rule_name[rule])
             plt.axis('equal')
 
-def run_network_replacerule(save_addon, rule, rule_X, beta):
+def run_network_replacerule(save_addon, rule, replace_rule, rule_strength=None):
     '''
     Run the network but with replaced rule input weight
     :param rule: the rule to run
@@ -607,12 +607,12 @@ def run_network_replacerule(save_addon, rule, rule_X, beta):
     with Run(save_addon, fast_eval=True) as R:
         config = R.config
 
-        if beta is None: # Do nothing
-            print('Original rule input')
-        else:
-            beta = replacerule(R, rule, rule_X, beta)
-            beta = beta.flatten()
-            print(beta)
+        # if rule_strength is None: # Do nothing
+        #     print('Original rule input')
+        # else:
+        #     beta = replacerule(R, rule, replace_rule, rule_strength)
+        #     beta = beta.flatten()
+        #     print(beta)
 
         # Get performance
         batch_size_test = 2000
@@ -620,13 +620,17 @@ def run_network_replacerule(save_addon, rule, rule_X, beta):
         batch_size_test_rep = int(batch_size_test/n_rep)
         perf_rep = list()
         for i_rep in range(n_rep):
-            task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep)
+            if rule_strength is None:
+                task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep)
+            else:
+                task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep,
+                                         add_rule=replace_rule, rule_strength=rule_strength)
             h = R.f_h(task.x)
             y_hat = R.f_y(h)
             perf = get_perf(y_hat, task.y_loc)
             perf_rep.append(perf.mean())
 
-    return np.mean(perf_rep), beta
+    return np.mean(perf_rep), rule_strength
 
 def compute_and_plot_replacerule_performance(save_addon, setup):
     '''
@@ -722,18 +726,33 @@ def compute_and_plot_replacerule_performance(save_addon, setup):
         names.append(' 2'+rule_name[CHOICE_MOD1]+' \n+ -'+rule_name[CHOICE_INT])
         names.append('fit')
 
+    elif setup == 5:
+        rule = CHOICEDELAYATTEND_MOD1
+        rule_X = np.array([CHOICEDELAY_INT, CHOICEATTEND_MOD1, CHOICE_INT])
 
+        betas = list()
+        betas.append(None)
+        betas.append(np.array([1, 0, 0]))
+        betas.append(np.array([1, 1, 0]))
+        betas.append(np.array([1, 1,-1]))
+
+        names = list()
+        names.append(rule_name[CHOICEDELAYATTEND_MOD1])
+        names.append(rule_name[CHOICEDELAY_INT])
+        names.append(' '+rule_name[CHOICEDELAY_INT]+' \n+'+rule_name[CHOICEATTEND_MOD1])
+        names.append(' '+rule_name[CHOICEDELAY_INT]+' \n+'+rule_name[CHOICEATTEND_MOD1]+' \n-'+rule_name[CHOICE_INT])
 
     perfs = list()
     for beta in betas:
         perf, _ = run_network_replacerule(save_addon, rule, rule_X, beta)
         perfs.append(perf)
+    print(perfs)
 
     save = True
 
     fs = 7
     width = 0.2
-    fig = plt.figure(figsize=(2.0,1.5))
+    fig = plt.figure(figsize=(4.0,1.5))
     ax = fig.add_axes([0.17,0.4,0.8,0.45])
     b0 = ax.bar(np.arange(len(perfs))-width/2, perfs,
            width=width, color=sns.xkcd_palette(['dark blue'])[0], edgecolor='none')
@@ -756,14 +775,16 @@ def compute_and_plot_replacerule_performance(save_addon, setup):
 
 
 # save_addon = 'allrule_weaknoise_400'
-save_addon = 'allrule_softplus_340'
+# save_addon = 'allrule_softplus_440'
 # save_addon = 'allrule_relu_340'
 # save_addon = 'allrule_tanh_340'
 # save_addon = 'goantifamily_softplus_40'
+save_addon = 'allrule_relu_460newset'
 
 # plot_taskspaces(save_addon, get_lasttimepoint=True)
 # plot_weight_rule_PCA(save_addon)
-for setup in [0, 1]:
+for setup in [5]:
+    pass
     compute_and_plot_replacerule_performance(save_addon, setup)
 # plot_dim()
 # plot_dimpair()
@@ -773,8 +794,8 @@ for setup in [0, 1]:
 # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
 # rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
 
-# save_addon = 'goantifamily_softplus_140'
-# rules = [INHGO, DELAYGO, INHREMAP, DELAYREMAP]
+# save_addon = 'allrule_relu_460newset'
+# rules = [CHOICE_INT, CHOICEDELAY_INT, CHOICEATTEND_MOD1, CHOICEDELAYATTEND_MOD1]
 # tsa = TaskSetAnalysis(save_addon, rules=rules)
 # tsa.plot_taskspace(rules=rules,
 #                    epochs=['tar1'], plot_text=True,
