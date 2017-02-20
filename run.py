@@ -24,7 +24,8 @@ class Run(Session):
     It is less flexible than raw tensorflow,
     but more convenient if you want to reuse the same model over and over again.
     '''
-    def __init__(self, restore=None, config=None, sigma_rec=None, lesion_units=None, fast_eval=False):
+    def __init__(self, restore=None, config=None, sigma_rec=None,
+                 lesion_units=None, fast_eval=False):
         '''
         save_addon: add on for loading and saving
         inh_id    : Ids of units to inhibit inputs or outputs
@@ -59,7 +60,6 @@ class Run(Session):
         else:
             assert config is not None
 
-
         config['alpha'] = config['dt']/TAU
 
         if sigma_rec is not None:
@@ -77,7 +77,7 @@ class Run(Session):
         c_mask = tf.placeholder("float", [None, n_output])
 
         # Define weights
-        w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_output)))
+        w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)))
         b_out = tf.Variable(tf.zeros([n_output]))
 
         # Initial state (requires tensorflow later than 0.10)
@@ -261,11 +261,7 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
 
     with Run(save_addon) as R:
         config = R.config
-        # task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=2000)
-        print('Using temporary rule setup!')
-        task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=2000,
-                                 add_rule=[CHOICEDELAY_MOD2, CHOICEATTEND_MOD2, CHOICE_INT],
-                                 rule_strength=[1., 1., -1.])
+        task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=2000)
         x_sample = task.x
         h_sample = R.f_h(x_sample)
         y_sample = R.f_y(h_sample)
@@ -572,3 +568,4 @@ if __name__ == "__main__":
 
     # test_init()
     pass
+
