@@ -31,8 +31,8 @@ def mkdir_p(path):
         else:
             raise
 
-def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
-          batch_size_train=50, batch_size_test=2000, display_step=1000, save_addon=None):
+def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
+          batch_size_train=50, batch_size_test=200, display_step=1000, save_addon=None):
     '''
     Training the network
     :param HDIM: Number of recurrent units
@@ -43,8 +43,15 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
     :return:
     '''
 
+    mkdir_p('data')
+
     # Number of input rings
     num_ring = 2
+    # Number of units each ring has
+    N_RING = 16
+
+    sigma_rec = 0.05
+    sigma_x   = 0.01
 
     if s == 0:
         save_addon_type = 'allrule_softplus'
@@ -78,14 +85,13 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
         save_addon_type = 'choicefamily_softplus'
     elif s == 15:
         save_addon_type = 'goantifamily_softplus'
+    elif s == 16:
+        save_addon_type = 'allrule_softplus'
+        N_RING = 32
 
 
     tf.reset_default_graph()
 
-    N_RING = 16
-
-    sigma_rec = 0.05
-    sigma_x   = 0.01
 
     if 'allrule' in save_addon_type:
         # Rules
@@ -164,7 +170,6 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
 
     # Use customized session that launches the graph as well
     with Run(config=config) as R:
-
         step = 1
         # Keep training until reach max iterations
         while step * batch_size_train < training_iters:
@@ -205,11 +210,25 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
                         print('{:15s}'.format(rule_name[rule]) +
                               '| cost {:0.5f}'.format(cost_tests[rule][-1])  +
                               '  | perf {:0.2f}'.format(perf_tests[rule][-1]))
+
+                    # Saving the model
+                    R.save()
+
+                    config['trials']     = trials
+                    config['times']      = times
+                    config['cost_tests'] = cost_tests
+                    config['perf_tests'] = perf_tests
+                    with open(os.path.join('data', 'config'+config['save_addon']+'.pkl'), 'wb') as f:
+                        pickle.dump(config, f)
+
                 step += 1
+
+
+
             except KeyboardInterrupt:
                 break
 
-        mkdir_p('data')
+
 
         # Saving the model
         R.save()
@@ -235,4 +254,5 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=2000000,
 
 if __name__ == '__main__':
     pass
-    train(HDIM=37, s=0, save_addon='test', training_iters=300000, batch_size_train=50, batch_size_test=200, display_step=100)
+    train(HDIM=340, s=0, save_addon='test', training_iters=300000,
+          batch_size_train=50, batch_size_test=200, display_step=100)
