@@ -8,7 +8,7 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-setup_type = 'standard'
+setup_type = 'newset'
 
 if setup_type == 'standard':
 
@@ -20,7 +20,7 @@ if setup_type == 'standard':
     REMAP, INHREMAP, DELAYREMAP,\
     DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
 
-    CHOICEDELAYATTEND_MOD1 = CHOICEDELAYATTEND_MOD2 = CHOICEDELAYATTEND_INT =\
+    CHOICEDELAYATTEND_MOD1 = CHOICEDELAYATTEND_MOD2 = CHOICEDELAY_INT =\
     CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = DMC = -2 # dummy
 
     TEST_INIT = -1
@@ -37,7 +37,7 @@ elif setup_type == 'OICDMC':
     REMAP, INHREMAP, DELAYREMAP,\
     DMSGO, DMSNOGO, DMCGO, DMCNOGO = [-2] * 17
 
-    CHOICEDELAYATTEND_MOD1 = CHOICEDELAYATTEND_MOD2 = CHOICEDELAYATTEND_INT =\
+    CHOICEDELAYATTEND_MOD1 = CHOICEDELAYATTEND_MOD2 = CHOICEDELAY_INT =\
     CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = -2 # dummy
 
     TEST_INIT = -1
@@ -49,7 +49,7 @@ elif setup_type == 'newset':
     GO, INHGO, DELAYGO,\
     REMAP, INHREMAP, DELAYREMAP,\
     CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAYATTEND_INT,\
+    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT,\
     DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
 
     CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = DMC = -2 # dummy
@@ -179,7 +179,8 @@ class Task(object):
             # Scale the cost mask of the pre-response period by a factor
             self.c_mask[pre_on:pre_offs[i], i, :] = (self.tdim-post_ons[i])/(pre_offs[i]-pre_on)
 
-        self.c_mask[:, :, 0] *= self.N_RING # Fixation is important
+        # self.c_mask[:, :, 0] *= self.N_RING # Fixation is important
+        self.c_mask[:, :, 0] *= 2 # Fixation is important
 
     def add_rule(self, rule, on=None, off=None, strength=1.):
         self.x[on:off,:,self.config['rule_start']+rule] = strength # Have rule input
@@ -1025,7 +1026,7 @@ def choicego_int(config, mode, **kwargs):
 
         tars_mod1_mean = np.random.uniform(0.8,1.2,(batch_size,))
         # tars_mod1_diff = np.random.uniform(0.05,0.4,(batch_size,))
-        tars_mod1_diff = np.random.choice([0.01, 0.02, 0.04], (batch_size,))
+        tars_mod1_diff = np.random.choice([0.02, 0.04, 0.08, 0.16], (batch_size,))
         tars_mod1_sign = np.random.choice([1,-1], (batch_size,))
 
         tar1_mod1_strengths = tars_mod1_mean + tars_mod1_diff*tars_mod1_sign/2
@@ -1176,20 +1177,20 @@ def choicedelaygo_(config, mode, tar_mod, **kwargs):
         batch_size = 1
 
     elif mode == 'test':
-        tdim = int(2500/dt)
+        tdim = int(3000/dt)
         n_tar_loc, n_tar1_strength = batch_shape = 20, 5
         batch_size = np.prod(batch_shape)
         ind_tar_loc, ind_tar1_strength = np.unravel_index(range(batch_size),batch_shape)
 
-        fix_offs  = int(2000/dt)
+        fix_offs  = int(2700/dt)
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
         tar1_strengths = 1.0*ind_tar1_strength/n_tar1_strength+0.5
         tar2_strengths = 2 - tar1_strengths
         tar1_ons = int(500/dt)
-        tar1_offs = int(800/dt)
-        tar2_ons = int(1600/dt)
-        tar2_offs = int(1900/dt)
+        tar1_offs = int(1000/dt)
+        tar2_ons = int(2000/dt)
+        tar2_offs = int(2500/dt)
 
     elif mode == 'psychometric':
         p = kwargs['params']
@@ -1323,10 +1324,10 @@ def choicegodelay_attend_(config, mode, attend_mod, **kwargs):
         tar2_mod2_strengths = 2 - tar1_mod2_strengths
 
         tar1_ons = int(500/dt)
-        tar1_offs = int(800/dt)
-        tar2_ons = int(1600/dt)
-        tar2_offs = int(1900/dt)
-        fix_offs  = int(2000/dt)
+        tar1_offs = int(1000/dt)
+        tar2_ons = int(2000/dt)
+        tar2_offs = int(2200/dt)
+        fix_offs  = int(2300/dt)
         tdim = int(2500/dt)
 
     elif mode == 'psychometric':
@@ -1470,10 +1471,10 @@ def choicegodelay_int(config, mode, **kwargs):
         tar2_mod2_strengths = tar2_mod1_strengths
 
         tar1_ons = int(500/dt)
-        tar1_offs = int(800/dt)
-        tar2_ons = int(1600/dt)
-        tar2_offs = int(1900/dt)
-        fix_offs  = int(2000/dt)
+        tar1_offs = int(1000/dt)
+        tar2_ons = int(2000/dt)
+        tar2_offs = int(2200/dt)
+        fix_offs  = int(2300/dt)
         tdim = int(2500/dt)
 
     elif mode == 'psychometric':
@@ -1567,7 +1568,7 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
         # Since tar1 is always shown first, it's important that we completely randomize their relative positions
         matchs    = np.random.choice([0,1],(batch_size,)) # match or not?
         # tar_dist range between 1/18*pi and (2-1/18*pi), corresponding to 10 degree to 350 degree
-        tar_dist  = np.random.uniform(np.pi/18,np.pi*35./18.,(batch_size,))*np.random.choice([-1,1],(batch_size,))
+        tar_dist  = np.random.uniform(np.pi/9,np.pi*17./9.,(batch_size,))*np.random.choice([-1,1],(batch_size,))
         tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
         tar2_locs = (tar1_locs+tar_dist*(1-matchs))%(2*np.pi)
 
@@ -2225,7 +2226,7 @@ rule_mapping = {TEST_INIT               : test_init,
                 CHOICEDELAY_MOD1_COPY   : choicedelaygo_mod1,
                 CHOICEDELAYATTEND_MOD1  : choicegodelay_attend_mod1,
                 CHOICEDELAYATTEND_MOD2  : choicegodelay_attend_mod2,
-                CHOICEDELAYATTEND_INT   : choicegodelay_int,
+                CHOICEDELAY_INT         : choicegodelay_int,
                 TIMEDGO                 : timedgo,
                 REMAP                   : remapgo,
                 DELAYTIMEDGO            : delaytimedgo,
@@ -2254,7 +2255,7 @@ rule_name    = {FIXATION                : 'Fixation',
                 CHOICEDELAY_MOD1_COPY   : 'Del DM 1*',
                 CHOICEDELAYATTEND_MOD1  : 'Context Del DM 1',
                 CHOICEDELAYATTEND_MOD2  : 'Context Del DM 2',
-                CHOICEDELAYATTEND_INT   : 'MultiSen Del DM',
+                CHOICEDELAY_INT         : 'MultiSen Del DM',
                 TIMEDGO                 : 'Timed Go',
                 DELAYTIMEDGO            : 'Timed Delay Go',
                 REMAP                   : 'Anti',
