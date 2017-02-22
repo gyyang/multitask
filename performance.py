@@ -26,17 +26,20 @@ from run import Run
 
 rule_color={GO                : sns.xkcd_palette(['green'])[0],
             DELAYGO           : sns.xkcd_palette(['olive'])[0],
-            INHGO             : sns.xkcd_palette(['light green'])[0],
+            INHGO             : sns.xkcd_palette(['forest green'])[0],
             REMAP             : sns.xkcd_palette(['mustard'])[0],
             DELAYREMAP        : sns.xkcd_palette(['tan'])[0],
-            INHREMAP          : sns.xkcd_palette(['yellow'])[0],
+            INHREMAP          : sns.xkcd_palette(['orange'])[0],
             CHOICE_MOD1       : sns.xkcd_palette(['lavender'])[0],
             CHOICE_MOD2       : sns.xkcd_palette(['aqua'])[0],
             CHOICEATTEND_MOD1 : sns.xkcd_palette(['bright purple'])[0],
-            CHOICEATTEND_MOD2 : sns.xkcd_palette(['cyan'])[0],
+            CHOICEATTEND_MOD2 : sns.xkcd_palette(['green blue'])[0],
             CHOICE_INT        : sns.xkcd_palette(['blue'])[0],
-            CHOICEDELAY_MOD1  : sns.xkcd_palette(['violet'])[0],
-            CHOICEDELAY_MOD2  : sns.xkcd_palette(['teal'])[0],
+            CHOICEDELAY_MOD1  : sns.xkcd_palette(['indigo'])[0],
+            CHOICEDELAY_MOD2  : sns.xkcd_palette(['grey blue'])[0],
+            CHOICEDELAYATTEND_MOD1  : sns.xkcd_palette(['royal purple'])[0],
+            CHOICEDELAYATTEND_MOD2  : sns.xkcd_palette(['dark cyan'])[0],
+            CHOICEDELAY_INT   : sns.xkcd_palette(['royal blue'])[0],
             DMSGO             : sns.xkcd_palette(['red'])[0],
             DMSNOGO           : sns.xkcd_palette(['rose'])[0],
             DMCGO             : sns.xkcd_palette(['orange'])[0],
@@ -97,11 +100,13 @@ def plot_trainingprogress(save_addon, rule_plot=None, save=True):
         plt.savefig('figure/Training_Progress'+config['save_addon']+'.pdf', transparent=True)
     plt.show()
 
-def plot_finalperformance(save_type):
+def plot_finalperformance(save_type, save_type_end=None):
     HDIMs = range(1000)
     # Initialization. Dictionary comprehension.
     for HDIM in HDIMs:
         save_addon = save_type+'_'+str(HDIM)
+        if save_type_end is not None:
+            save_addon = save_addon + save_type_end
         fname = 'data/config'+save_addon+'.pkl'
         if os.path.isfile(fname):
             break
@@ -119,6 +124,8 @@ def plot_finalperformance(save_type):
 
     for HDIM in HDIMs:
         save_addon = save_type+'_'+str(HDIM)
+        if save_type_end is not None:
+            save_addon = save_addon + save_type_end
         fname = 'data/config'+save_addon+'.pkl'
         if not os.path.isfile(fname):
             continue
@@ -1219,9 +1226,10 @@ def psychometric_goantifamily_2D(save_addon, rule, title=None, **kwargs):
 
 if __name__ == '__main__':
     pass
-    # plot_trainingprogress('allrule_tanh_340')
-    # plot_trainingprogress('oicdmconly_strongnoise_200')
-    # plot_finalperformance('allrule_relu')
+    # plot_trainingprogress('allrule_softplus_400largeinput')
+    # plot_trainingprogress('goantifamily_softplus_40')
+    # plot_finalperformance('allrule_softplus')
+    # plot_finalperformance('allrule_softplus', 'largeinput')
     # plot_finalperformance('oicdmconly_strongnoise')
     # plot_finalperformance_lr()
     
@@ -1236,7 +1244,7 @@ if __name__ == '__main__':
     # save_addon = 'allrule_weaknoise_480' # This works as well
     # save_addon = 'allrule_weaknoise_500'
     # save_addon = 'allrule_weaknoise_400'
-    save_addon = 'allrule_softplus_380'
+    save_addon = 'allrule_softplus_440largeinput'
     # save_addon = 'choicefamily_softplus_220'
     # save_addon = 'attendonly_weaknoise_500'
     # for rule in [CHOICEATTEND_MOD1]:
@@ -1266,5 +1274,6 @@ if __name__ == '__main__':
 
     save_addon = 'allrule_softplus_300'
     for rule in [GO, INHGO, DELAYGO, REMAP, INHREMAP, DELAYREMAP]:
-        psychometric_goantifamily_2D(save_addon, rule)
+        # psychometric_goantifamily_2D(save_addon, rule)
+        pass
 
