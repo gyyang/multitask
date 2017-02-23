@@ -21,7 +21,7 @@ from run import Run
 from network import get_perf
 from slowpoints import search_slowpoints
 
-save = False # TEMP
+save = True # TEMP
 
 def generate_surrogate_data():
     # Generate surrogate data
@@ -1168,12 +1168,14 @@ def plot_groupsize(save_type):
     ax.yaxis.set_ticks_position('left')
     plt.savefig('figure/choiceattend_groupsize'+save_type+'.pdf', transparent=True)
 
-def plot_betaweights(save_type):
+def plot_betaweights(save_type, save_type_end=None):
     HDIMs = range(150, 1000)
     coefs = {}
 
     for HDIM in HDIMs:
         save_addon = save_type+'_'+str(HDIM)
+        if save_type_end is not None:
+            save_addon = save_addon + save_type_end
         fname = 'data/config'+save_addon+'.pkl'
         if not os.path.isfile(fname):
             continue
@@ -1218,7 +1220,7 @@ def quick_statespace(save_addon):
 
 ######################### Connectivity and Lesioning ##########################
 save_addon = 'allrule_softplus_400'
-ua = UnitAnalysis(save_addon)
+# ua = UnitAnalysis(save_addon)
 # ua.plot_inout_connectivity(conn_type='rec')
 # ua.plot_inout_connectivity(conn_type='rule')
 # ua.plot_inout_connectivity(conn_type='output')
@@ -1226,7 +1228,7 @@ ua = UnitAnalysis(save_addon)
 # ua.plot_performance_choicetasks()
 
 rule = CHOICEATTEND_MOD1
-ua.plot_performance_2D(rule=rule)
+# ua.plot_performance_2D(rule=rule)
 # for lesion_group in ['1', '2', '12', '1+2']:
 #     ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
 
@@ -1240,8 +1242,8 @@ ua.plot_performance_2D(rule=rule)
 # ssa.plot_statespace(plot_slowpoints=True)
 
 # Plot beta weights
-# save_type = 'allrule_weaknoise'
-# plot_betaweights(save_type)
+save_type = 'allrule_softplus'
+plot_betaweights(save_type, save_type_end='largeinput')
 
 # Plot units in time
 # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, z_score=False)

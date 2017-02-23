@@ -685,7 +685,6 @@ def compute_and_plot_taskspace(save_addon=None, save_type=None,
 
     plot_taskspace(h_trans, save_name)
 
-
 def run_network_replacerule(save_addon, rule, replace_rule, rule_strength=None):
     '''
     Run the network but with replaced rule input weight

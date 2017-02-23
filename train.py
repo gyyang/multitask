@@ -48,7 +48,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
     # Number of input rings
     num_ring = 2
     # Number of units each ring has
-    N_RING = 16
+    N_RING = 32
 
     sigma_rec = 0.05
     sigma_x   = 0.01
@@ -85,9 +85,6 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
         save_addon_type = 'choicefamily_softplus'
     elif s == 15:
         save_addon_type = 'goantifamily_softplus'
-    elif s == 16:
-        save_addon_type = 'allrule_softplus'
-        N_RING = 32
 
 
     tf.reset_default_graph()

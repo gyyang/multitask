@@ -20,14 +20,10 @@ save = False
 
 ########################## Running the network ################################
 # save_addon = 'allrule_weaknoise_400'
-save_addon = 'allrule_relu_400'
+save_addon = 'allrule_softplus_400largeinput'
 data_type = 'rule'
 
-rules = [GO, INHGO, DELAYGO,\
-    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
-    REMAP, INHREMAP, DELAYREMAP,\
-    DMSGO, DMCNOGO, DMCGO, DMCNOGO]
+rules = range(N_RULE)
 
 # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
 
@@ -47,7 +43,7 @@ h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
 ################################## Clustering ################################
 if data_type == 'rule':
-    n_cluster = 13
+    n_cluster = 15
     # n_cluster = 3
 elif data_type == 'epoch':
     n_cluster = 15

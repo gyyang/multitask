@@ -756,7 +756,7 @@ def compute_choicefamily_varytime(save_addon, rule):
     print('Starting vary time analysis of the {:s} task...'.format(rule_name[rule]))
     with Run(save_addon, fast_eval=fast_eval) as R:
         n_tar_loc = 3000
-        n_coh = 3
+        n_coh = 4
         batch_size = n_tar_loc * n_coh
         batch_shape = (n_tar_loc,n_coh)
         ind_tar_loc, ind_tar = np.unravel_index(range(batch_size),batch_shape)
@@ -764,10 +764,11 @@ def compute_choicefamily_varytime(save_addon, rule):
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
 
-        if rule == CHOICE_INT:
-            tar_str_range = 0.02
-        else:
-            tar_str_range = 0.04
+        # if rule == CHOICE_INT:
+        #     tar_str_range = 0.02
+        # else:
+        #     tar_str_range = 0.04
+        tar_str_range = 0.04
 
         cohs = tar_str_range*(2**np.arange(n_coh))/(2**(n_coh-1))
         tar1_strengths = 1 + cohs[ind_tar]

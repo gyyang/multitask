@@ -116,13 +116,13 @@ def write_jobfile(cmd, jobname, pbspath, scratchpath,
 #=========================================================================================
 
 if True:
-    nunits = range(20,501,20)[::-1]
-    s_list = [13, 14, 15]
+    nunits = range(20,501,5)[::-1]
+    s_list = [0]
     for nunit in nunits:
         for s in s_list:
             jobname = 'job_{:d}_{:d}'.format(s, nunit)
             train_arg = 'HDIM={:d}, s={:d}'.format(nunit, s)
-            train_arg+= r", save_addon='"+'{:d}'.format(nunit)+r"'"
+            train_arg+= r", save_addon='"+'{:d}latest'.format(nunit)+r"'"
             cmd     = r'''python -c "import train as t;t.train('''+train_arg+''')"'''
 
             pbspath = './pbs/'

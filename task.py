@@ -8,9 +8,22 @@ import numpy as np
 #-----------------------------------------------------------------------------------------
 # Rules
 #-----------------------------------------------------------------------------------------
-setup_type = 'newset'
-
+setup_type = 'standard'
 if setup_type == 'standard':
+
+    N_RULE          = 20
+
+    GO, INHGO, DELAYGO,\
+    REMAP, INHREMAP, DELAYREMAP,\
+    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
+    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT,\
+    DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
+
+    CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = DMC = -2 # dummy
+
+    TEST_INIT = -1
+
+elif setup_type == 'old_standard':
 
     N_RULE          = 17
 
@@ -42,19 +55,7 @@ elif setup_type == 'OICDMC':
 
     TEST_INIT = -1
 
-elif setup_type == 'newset':
 
-    N_RULE          = 20
-
-    GO, INHGO, DELAYGO,\
-    REMAP, INHREMAP, DELAYREMAP,\
-    CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-    CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT,\
-    DMSGO, DMSNOGO, DMCGO, DMCNOGO = range(N_RULE)
-
-    CHOICEDELAY_MOD1_COPY = FIXATION = TIMEDGO = DELAYTIMEDGO = INTREPRO = OIC = DMC = -2 # dummy
-
-    TEST_INIT = -1
 #-----------------------------------------------------------------------------------------
 # Network structure
 #-----------------------------------------------------------------------------------------
@@ -1055,18 +1056,33 @@ def choicego_int(config, mode, **kwargs):
         tar_ons  = [int(0.15*tdim)]
         batch_size = 1
 
+    # elif mode == 'test':
+    #     tdim = int(2500/dt)
+    #     n_tar_loc, n_tar_mod1_strength = batch_shape = 20, 5
+    #     batch_size = np.prod(batch_shape)
+    #     ind_tar_loc, ind_tar_mod1_strength = np.unravel_index(range(batch_size),batch_shape)
+    #     fix_offs  = int(2000/dt)
+    #
+    #     tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
+    #     tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
+    #     tar1_mod1_strengths = 0.4*ind_tar_mod1_strength/n_tar_mod1_strength+0.8
+    #     tar2_mod1_strengths = 2 - tar1_mod1_strengths
+    #     tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
+    #     tar_ons  = int(500/dt)
+
     elif mode == 'test':
         tdim = int(2500/dt)
-        n_tar_loc, n_tar_mod1_strength = batch_shape = 20, 5
+        n_tar_loc, n_tar_mod1_strength, n_tar_mod2_strength = batch_shape = 20, 5, 5
         batch_size = np.prod(batch_shape)
-        ind_tar_loc, ind_tar_mod1_strength = np.unravel_index(range(batch_size),batch_shape)
+        ind_tar_loc, ind_tar_mod1_strength, ind_tar_mod2_strength = np.unravel_index(range(batch_size),batch_shape)
         fix_offs  = int(2000/dt)
 
         tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
         tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
         tar1_mod1_strengths = 0.4*ind_tar_mod1_strength/n_tar_mod1_strength+0.8
         tar2_mod1_strengths = 2 - tar1_mod1_strengths
-        tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
+        tar1_mod2_strengths = 0.4*ind_tar_mod2_strength/n_tar_mod2_strength+0.8
+        tar2_mod2_strengths = 2 - tar1_mod2_strengths
         tar_ons  = int(500/dt)
 
     elif mode == 'psychometric':

@@ -77,7 +77,12 @@ class Run(Session):
         c_mask = tf.placeholder("float", [None, n_output])
 
         # Define weights
-        w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)))
+        if config['activation'] == 'softplus':
+            w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)))
+        elif config['activation'] == 'relu':
+            w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.6/np.sqrt(n_hidden)))
+        elif config['activation'] == 'tanh':
+            w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=2.0/np.sqrt(n_hidden)))
         b_out = tf.Variable(tf.zeros([n_output]))
 
         # Initial state (requires tensorflow later than 0.10)
@@ -204,19 +209,25 @@ def test_init():
         n_input, n_hidden, n_output = config['shape']
         h_sample = R.f_h(task.x)
         y_sample = R.f_y(h_sample)
-        grads_and_vars = R.f_grad(task.x,
-                       task.y.reshape((-1,n_output)),
-                       task.c_mask.reshape((-1,n_output)))
+        # grads_and_vars = R.f_grad(task.x,
+        #                task.y.reshape((-1,n_output)),
+        #                task.c_mask.reshape((-1,n_output)))
 
     plt.plot(task.x[:,0,:])
     plt.show()
 
     plt.plot(h_sample[:,0,:])
     plt.show()
+    
+    plt.hist(h_sample[:,0,:].flatten())
+    plt.show()
 
     plt.plot(y_sample[:,0,:])
     plt.show()
 
+    plt.hist(y_sample[:,0,:].flatten())
+    plt.show()    
+    
 def replacerule(R, rule, rule_X, beta):
     '''
     Run the network but with replaced rule input weight
@@ -259,7 +270,7 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
     import seaborn.apionly as sns
     fs = 7
 
-    with Run(save_addon) as R:
+    with Run(save_addon, fast_eval=True) as R:
         config = R.config
         task = generate_onebatch(rule=rule, config=config, mode='sample', t_tot=2000)
         x_sample = task.x
@@ -269,6 +280,8 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
         params = R.params
         w_rec = R.w_rec
         w_in  = R.w_in
+
+    t_plot = np.arange(x_sample.shape[0])*config['dt']/1000
 
     assert config['num_ring'] == 2
 
@@ -302,7 +315,7 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
             ax.xaxis.set_ticks_position('none')
 
         if i == 0:
-            plt.plot(x_sample[:,0,0], color=sns.xkcd_palette(['blue'])[0])
+            plt.plot(t_plot, x_sample[:,0,0], color=sns.xkcd_palette(['blue'])[0])
             if plot_ylabel:
                 plt.yticks([0,1],['',''],rotation='vertical')
             plt.ylim([-0.1,1.5])
@@ -317,8 +330,8 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
             if plot_ylabel:
                 plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
         elif i == 3:
-            plt.plot(y[:,0,0],color=sns.xkcd_palette(['green'])[0])
-            plt.plot(y_sample[:,0,0],color=sns.xkcd_palette(['blue'])[0])
+            plt.plot(t_plot, y[:,0,0],color=sns.xkcd_palette(['green'])[0])
+            plt.plot(t_plot, y_sample[:,0,0],color=sns.xkcd_palette(['blue'])[0])
             if plot_ylabel:
                 plt.yticks([0.05,0.8],['',''],rotation='vertical')
             plt.ylim([-0.1,1.1])
@@ -327,7 +340,7 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
             # plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
             if plot_ylabel:
                 plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$',r'180$\degree$',r'360$\degree$'],rotation='vertical')
-            plt.xticks([0,2000], ['0', '2'])
+            plt.xticks([0,y_sample.shape[0]], ['0', '2'])
             plt.xlabel('Time (s)',fontsize=fs, labelpad=-3)
             ax.spines["bottom"].set_visible(True)
 
@@ -466,13 +479,13 @@ def schematic_plot(save_addon):
             plt.plot(y_sample[:,0,0],color=sns.xkcd_palette(['blue'])[0])
             plt.yticks([0.05,0.8],['',''],rotation='vertical')
             plt.ylim([-0.1,1.1])
-            plt.title('Fixation output', fontsize=fontsize, y=0.9)
+            plt.title('Fixation', fontsize=fontsize, y=0.9)
 
         elif i == 1:
             plt.imshow(y_sample[:,0,1:].T, aspect='auto', cmap=cmap, vmin=0, vmax=1, interpolation='none',origin='lower')
             plt.yticks([0,(N_RING-1)/2,N_RING-1],[r'0$\degree$','',r'360$\degree$'],rotation='vertical')
             plt.xticks([])
-            plt.title('Output', fontsize=fontsize, y=0.9)
+            plt.title('Response', fontsize=fontsize, y=0.9)
 
         ax.get_yaxis().set_label_coords(-0.12,0.5)
 
@@ -480,7 +493,8 @@ def schematic_plot(save_addon):
     plt.show()
 
 def plot_singleneuron_intime(save_addon, neurons, rules,
-                             epoch=None, save=False, ylabel_firstonly=True):
+                             epoch=None, save=False, ylabel_firstonly=True,
+                             trace_only=False, plot_stim_avg=False):
     '''
 
     :param save_addon:
@@ -521,6 +535,11 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
             _ = ax.plot(np.arange(h_tests[rule][t_start:].shape[0])*config['dt']/1000,
                         h_tests[rule][t_start:,:,neuron], lw=0.5)
 
+            if plot_stim_avg:
+                # Plot stimulus averaged trace
+                _ = ax.plot(np.arange(h_tests[rule][t_start:].shape[0])*config['dt']/1000,
+                        h_tests[rule][t_start:,:,neuron].mean(axis=1), lw=1, color='black')
+
             if epoch is not None:
                 e0, e1 = task.epochs[epoch]
                 e0 = e0 if e0 is not None else 0
@@ -545,26 +564,32 @@ def plot_singleneuron_intime(save_addon, neurons, rules,
             ax.spines["top"].set_visible(False)
             ax.xaxis.set_ticks_position('bottom')
             ax.yaxis.set_ticks_position('left')
+            if trace_only:
+                ax.spines["left"].set_visible(False)
+                ax.spines["bottom"].set_visible(False)
+                ax.xaxis.set_ticks_position('none')
+                ax.set_xlabel('')
+                ax.set_ylabel('')
+                ax.set_xticks([])
+                ax.set_yticks([])
+                ax.set_title('')
+
             if save:
                 plt.savefig(save_name, transparent=True)
             plt.show()
 
 
 if __name__ == "__main__":
-    # schematic_plot(save_addon='allrule_weaknoise_400')
-    rules = [GO, INHGO, DELAYGO,\
-        CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-        CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
-        REMAP, INHREMAP, DELAYREMAP,\
-        DMSGO, DMSNOGO, DMCGO, DMCNOGO]
+    # schematic_plot(save_addon='allrule_softplus_400largeinput')
+    rules = range(N_RULE)
 
-    rules = [CHOICEATTEND_MOD2]
+    # rules = [CHOICEATTEND_MOD2]
     for rule in rules:
         pass
-        # sample_plot(save_addon='allrule_softplus_test', rule=rule, save=False)
+        sample_plot(save_addon='allrule_softplus_400largeinput', rule=rule, save=True)
 
-    # plot_singleneuron_intime('allrule_weaknoise_360', [80], [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
-    #                          epoch=None, save=False, ylabel_firstonly=True)
+    # plot_singleneuron_intime('allrule_softplus_400largeinput', [4, 15, 16], [INHGO],
+    #                          epoch=None, save=False, trace_only=True, plot_stim_avg=True)
 
     # test_init()
     pass

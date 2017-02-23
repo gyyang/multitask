@@ -26,14 +26,25 @@ class LeakyRNNCell(RNNCell):
         self._num_units = num_units
         if activation == 'softplus':
             self._activation = tf.nn.softplus
+            self._bias_start = 0.
+            self._w_in_start = 1.0
+            self._w_rec_start= 0.54
         elif activation == 'tanh':
             self._activation = tf.tanh
+            self._bias_start = 0.
+            self._w_in_start = 1.0
+            self._w_rec_start= 0.54
         elif activation == 'relu':
             self._activation = tf.nn.relu
+            self._bias_start = 0.5
+            self._w_in_start = 1.0
+            self._w_rec_start= 0.54
         else:
             raise ValueError('Unknown activation')
         self._alpha = alpha
         self._sigma = np.sqrt(2*alpha) * sigma_rec
+
+
 
 
     @property
@@ -48,12 +59,15 @@ class LeakyRNNCell(RNNCell):
         """Leaky RNN: output = new_state = (1-alpha)*state + alpha*activation(W * input + U * state + B)."""
         with vs.variable_scope(scope or type(self).__name__):    # "LeakyRNNCell"
             output = (1-self._alpha)*state + \
-                     self._alpha * self._activation(_linear([inputs, state], self._num_units, True)) + \
-                tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma, dtype = tf.float32)
+    self._alpha * self._activation(_linear(
+        [inputs, state], self._num_units, True,
+        bias_start=self._bias_start, w_in_start=self._w_in_start, w_rec_start=self._w_rec_start)
+    ) + tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma, dtype = tf.float32)
 
         return output, output
 
-def _linear(args, output_size, bias, bias_start=0.0, scope=None):
+def _linear(args, output_size, bias,
+            bias_start=0.0, w_in_start=1.0, w_rec_start=1.0, scope=None):
     """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
 
     Args:
@@ -89,8 +103,11 @@ def _linear(args, output_size, bias, bias_start=0.0, scope=None):
     dtype = [a.dtype for a in args][0]
 
     input_size = total_arg_size - output_size
-    matrix0 = np.random.randn(input_size, output_size)/np.sqrt(input_size)
-    matrix0 = np.concatenate((matrix0, 0.54*np.eye(output_size)), axis=0)
+    # matrix0 = np.random.randn(input_size, output_size)/np.sqrt(input_size)
+    # matrix0 = np.concatenate((matrix0, 0.54*np.eye(output_size)), axis=0)
+
+    matrix0 = np.random.randn(input_size, output_size)/np.sqrt(input_size)*w_in_start
+    matrix0 = np.concatenate((matrix0, w_rec_start*np.eye(output_size)), axis=0)
 
     # Now the computation.
     with vs.variable_scope(scope or "Linear"):

@@ -121,7 +121,7 @@ def _compute_hist_varprop(save_addon, rules):
     return hist, bins_edge
 
 
-def compute_hist_varprop(save_type, rules):
+def compute_hist_varprop(save_type, rules, **kwargs):
     data_type = 'rule'
     assert len(rules) == 2
     assert data_type == 'rule'
@@ -131,6 +131,8 @@ def compute_hist_varprop(save_type, rules):
     hdims = list()
     for HDIM in HDIMs:
         save_addon = save_type+'_'+str(HDIM)
+        if 'save_type_end' in kwargs:
+            save_addon = save_addon + kwargs['save_type_end']
 
         hist, bins_edge_ = _compute_hist_varprop(save_addon, rules)
         if hist is None:
@@ -176,7 +178,7 @@ def _plot_hist_varprop(hist_plot, bins_edge, rules, hist_example=None):
                 rule_name[rules[1]].replace(' ','')+
                 save_type+'.pdf', transparent=True)
 
-def plot_hist_varprop(save_type, rules, hdim_example=None):
+def plot_hist_varprop(save_type, rules, hdim_example=None, **kwargs):
     '''
     Plot histogram of proportion of variance for some tasks across units
     :param save_addon:
@@ -185,7 +187,7 @@ def plot_hist_varprop(save_type, rules, hdim_example=None):
     :return:
     '''
 
-    hists, bins_edge, hdims = compute_hist_varprop(save_type, rules)
+    hists, bins_edge, hdims = compute_hist_varprop(save_type, rules, **kwargs)
 
     hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
 
@@ -209,7 +211,7 @@ def plot_hist_varprop_selection(save_type, **kwargs):
     for rules in rules_list:
         plot_hist_varprop(save_type=save_type, rules=rules, **kwargs)
 
-def plot_hist_varprop_all(save_type, hdim_example=None):
+def plot_hist_varprop_all(save_type, hdim_example=None, **kwargs):
     '''
     Plot histogram of proportion of variance for some tasks across units
     :param save_addon:
@@ -218,11 +220,7 @@ def plot_hist_varprop_all(save_type, hdim_example=None):
     :return:
     '''
     data_type = 'rule'
-    rules = [GO, INHGO, DELAYGO,\
-        CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-        CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
-        REMAP, INHREMAP, DELAYREMAP,\
-        DMSGO, DMSNOGO, DMCGO, DMCNOGO]
+    rules = range(N_RULE)
     figsize = (8, 8)
 
     # rules = [GO, INHGO, DELAYGO]
@@ -243,7 +241,7 @@ def plot_hist_varprop_all(save_type, hdim_example=None):
             #     ax.axis('off')
             #     continue
 
-            hists, bins_edge, hdims = compute_hist_varprop(save_type, (rules[i], rules[j]))
+            hists, bins_edge, hdims = compute_hist_varprop(save_type, (rules[i], rules[j]), **kwargs)
 
             hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
 
@@ -360,11 +358,12 @@ if __name__ == '__main__':
 
     # save_type = 'allrule_weaknoise'
     save_type = 'allrule_softplus'
+    save_type_end = 'largeinput'
     # save_type = 'allrule_tanh'
     # save_type = 'allrule_relu'
-    # plot_hist_varprop(save_type, rules=[DMSGO, DMCGO], hdim_example=400)
-    # plot_hist_varprop_all('allrule_weaknoise')
-    plot_hist_varprop_selection(save_type, hdim_example=400)
+    # plot_hist_varprop(save_type, rules=[DMSGO, DMCGO], hdim_example=400, save_type_end=save_type_end)
+    plot_hist_varprop_all(save_type, save_type_end=save_type_end)
+    plot_hist_varprop_selection(save_type, hdim_example=400, save_type_end=save_type_end)
 
 
     # Study OIC & DMC
