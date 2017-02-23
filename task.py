@@ -752,6 +752,9 @@ def choicego_attend_(config, mode, attend_mod, **kwargs):
         tar1_strengths, tar2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
     elif attend_mod == 2:
         tar1_strengths, tar2_strengths = tar1_mod2_strengths, tar2_mod2_strengths
+    elif attend_mod == 'both':
+        tar1_strengths = tar1_mod1_strengths + tar1_mod2_strengths
+        tar2_strengths = tar2_mod1_strengths + tar2_mod2_strengths
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
@@ -778,138 +781,8 @@ def choicego_attend_mod1(config, mode, **kwargs):
 def choicego_attend_mod2(config, mode, **kwargs):
     return choicego_attend_(config, mode, 2, **kwargs)
 
-
 def choicego_int(config, mode, **kwargs):
-    '''
-    Fixate whenever fixation point is shown.
-    Two targets are shown in each ring, pointing to the same direction
-    Saccade to the one with higher intensity for the attended ring
-    Generate one batch of trials
-
-    The fixation is shown between (0, fix_off)
-    The two targets is shown between (0,T)
-
-    The output should be fixation location for (0, fix_off)
-    Otherwise the location of the stronger target
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-
-        # A list of locations of targets, same locations for both modalities
-        tar_dist = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
-        tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
-        tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
-
-        tars_mod1_mean = np.random.uniform(0.8,1.2,(batch_size,))
-        # tars_mod1_diff = np.random.uniform(0.05,0.4,(batch_size,))
-        tars_mod1_diff = np.random.choice([0.02, 0.04, 0.08, 0.16], (batch_size,))
-        tars_mod1_sign = np.random.choice([1,-1], (batch_size,))
-
-        tar1_mod1_strengths = tars_mod1_mean + tars_mod1_diff*tars_mod1_sign/2
-        tar2_mod1_strengths = tars_mod1_mean - tars_mod1_diff*tars_mod1_sign/2
-
-        # Always the same as mod 1
-        tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
-
-        # Time of targets on/off
-        tar_on = int(np.random.uniform(100,400)/dt)
-        tar_ons = (np.ones(batch_size)*tar_on).astype(int)
-        # tar_dur = int(np.random.uniform(300,1500)/dt)
-        tar_dur = int(np.random.uniform(900, 1500)/dt)
-        fix_offs = (tar_ons+tar_dur).astype(int)
-        # each batch consists of sequences of equal length
-        tdim = tar_on+tar_dur+int(500/dt)
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(0.75*tdim)])
-        tar1_locs = [0.5*np.pi]
-        tar2_locs = [1.5*np.pi]
-        tar1_mod1_strengths = [0.95]
-        tar2_mod1_strengths = [1.05]
-        tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
-        tar_ons  = [int(0.15*tdim)]
-        batch_size = 1
-
-    # elif mode == 'test':
-    #     tdim = int(2500/dt)
-    #     n_tar_loc, n_tar_mod1_strength = batch_shape = 20, 5
-    #     batch_size = np.prod(batch_shape)
-    #     ind_tar_loc, ind_tar_mod1_strength = np.unravel_index(range(batch_size),batch_shape)
-    #     fix_offs  = int(2000/dt)
-    #
-    #     tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-    #     tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-    #     tar1_mod1_strengths = 0.4*ind_tar_mod1_strength/n_tar_mod1_strength+0.8
-    #     tar2_mod1_strengths = 2 - tar1_mod1_strengths
-    #     tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
-    #     tar_ons  = int(500/dt)
-
-    elif mode == 'test':
-        tdim = int(2500/dt)
-        n_tar_loc, n_tar_mod1_strength, n_tar_mod2_strength = batch_shape = 20, 5, 5
-        batch_size = np.prod(batch_shape)
-        ind_tar_loc, ind_tar_mod1_strength, ind_tar_mod2_strength = np.unravel_index(range(batch_size),batch_shape)
-        fix_offs  = int(2000/dt)
-
-        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-        tar1_mod1_strengths = 0.4*ind_tar_mod1_strength/n_tar_mod1_strength+0.8
-        tar2_mod1_strengths = 2 - tar1_mod1_strengths
-        tar1_mod2_strengths = 0.4*ind_tar_mod2_strength/n_tar_mod2_strength+0.8
-        tar2_mod2_strengths = 2 - tar1_mod2_strengths
-        tar_ons  = int(500/dt)
-
-    elif mode == 'psychometric':
-        p = kwargs['params']
-        tar1_locs = p['tar1_locs']
-        tar2_locs = p['tar2_locs']
-        tar1_mod1_strengths = p['tar1_mod1_strengths']
-        tar2_mod1_strengths = p['tar2_mod1_strengths']
-        tar1_mod2_strengths = p['tar1_mod2_strengths']
-        tar2_mod2_strengths = p['tar2_mod2_strengths']
-        # tar1_mod2_strengths, tar2_mod2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
-        tar_time = int(p['tar_time']/dt)
-        batch_size = len(tar1_locs)
-
-        # Time of targets on/off
-        tar_ons = int(400/dt)
-        fix_offs = int(400/dt) + tar_time
-        tdim = int(400/dt) + fix_offs
-
-    # time to check the saccade location
-    check_ons  = fix_offs + int(100/dt)
-
-    tar1_strengths = tar1_mod1_strengths + tar1_mod2_strengths
-    tar2_strengths = tar2_mod1_strengths + tar2_mod2_strengths
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in', offs=fix_offs)
-    task.add('tar', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod1_strengths, mods=1)
-    task.add('tar', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod1_strengths, mods=1)
-    task.add('tar', tar1_locs, ons=tar_ons, offs=fix_offs, strengths=tar1_mod2_strengths, mods=2)
-    task.add('tar', tar2_locs, ons=tar_ons, offs=fix_offs, strengths=tar2_mod2_strengths, mods=2)
-    task.add('fix_out', offs=fix_offs)
-    tar_locs = [tar1_locs[i] if (tar1_strengths[i]>tar2_strengths[i])
-                else tar2_locs[i] for i in range(batch_size)]
-    task.add('out', tar_locs, ons=fix_offs)
-
-    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, tar_ons),
-                   'tar1'     : (tar_ons, fix_offs),
-                   'go1'      : (fix_offs, None)}
-
-    return task
-
+    return choicego_attend_(config, mode, 'both', **kwargs)
 
 def choicedelaygo_(config, mode, tar_mod, **kwargs):
     '''
@@ -1158,6 +1031,9 @@ def choicegodelay_attend_(config, mode, attend_mod, **kwargs):
         tar1_strengths, tar2_strengths = tar1_mod1_strengths, tar2_mod1_strengths
     elif attend_mod == 2:
         tar1_strengths, tar2_strengths = tar1_mod2_strengths, tar2_mod2_strengths
+    elif attend_mod == 'both':
+        tar1_strengths = tar1_mod1_strengths + tar1_mod2_strengths
+        tar2_strengths = tar2_mod1_strengths + tar2_mod2_strengths
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
@@ -1188,143 +1064,7 @@ def choicegodelay_attend_mod2(config, mode, **kwargs):
     return choicegodelay_attend_(config, mode, 2, **kwargs)
 
 def choicegodelay_int(config, mode, **kwargs):
-    '''
-    Fixate whenever fixation point is shown.
-    Two targets are shown in each ring,
-    Saccade to the one with higher intensity for the attended ring
-    Generate one batch of trials
-
-    The fixation is shown between (0, fix_off)
-    The two targets is shown between (0,T)
-
-    The output should be fixation location for (0, fix_off)
-    Otherwise the location of the stronger target
-
-    In this task, if the model's strategy is to ignore context, and integrate both,
-    then the maximum performance is 75%. So we need to make the highest correct performance
-    much higher than that.
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-
-        # A list of locations of targets, same locations for both modalities
-        tar_dist = np.random.uniform(0.5*np.pi,1.5*np.pi,(batch_size,))*np.random.choice([-1,1],(batch_size,))
-        tar1_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
-        tar2_locs = (tar1_locs+tar_dist)%(2*np.pi)
-
-        tars_mod1_mean = np.random.uniform(0.8,1.2,(batch_size,))
-        tars_mod1_diff = np.random.uniform(0.1,0.3,(batch_size,))
-        tars_mod1_sign = np.random.choice([1,-1], (batch_size,))
-
-        tar1_mod1_strengths = tars_mod1_mean + tars_mod1_diff*tars_mod1_sign/2
-        tar2_mod1_strengths = tars_mod1_mean - tars_mod1_diff*tars_mod1_sign/2
-
-        tar1_mod2_strengths = tar1_mod1_strengths
-        tar2_mod2_strengths = tar2_mod1_strengths
-
-        # Time of targets on/off
-        tar1_ons  = (np.ones(batch_size)*np.random.uniform(100,300)/dt).astype(int)
-        tar1_offs = tar1_ons + int(300/dt)
-        tar2_ons  = (np.ones(batch_size)*np.random.choice([400,600,1000,1400,2000])/dt).astype(int)
-        tar2_offs = tar2_ons + int(300/dt)
-
-        fix_offs  = tar2_offs + int(np.random.uniform(100,300)/dt)
-
-        # each batch consists of sequences of equal length
-        tdim = max(fix_offs) + int(300/dt) # longest trial
-
-    elif mode == 'sample':
-        tar1_locs = [0.5*np.pi]
-        tar2_locs = [1.5*np.pi]
-        tar1_mod1_strengths = [1.2]
-        tar2_mod1_strengths = [0.8]
-        tar1_mod2_strengths = [1.2]
-        tar2_mod2_strengths = [0.8]
-        batch_size = 1
-
-        tar1_ons = [int(100/dt)]
-        tar1_offs = [int(300/dt)]
-        tar2_ons = [int(1500/dt)]
-        tar2_offs = [int(1700/dt)]
-        fix_offs  = np.array([int(1800/dt)])
-        tdim = int(2000/dt)
-
-    elif mode == 'test':
-        n_tar_loc, n_tar_mod1_strength = batch_shape = 20, 5
-        batch_size = np.prod(batch_shape)
-        ind_tar_loc, ind_tar_mod1_strength = np.unravel_index(range(batch_size),batch_shape)
-
-        tar1_locs = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar2_locs = (tar1_locs+np.pi)%(2*np.pi)
-        tar1_mod1_strengths = 0.4*ind_tar_mod1_strength/n_tar_mod1_strength+0.8
-        tar2_mod1_strengths = 2 - tar1_mod1_strengths
-        tar1_mod2_strengths = tar1_mod1_strengths
-        tar2_mod2_strengths = tar2_mod1_strengths
-
-        tar1_ons = int(500/dt)
-        tar1_offs = int(1000/dt)
-        tar2_ons = int(2000/dt)
-        tar2_offs = int(2200/dt)
-        fix_offs  = int(2300/dt)
-        tdim = int(2500/dt)
-
-    elif mode == 'psychometric':
-        p = kwargs['params']
-        tar1_locs = p['tar1_locs']
-        tar2_locs = p['tar2_locs']
-        tar1_mod1_strengths = p['tar1_mod1_strengths']
-        tar2_mod1_strengths = p['tar2_mod1_strengths']
-        tar1_mod2_strengths = p['tar1_mod2_strengths']
-        tar2_mod2_strengths = p['tar2_mod2_strengths']
-        # tar1_ons        = int(500/dt)
-        # tar1_offs       = int(1000/dt)
-        # tar2_ons        = int(p['tar_time']/dt) + tar1_offs
-        # tar2_offs       = int(500/dt) + tar2_ons
-        tar1_ons        = int(300/dt)
-        tar1_offs       = int(600/dt)
-        tar2_ons        = int(p['tar_time']/dt) + tar1_offs
-        tar2_offs       = int(300/dt) + tar2_ons
-        batch_size = len(tar1_locs)
-
-        # Time of targets on/off
-        fix_offs = int(200/dt) + tar2_offs
-        tdim = int(300/dt) + fix_offs
-
-    # time to check the saccade location
-    check_ons  = fix_offs + int(100/dt)
-
-    tar1_strengths = tar1_mod1_strengths + tar1_mod2_strengths
-    tar2_strengths = tar2_mod1_strengths + tar2_mod2_strengths
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in', offs=fix_offs)
-    task.add('tar', tar1_locs, ons=tar1_ons, offs=tar1_offs, strengths=tar1_mod1_strengths, mods=1)
-    task.add('tar', tar2_locs, ons=tar2_ons, offs=tar2_offs, strengths=tar2_mod1_strengths, mods=1)
-    task.add('tar', tar1_locs, ons=tar1_ons, offs=tar1_offs, strengths=tar1_mod2_strengths, mods=2)
-    task.add('tar', tar2_locs, ons=tar2_ons, offs=tar2_offs, strengths=tar2_mod2_strengths, mods=2)
-    task.add('fix_out', offs=fix_offs)
-    tar_locs = [tar1_locs[i] if (tar1_strengths[i]>tar2_strengths[i])
-                else tar2_locs[i] for i in range(batch_size)]
-    task.add('out', tar_locs, ons=fix_offs)
-
-    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, tar1_ons),
-                   'tar1'     : (tar1_ons, tar1_offs),
-                   'delay1'   : (tar1_offs, tar2_ons),
-                   'tar2'     : (tar2_ons, tar2_offs),
-                   'delay2'   : (tar2_offs, fix_offs),
-                   'go1'      : (fix_offs, None)}
-
-    return task
+    return choicegodelay_attend_(config, mode, 'both', **kwargs)
 
 def delaymatchsample_(config, mode, matchnogo, **kwargs):
     '''
@@ -1453,7 +1193,6 @@ def delaymatchsample_(config, mode, matchnogo, **kwargs):
                    'go1'      : (tar2_ons, None)}
 
     return task
-
 
 def delaymatchsamplego(config, mode, **kwargs):
     return delaymatchsample_(config, mode, 0, **kwargs)
