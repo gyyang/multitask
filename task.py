@@ -247,7 +247,8 @@ def fixation(config, mode, **kwargs):
     return task
 
 
-def go(config, mode, **kwargs):
+
+def go_(config, mode, anti_response, **kwargs):
     '''
     Fixate whenever fixation point is shown,
     A target will be shown once the fixation is off
@@ -271,10 +272,9 @@ def go(config, mode, **kwargs):
     if mode == 'random': # Randomly generate parameters
         batch_size = kwargs['batch_size']
         # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,2000)/dt)
-
         # A list of locations of fixation points and fixation off time
-        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
+        fix_offs = int(np.random.uniform(500,1500)/dt)
+        tdim = int(500/dt) + fix_offs
 
         # A list of locations of targets (they are always on)
         tar_locs = np.random.uniform(0, 2*np.pi, (batch_size,))
@@ -308,16 +308,21 @@ def go(config, mode, **kwargs):
         tdim = int(400/dt) + fix_offs
         tar_mod   = 1
 
-
-
     # time to check the saccade location
     check_ons  = fix_offs + int(100/dt)
+
+    # Response locations
+    tar_locs = np.array(tar_locs)
+    if not anti_response:
+        response_locs = tar_locs
+    else:
+        response_locs = (tar_locs+np.pi)%(2*np.pi)
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
     task.add('tar', tar_locs, ons=fix_offs, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_locs, ons=fix_offs)
+    task.add('out', response_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
 
     task.epochs = {'fix1'     : (None, fix_offs),
@@ -325,7 +330,13 @@ def go(config, mode, **kwargs):
 
     return task
 
-def inhgo(config, mode, **kwargs):
+def go(config, mode, **kwargs):
+    return go_(config, mode, False, **kwargs)
+
+def remapgo(config, mode, **kwargs):
+    return go_(config, mode, True, **kwargs)
+
+def inhgo_(config, mode, anti_response, **kwargs):
     '''
     Go with inhibitory control. Important difference with Go task is that
     the stimulus is presented from the beginning.
@@ -352,10 +363,9 @@ def inhgo(config, mode, **kwargs):
     if mode == 'random': # Randomly generate parameters
         batch_size = kwargs['batch_size']
         # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,2000)/dt)
-
         # A list of locations of fixation points and fixation off time
-        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
+        fix_offs = int(np.random.uniform(500,1500)/dt)
+        tdim = int(500/dt) + fix_offs
 
         # A list of locations of targets (they are always on)
         tar_locs = np.random.rand(batch_size)*2*np.pi
@@ -394,13 +404,20 @@ def inhgo(config, mode, **kwargs):
         tar_mod   = 1
 
     # time to check the saccade location
-    check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
+    check_ons  = fix_offs + int(100/dt)
+
+    # Response locations
+    tar_locs = np.array(tar_locs)
+    if not anti_response:
+        response_locs = tar_locs
+    else:
+        response_locs = (tar_locs+np.pi)%(2*np.pi)
 
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
     task.add('tar', tar_locs, ons=tar_ons, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_locs, ons=fix_offs)
+    task.add('out', response_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
 
     task.epochs = {'fix1'     : (None, tar_ons),
@@ -409,7 +426,13 @@ def inhgo(config, mode, **kwargs):
 
     return task
 
-def delaygo(config, mode, **kwargs):
+def inhgo(config, mode, **kwargs):
+    return inhgo_(config, mode, False, **kwargs)
+
+def inhremapgo(config, mode, **kwargs):
+    return inhgo_(config, mode, True, **kwargs)
+
+def delaygo_(config, mode, anti_response, **kwargs):
     '''
     Fixate whenever fixation point is shown,
     saccade to the location of the previously shown target
@@ -480,11 +503,18 @@ def delaygo(config, mode, **kwargs):
 
     check_ons= fix_offs + int(100/dt)
 
+    # Response locations
+    tar_locs = np.array(tar_locs)
+    if not anti_response:
+        response_locs = tar_locs
+    else:
+        response_locs = (tar_locs+np.pi)%(2*np.pi)
+
     task = Task(config, tdim, batch_size)
     task.add('fix_in', offs=fix_offs)
     task.add('tar', tar_locs, ons=tar_ons, offs=tar_offs, mods=tar_mod)
     task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_locs, ons=fix_offs)
+    task.add('out', response_locs, ons=fix_offs)
     task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
 
     task.epochs = {'fix1'     : (None, tar_ons),
@@ -494,258 +524,11 @@ def delaygo(config, mode, **kwargs):
 
     return task
 
-def remapgo(config, mode, **kwargs):
-    '''
-    Fixate whenever fixation point is shown,
-    A target will be shown once the fixation is off
-    And output should saccade away from the target location
-    Generate one batch of trials
-
-    The fixation is shown between (0, fix_off)
-    The target is shown between (fix_off,T)
-
-    The output should be fixation location for (0, fix_off)
-    Otherwise should be the anti location of the target location
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,2000)/dt)
-
-        # A list of locations of fixation points and fixation off time
-        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
-
-        # A list of locations of targets (they are always on)
-        tar_locs      = np.random.uniform(0, 2*np.pi, (batch_size,))
-
-        tar_mod  = np.random.choice([1,2])
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(1500/dt)])
-        tar_locs  = np.array([1.5*np.pi])
-        tar_mod   = 1
-        batch_size = 1
-
-    elif mode == 'test':
-        tdim = int(2500/dt)
-        n_tar_loc, n_tar_mod = batch_shape = 20, 2
-        batch_size = np.prod(batch_shape)
-        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
-
-        fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar_mod   = ind_tar_mod + 1
-
-    elif mode == 'psychometric':
-        p = kwargs['params']
-        tar_locs = p['tar_locs']
-        batch_size = len(tar_locs)
-
-        # Time of targets on/off
-        fix_offs = int(1000/dt)
-        tdim = int(400/dt) + fix_offs
-        tar_mod   = 1
-
-    # time to check the saccade location
-    check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
-
-    tar_anti_locs = (tar_locs+np.pi)%(2*np.pi)
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in', offs=fix_offs)
-    task.add('tar', tar_locs, ons=fix_offs, mods=tar_mod)
-    task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_anti_locs, ons=fix_offs)
-    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, fix_offs),
-                   'go1'      : (fix_offs, None)}
-
-    return task
-
-def inhremapgo(config, mode, **kwargs):
-    '''
-    Fixate whenever fixation point is shown,
-    A target will be shown from the beginning
-    And output should saccade away from the target location
-    Generate one batch of trials
-
-    The fixation is shown between (0, fix_off)
-    The target is shown between (0, T)
-
-    The output should be fixation location for (0, fix_off)
-    Otherwise should be the anti location of the target location
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,2000)/dt)
-
-        # A list of locations of fixation points and fixation off time
-        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
-
-        # A list of locations of targets (they are always on)
-        tar_locs      = np.random.uniform(0, 2*np.pi, (batch_size,))
-        tar_mod  = np.random.choice([1,2])
-
-        tar_ons  = (np.ones(batch_size)*np.random.uniform(100,300)/dt).astype(int)
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(1500/dt)])
-        tar_locs  = np.array([1.5*np.pi])
-        tar_ons   = np.array([int(300/dt)])
-        tar_mod   = 1
-        batch_size = 1
-
-    elif mode == 'test':
-        tdim = int(2500/dt)
-        n_tar_loc, n_tar_mod = batch_shape = 20, 2
-        batch_size = np.prod(batch_shape)
-        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
-
-        tar_ons   = int(500/dt)
-        fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar_mod   = ind_tar_mod + 1
-
-    elif mode == 'psychometric':
-        p = kwargs['params']
-        tar_locs = p['tar_locs']
-        tar_time = int(p['tar_time']/dt)
-        batch_size = len(tar_locs)
-
-        # Time of targets on/off
-        tar_ons   = int(300/dt)
-        fix_offs  = tar_ons + tar_time
-        tdim      = int(400/dt) + fix_offs
-        tar_mod   = 1
-
-    # time to check the saccade location
-    check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
-
-    tar_anti_locs = (tar_locs+np.pi)%(2*np.pi)
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in', offs=fix_offs)
-    task.add('tar', tar_locs, ons=tar_ons, mods=tar_mod)
-    task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_anti_locs, ons=fix_offs)
-    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, tar_ons),
-                   'tar1'     : (tar_ons, fix_offs),
-                   'go1'      : (fix_offs, None)}
-
-    return task
+def delaygo(config, mode, **kwargs):
+    return delaygo_(config, mode, False, **kwargs)
 
 def delayremapgo(config, mode, **kwargs):
-    '''
-    Fixate whenever fixation point is shown,
-    A target is shown before the fixation is off
-    And output should move away from the target location (remap)
-    Generate one batch of trials
-
-    The fixation is shown between (0, fix_off)
-    The target is shown between (tar_on, tar_off)
-
-    The output should be fixation location for (0, fix_off)
-    Otherwise should be the anti location of the target location
-
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
-    Optional parameters:
-    :param batch_size: Batch size (required for mode=='random')
-    :param tdim: dimension of time (required for mode=='sample')
-    :param param: a dictionary of parameters (required for mode=='explicit')
-    :return: 2 Tensor3 data array (Time, Batchsize, Units)
-    '''
-    dt = config['dt']
-    if mode == 'random': # Randomly generate parameters
-        batch_size = kwargs['batch_size']
-        # each batch consists of sequences of equal length
-        tdim = int(np.random.uniform(1000,2000)/dt)
-
-        # A list of locations of fixation points and fixation off time
-        fix_offs = (0.8*np.ones(batch_size)*tdim).astype(int)
-
-        # A list of locations of target on and off time
-        tar_ons  = (0.1*np.ones(batch_size)*tdim).astype(int)
-        tar_offs = (0.3*np.ones(batch_size)*tdim).astype(int)
-
-        # A list of locations of targets (they are always on)
-        tar_locs      = np.random.uniform(0, 2*np.pi, (batch_size,))
-        tar_mod  = np.random.choice([1,2])
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(1500/dt)])
-        tar_ons   = np.array([int(300/dt)])
-        tar_offs  = np.array([int(500/dt)])
-        tar_locs  = np.array([1.5*np.pi])
-        tar_mod   = 1
-        batch_size = 1
-
-    elif mode == 'test':
-        tdim = int(2500/dt)
-        n_tar_loc, n_tar_mod = batch_shape = 20, 2
-        batch_size = np.prod(batch_shape)
-        ind_tar_loc, ind_tar_mod = np.unravel_index(range(batch_size),batch_shape)
-
-        fix_offs  = int(2000/dt)
-        tar_locs  = 2*np.pi*ind_tar_loc/n_tar_loc
-        tar_ons   = int(500/dt)
-        tar_mod   = ind_tar_mod + 1
-        tar_offs  = int(1000/dt)
-
-    elif mode == 'psychometric':
-        p = kwargs['params']
-        tar_locs = p['tar_locs']
-        # Time of targets on/off
-        tar_ons    = int(p['tar_ons']/dt)
-        tar_offs   = int(p['tar_offs']/dt)
-        delay_time = int(p['delay_time']/dt)
-        fix_offs   = tar_offs + delay_time
-        tdim       = int(400/dt) + fix_offs
-        tar_mod    = 1
-
-        batch_size = len(tar_locs)
-
-    # time to check the saccade location
-    check_ons  = (0.85*np.ones(batch_size)*tdim).astype(int)
-
-    tar_anti_locs = (tar_locs+np.pi)%(2*np.pi)
-
-    task = Task(config, tdim, batch_size)
-    task.add('fix_in', offs=fix_offs)
-    task.add('tar', tar_locs, ons=tar_ons, offs=tar_offs, mods=tar_mod)
-    task.add('fix_out', offs=fix_offs)
-    task.add('out', tar_anti_locs, ons=fix_offs)
-    task.add_c_mask(pre_offs=fix_offs, post_ons=check_ons)
-
-    task.epochs = {'fix1'     : (None, tar_ons),
-                   'tar1'     : (tar_ons, tar_offs),
-                   'delay1'   : (tar_offs, fix_offs),
-                   'go1'      : (fix_offs, None)}
-
-    return task
-
+    return delaygo_(config, mode, True, **kwargs)
 
 def choicego_(config, mode, tar_mod, **kwargs):
     '''
