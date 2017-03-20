@@ -31,8 +31,8 @@ def mkdir_p(path):
         else:
             raise
 
-def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
-          batch_size_train=50, batch_size_test=200, display_step=1000, save_addon=None):
+def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
+          batch_size_train=50, batch_size_test=200, display_step=1000, save_addon=None, **kwargs):
     '''
     Training the network
     :param HDIM: Number of recurrent units
@@ -52,6 +52,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
 
     sigma_rec = 0.05
     sigma_x   = 0.01
+
+    w_rec_init = 'diag'
 
     if s == 0:
         save_addon_type = 'allrule_softplus'
@@ -85,6 +87,10 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
         save_addon_type = 'choicefamily_softplus'
     elif s == 15:
         save_addon_type = 'goantifamily_softplus'
+    elif s == 16:
+        save_addon_type = 'allrule_softplus_randortho'
+    elif s == 17:
+        save_addon_type = 'attendonly_softplus_randortho'
 
 
     tf.reset_default_graph()
@@ -126,6 +132,9 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
         rule_weights[rules.index(CHOICEATTEND_MOD1)] = 5
         rule_weights[rules.index(CHOICEATTEND_MOD2)] = 5
 
+    if 'randortho' in save_addon_type:
+        w_rec_init = 'randortho'
+
     if save_addon is None:
         save_addon = save_addon_type
     else:
@@ -137,6 +146,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
               'dt'          : 0.2*TAU,
               'sigma_rec'   : sigma_rec,
               'sigma_x'     : sigma_x,
+              'w_rec_init'  : w_rec_init,
+              'beta_anchor' : 0.0,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'num_ring'    : num_ring,
@@ -148,7 +159,11 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
               'learning_rate': learning_rate,
               'training_iters' : training_iters,
               'batch_size_train' : batch_size_train,
-              'batch_size_test' : batch_size_test}
+              'batch_size_test' : batch_size_test
+              }
+
+    for key, val in kwargs.iteritems():
+        config[key] = val
 
     for key, val in config.iteritems():
         print('{:20s} = '.format(key) + str(val))
@@ -251,5 +266,5 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=5000000,
 
 if __name__ == '__main__':
     pass
-    train(HDIM=340, s=0, save_addon='test', training_iters=300000,
-          batch_size_train=50, batch_size_test=200, display_step=100)
+    train(HDIM=340, s=17, save_addon='test', training_iters=300000,
+          batch_size_train=50, batch_size_test=200, display_step=100, beta_anchor=0.0001)

@@ -10,6 +10,7 @@ import pickle
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.python.ops import rnn
+from tensorflow.python.ops import init_ops
 from tensorflow.python.client.session import Session
 
 from task import *
@@ -57,6 +58,12 @@ class Run(Session):
             # Temporary for backward-compatibility
             if 'activation' not in config:
                 config['activation'] = 'softplus'
+
+            if 'w_rec_init' not in config:
+                config['w_rec_init'] = 'diag'
+
+            if 'beta_anchor' not in config:
+                config['beta_anchor'] = 0.0
         else:
             assert config is not None
 
@@ -78,31 +85,54 @@ class Run(Session):
 
         # Define weights
         if config['activation'] == 'softplus':
-            w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.4/np.sqrt(n_hidden)))
+            stddev = 0.4/np.sqrt(n_hidden)
         elif config['activation'] == 'relu':
-            w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=0.6/np.sqrt(n_hidden)))
+            stddev = 0.6/np.sqrt(n_hidden)
         elif config['activation'] == 'tanh':
-            w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=2.0/np.sqrt(n_hidden)))
-        b_out = tf.Variable(tf.zeros([n_output]))
+            stddev = 2.0/np.sqrt(n_hidden)
+
+        # w_out = tf.Variable(tf.random_normal([n_hidden, n_output], stddev=stddev, name='Matrix'))
+        # b_out = tf.Variable(tf.zeros([n_output]), name='Bias')
+
+
+        with tf.variable_scope("Output"):
+            w_out = tf.get_variable('Matrix', [n_hidden, n_output], dtype=tf.float32,
+                                    initializer=init_ops.random_normal_initializer(0.0, stddev, dtype=tf.float32))
+            b_out = tf.get_variable('Bias', [n_output], dtype=tf.float32,
+                                    initializer=init_ops.constant_initializer(0.0, dtype=tf.float32))
+
 
         # Initial state (requires tensorflow later than 0.10)
-        h_init = tf.Variable(0.3*tf.ones([1, n_hidden]))
+        h_init = tf.Variable(0.3*tf.ones([1, n_hidden]), name='InitActivity')
         h_init_bc = tf.tile(h_init, [tf.shape(x)[1], 1]) # broadcast to size (batch, n_h)
 
         # Recurrent activity
-        cell = LeakyRNNCell(n_hidden, config['alpha'], sigma_rec=config['sigma_rec'], activation=config['activation'])
+        cell = LeakyRNNCell(n_hidden, config['alpha'], sigma_rec=config['sigma_rec'],
+                            activation=config['activation'], w_rec_init=config['w_rec_init'])
+
         h, states = rnn.dynamic_rnn(cell, x, initial_state=tf.abs(h_init_bc),
                                     dtype=tf.float32, time_major=True) # time_major is important
 
+
+        w_rnn_anchor = cell.w_rnn0
 
         # Output
         y_hat = tf.sigmoid(tf.matmul(tf.reshape(h, (-1, n_hidden)), w_out) + b_out)
 
         # Loss
         cost = tf.reduce_mean(tf.square((y-y_hat)*c_mask))
+        # TODO: TEMPORARY
+        # Including a weak L1 regularization on activity to prevent blowing up
+        cost += tf.reduce_mean(tf.abs(h))*0.0001
+
+        with tf.variable_scope('RNN/LeakyRNNCell/Linear', reuse=True):
+            w_rnn = tf.get_variable('Matrix') # include both input and recurrent weights
+
+        # Anchor the recurrent weight
+        if config['beta_anchor'] > 0:
+            cost += tf.reduce_mean(tf.abs(w_rnn-w_rnn_anchor))*config['beta_anchor']
 
         # optimizer = tf.train.AdamOptimizer(learning_rate=config['learning_rate']).minimize(cost)
-
 
         # Create an optimizer.
         opt = tf.train.AdamOptimizer(learning_rate=config['learning_rate'])
@@ -191,6 +221,7 @@ def test_init():
               'dt'          : 0.2*TAU,
               'sigma_rec'   : 0.05,
               'sigma_x'     : 0.01,
+              'w_rec_init'  : 'randortho',
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'num_ring'    : num_ring,
@@ -355,8 +386,8 @@ def sample_plot(save_addon, rule, save=False, plot_ylabel=False):
     plt.show()
 
 
-    _ = plt.plot(h_sample[:,0,:20])
-    plt.show()
+    # _ = plt.plot(h_sample[:,0,:20])
+    # plt.show()
 
 def schematic_plot(save_addon):
     import seaborn.apionly as sns
@@ -586,11 +617,10 @@ if __name__ == "__main__":
     # rules = [CHOICEATTEND_MOD2]
     for rule in rules:
         pass
-        sample_plot(save_addon='allrule_softplus_400largeinput', rule=rule, save=True)
+        # sample_plot(save_addon='allrule_softplus_200largeinput', rule=rule, save=False)
 
     # plot_singleneuron_intime('allrule_softplus_400largeinput', [4, 15, 16], [INHGO],
     #                          epoch=None, save=False, trace_only=True, plot_stim_avg=True)
 
-    # test_init()
+    test_init()
     pass
-
