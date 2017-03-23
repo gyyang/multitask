@@ -32,7 +32,7 @@ def mkdir_p(path):
             raise
 
 def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
-          batch_size_train=50, batch_size_test=200, display_step=1000, save_addon=None, **kwargs):
+          batch_size_train=50, batch_size_test=200, display_step=100, save_addon=None, **kwargs):
     '''
     Training the network
     :param HDIM: Number of recurrent units
@@ -50,10 +50,11 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
     # Number of units each ring has
     N_RING = 32
 
-    sigma_rec = 0.05
+    sigma_rec = 0.15
     sigma_x   = 0.01
 
     w_rec_init = 'diag'
+    early_stop = None # If not None, stop at this performance level
 
     if s == 0:
         save_addon_type = 'allrule_softplus'
@@ -88,10 +89,13 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
     elif s == 15:
         save_addon_type = 'goantifamily_softplus'
     elif s == 16:
-        save_addon_type = 'allrule_softplus_randortho'
+        save_addon_type = 'allrule_relu_randortho'
     elif s == 17:
-        save_addon_type = 'attendonly_softplus_randortho'
-
+        save_addon_type = 'attendonly_relu_randortho'
+    elif s == 18:
+        save_addon_type = 'allrule_relu_randgauss'
+    elif s == 19:
+        save_addon_type = 'attendonly_relu_randgauss'
 
     tf.reset_default_graph()
 
@@ -102,6 +106,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
 
     elif 'attendonly' in save_addon_type:
         rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+        early_stop = 0.85
     elif 'delaychoiceonly' in save_addon_type: # This has to be before choiceonly
         rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
     elif 'choiceonly' in save_addon_type:
@@ -134,6 +139,8 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
 
     if 'randortho' in save_addon_type:
         w_rec_init = 'randortho'
+    elif 'randgauss' in save_addon_type:
+        w_rec_init = 'randgauss'
 
     if save_addon is None:
         save_addon = save_addon_type
@@ -148,6 +155,7 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
               'sigma_x'     : sigma_x,
               'w_rec_init'  : w_rec_init,
               'beta_anchor' : 0.0,
+              'early_stop'  : early_stop,
               'HDIM'        : HDIM,
               'N_RING'      : N_RING,
               'num_ring'    : num_ring,
@@ -233,14 +241,16 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
                     with open(os.path.join('data', 'config'+config['save_addon']+'.pkl'), 'wb') as f:
                         pickle.dump(config, f)
 
+                    if early_stop is not None:
+                        perf_tests_mean = np.mean([perf_tests[rule][-1] for rule in rules])
+                        if perf_tests_mean > early_stop:
+                            print('Performance reached early stopping point')
+                            break
+
                 step += 1
-
-
-
+                
             except KeyboardInterrupt:
                 break
-
-
 
         # Saving the model
         R.save()
@@ -266,5 +276,5 @@ def train(HDIM=300, s=1, learning_rate=0.001, training_iters=3000000,
 
 if __name__ == '__main__':
     pass
-    train(HDIM=340, s=17, save_addon='test', training_iters=300000,
-          batch_size_train=50, batch_size_test=200, display_step=100, beta_anchor=0.0001)
+    train(HDIM=200, s=17, save_addon='test', training_iters=2000,
+          batch_size_train=50, batch_size_test=200, display_step=10, learning_rate=0.0)
