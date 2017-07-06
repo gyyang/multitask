@@ -16,12 +16,15 @@ import seaborn.apionly as sns
 from task import *
 from run import Run, plot_singleneuron_intime
 
-save = False
+save = True
+
+normalization_method = 'max'
+# normalization_method = 'sum'
 
 ########################## Running the network ################################
-# save_addon = 'allrule_weaknoise_400'
-save_addon = 'allrule_softplus_400largeinput'
-data_type = 'rule'
+save_addon = 'allrule_softplus_0_256paper'
+# data_type = 'rule'
+data_type = 'epoch'
 
 rules = range(N_RULE)
 
@@ -31,15 +34,20 @@ rules = range(N_RULE)
 fname = 'data/variance'+data_type+save_addon
 with open(fname+'.pkl','rb') as f:
     res = pickle.load(f)
-h_var_all = res['h_var_all']
+h_var_all_= res['h_var_all']
 keys      = res['keys']
 
 # First only get active units. Total variance across tasks larger than 1e-3
-ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
-h_var_all  = h_var_all[ind_active, :]
+ind_active = np.where(h_var_all_.sum(axis=1) > 1e-2)[0]
+h_var_all  = h_var_all_[ind_active, :]
 
 # Normalize by the total variance across tasks
-h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
+if normalization_method == 'sum':
+    h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
+elif normalization_method == 'max':
+    h_normvar_all = (h_var_all.T/np.max(h_var_all, axis=1)).T
+else:
+    raise ValueError()
 
 ################################## Clustering ################################
 if data_type == 'rule':
@@ -57,7 +65,11 @@ ac.fit(h_var_all) # n_samples, n_features = n_units, n_rules/n_epochs
 labels = ac.labels_ # cluster labels
 
 # Sort clusters by its task preference (important for consistency across nets)
-label_prefs = [rules[np.argmax(h_normvar_all[labels==l].sum(axis=0))] for l in set(labels)]
+if data_type == 'rule':
+    label_prefs = [rules[np.argmax(h_normvar_all[labels==l].sum(axis=0))] for l in set(labels)]
+elif data_type == 'epoch':
+    label_prefs = [keys[np.argmax(h_normvar_all[labels==l].sum(axis=0))][0] for l in set(labels)]
+
 ind_label_sort = np.argsort(label_prefs)
 label_prefs = np.array(label_prefs)[ind_label_sort]
 # Relabel
@@ -105,45 +117,61 @@ ind_active      = ind_active[ind_sort]
 # Plot Normalized Variance
 if data_type == 'rule':
     figsize = (3.5,2.5)
+    rect = [0.25, 0.2, 0.6, 0.7]
+    rect_color = [0.25, 0.15, 0.6, 0.05]
+    rect_cb = [0.87, 0.2, 0.03, 0.7]
     tick_names = [rule_name[r] for r in rules]
+    fs = 6
 elif data_type == 'epoch':
     figsize = (3.5,4.5)
+    rect = [0.25, 0.1, 0.6, 0.85]
+    rect_color = [0.25, 0.05, 0.6, 0.05]
+    rect_cb = [0.87, 0.1, 0.03, 0.85]
     tick_names = [rule_name[key[0]]+' '+key[1] for key in keys]
+    fs = 5
 else:
     raise ValueError
 
 h_plot  = h_normvar_all.T
-# h_plot /= h_normvar_all.max(axis=1)
 vmin, vmax = 0, 1
 fig = plt.figure(figsize=figsize)
-ax = fig.add_axes([0.25, 0.2, 0.6, 0.7])
+ax = fig.add_axes(rect)
 im = ax.imshow(h_plot, cmap='hot',
                aspect='auto', interpolation='nearest', vmin=vmin, vmax=vmax)
 
 plt.yticks(range(len(tick_names)), tick_names,
-           rotation=0, va='center', fontsize=6)
+           rotation=0, va='center', fontsize=fs)
 plt.xticks([])
 ax.tick_params('both', length=0)
 for loc in ['bottom','top','left','right']:
     ax.spines[loc].set_visible(False)
-ax = fig.add_axes([0.87, 0.2, 0.03, 0.7])
+ax = fig.add_axes(rect_cb)
 cb = plt.colorbar(im, cax=ax, ticks=[vmin,vmax])
 cb.outline.set_linewidth(0.5)
-cb.set_label('Normalized Variance', fontsize=7, labelpad=0)
+if normalization_method == 'sum':
+    clabel = 'Sum-normalized Variance'
+elif normalization_method == 'max':
+    clabel = 'Max-normalized Variance'
+
+cb.set_label(clabel, fontsize=7, labelpad=0)
 plt.tick_params(axis='both', which='major', labelsize=7)
 
-ax = fig.add_axes([0.25, 0.15, 0.6, 0.05])
-for l in range(n_cluster):
-    ind_l = np.where(labels==l)[0][[0, -1]]+np.array([0,1])
-    ax.plot(ind_l, [0,0], linewidth=2, solid_capstyle='butt',
-            color=sns.color_palette('deep', n_cluster)[l])
-ax.set_xlim([0, len(labels)])
-ax.axis('off')
+# Plot color bars indicating clustering
+if True:
+    ax = fig.add_axes(rect_color)
+    for l in range(n_cluster):
+        ind_l = np.where(labels==l)[0][[0, -1]]+np.array([0,1])
+        ax.plot(ind_l, [0,0], linewidth=2, solid_capstyle='butt',
+                color=sns.color_palette('deep', n_cluster)[l])
+    ax.set_xlim([0, len(labels)])
+    ax.axis('off')
+
 if save:
-    plt.savefig('figure/feature_map_by'+data_type+'.pdf', transparent=True)
+    plt.savefig('figure/feature_map_by'+data_type+'_norm'+normalization_method+'.pdf', transparent=True)
 plt.show()
 
-# Plot similarity matrix
+######################### Plotting Similarity Matrix ##########################
+
 from sklearn.metrics.pairwise import cosine_similarity
 similarity = cosine_similarity(h_normvar_all) # TODO: check
 fig = plt.figure(figsize=(3.5, 3.5))
@@ -174,29 +202,30 @@ if save:
 plt.show()
 
 
-# Plot variance for an example unit
-ind = 1 # example unit
-fig = plt.figure(figsize=(1.5,1.2))
-ax = fig.add_axes([0.3,0.3,0.6,0.5])
-ax.plot(range(h_plot.shape[0]), h_plot[:, ind], 'o-', color='black', lw=1, ms=2)
-plt.xticks(range(len(tick_names)), [tick_names[0]] + ['.']*(len(tick_names)-1),
-           rotation=90, fontsize=6)
-plt.xlabel('rule', fontsize=7, labelpad=1)
-plt.ylabel('Normalized var.', fontsize=7)
-plt.title('Unit {:d}'.format(ind_active[ind]), fontsize=7, y=0.85)
-plt.locator_params(axis='y', nbins=3)
-ax.tick_params(axis='both', which='major', labelsize=7, length=2)
-ax.spines["right"].set_visible(False)
-ax.spines["top"].set_visible(False)
-ax.xaxis.set_ticks_position('bottom')
-ax.yaxis.set_ticks_position('left')
-if save:
-    plt.savefig('figure/exampleunit_variance.pdf', transparent=True)
-plt.show()
+######################## Plotting Variance for example unit ###################
+if data_type == 'rule':
+    ind = 2 # example unit
+    fig = plt.figure(figsize=(1.2,1.0))
+    ax = fig.add_axes([0.4,0.4,0.5,0.45])
+    ax.plot(range(h_var_all.shape[1]), h_var_all_[ind_active[ind], :], 'o-', color='black', lw=1, ms=2)
+    plt.xticks(range(len(tick_names)), [tick_names[0]] + ['.']*(len(tick_names)-2) + [tick_names[-1]],
+               rotation=90, fontsize=6, horizontalalignment='center')
+    plt.xlabel('Task', fontsize=7, labelpad=-10)
+    plt.ylabel('Task Variance', fontsize=7)
+    plt.title('Unit {:d}'.format(ind_active[ind]), fontsize=7, y=0.85)
+    plt.locator_params(axis='y', nbins=3)
+    ax.tick_params(axis='both', which='major', labelsize=6, length=2)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    if save:
+        plt.savefig('figure/exampleunit_variance.pdf', transparent=True)
+    plt.show()
 
-# Plot single example neuron in time
-plot_singleneuron_intime(save_addon, [ind_active[ind]], [INHGO],
-                             epoch=None, save=True, ylabel_firstonly=True)
+    # Plot single example neuron in time
+    plot_singleneuron_intime(save_addon, [ind_active[ind]], [FDGO],
+                                 epoch=None, save=True, ylabel_firstonly=True)
 
 ######################### Plotting Connectivity ###############################
 nh = len(ind_active)

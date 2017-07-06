@@ -16,7 +16,7 @@ import seaborn.apionly as sns
 from task import *
 from run import Run
 
-save = False
+save = True
 
 def compute_variance(save_addon, data_type, rules,
                      random_rotation=False, fast_eval=False):
@@ -112,8 +112,9 @@ def _compute_hist_varprop(save_addon, rules):
     h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
     # Plot the proportion of variance for the first rule
-    data_plot = h_normvar_all[:, 0]
-    hist, bins_edge = np.histogram(data_plot, bins=20, range=(0,1))
+    # data_plot = h_normvar_all[:, 0]
+    data_plot = (h_var_all[:, 0]-h_var_all[:, 1])/((h_var_all[:, 0]+h_var_all[:, 1]))
+    hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1,1))
 
     # Plot the percentage instead of the total count
     hist = hist/np.sum(hist)
@@ -126,11 +127,12 @@ def compute_hist_varprop(save_type, rules, **kwargs):
     assert len(rules) == 2
     assert data_type == 'rule'
 
-    HDIMs = range(200, 1000)
+    # vars = range(100, 1000)
+    vars = range(100)
     hists = list()
-    hdims = list()
-    for HDIM in HDIMs:
-        save_addon = save_type+'_'+str(HDIM)
+    vars_ = list()
+    for var in vars:
+        save_addon = save_type+'_'+str(var)
         if 'save_type_end' in kwargs:
             save_addon = save_addon + kwargs['save_type_end']
 
@@ -142,36 +144,38 @@ def compute_hist_varprop(save_type, rules, **kwargs):
 
         # Store
         hists.append(hist)
-        hdims.append(HDIM)
+        vars_.append(var)
 
     # Get median of all histogram
     hists = np.array(hists)
     # hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
 
-    return hists, bins_edge, hdims
+    return hists, bins_edge, vars_
 
-def _plot_hist_varprop(hist_plot, bins_edge, rules, hist_example=None):
+def _plot_hist_varprop(hist_plot, bins_edge, rules, hist_example=None, plot_legend=False, **kwargs):
     fs = 6
     fig = plt.figure(figsize=(1.5,1.2))
     ax = fig.add_axes([0.2,0.3,0.6,0.5])
     if hist_example is not None:
-        print(bins_edge)
-        print(hist_example)
-        ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
-               color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
-    ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_plot, color='black', linewidth=1.5)
+        bar = ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
+               color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none', label='Example network')
+    line, = ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_plot, color='black', linewidth=1.5, label='All networks')
     # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_low)
     # ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_high)
     plt.locator_params(nbins=3)
-    xlabel = 'FracVar({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
+    xlabel = 'FTV({:s}, {:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
     ax.set_xlabel(xlabel, fontsize=fs)
     ax.set_ylim(bottom=-0.02*hist_plot.max())
-    ax.set_xlim([-0.1,1.1])
+    ax.set_xlim([-1.1,1.1])
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
     ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
+    if plot_legend:
+        lg = ax.legend([bar, line], ['Example network','All networks'], ncol=1,bbox_to_anchor=(1.1,1.3),
+                        fontsize=fs,labelspacing=0.3,loc=1, frameon=False)
+        plt.setp(lg.get_title(),fontsize=fs)
     if save:
         plt.savefig('figure/plot_hist_varprop'+
                 rule_name[rules[0]].replace(' ','')+
@@ -196,20 +200,23 @@ def plot_hist_varprop(save_type, rules, hdim_example=None, **kwargs):
 
     if hdim_example is not None:
         hist_example = hists[hdims.index(hdim_example)]
+    else:
+        hist_example = None
 
     hist_plot = hist_med
-    _plot_hist_varprop(hist_plot, bins_edge, rules=rules, hist_example=hist_example)
-
-
+    _plot_hist_varprop(hist_plot, bins_edge, rules=rules, hist_example=hist_example, **kwargs)
 
 def plot_hist_varprop_selection(save_type, **kwargs):
     rules_list = [(CHOICE_MOD1, CHOICE_MOD2),
                   (CHOICEATTEND_MOD1, CHOICEATTEND_MOD2),
-                  (CHOICE_MOD1, REMAP),
-                  (DMSGO, DMCGO),
-                  (INHGO, GO)]
+                  (CHOICE_MOD1, FDANTI),
+                  (CHOICE_MOD1, CHOICEATTEND_MOD1),
+                  (FDGO, REACTGO),
+                  (CHOICEDELAY_MOD1, CHOICE_MOD1),
+                  (DMSGO, DMCGO)]
     for rules in rules_list:
-        plot_hist_varprop(save_type=save_type, rules=rules, **kwargs)
+        plot_hist_varprop(save_type=save_type, rules=rules,
+                          plot_legend=(rules==(CHOICE_MOD1, FDANTI)), **kwargs)
 
 def plot_hist_varprop_all(save_type, hdim_example=None, **kwargs):
     '''
@@ -223,7 +230,7 @@ def plot_hist_varprop_all(save_type, hdim_example=None, **kwargs):
     rules = range(N_RULE)
     figsize = (8, 8)
 
-    # rules = [GO, INHGO, DELAYGO]
+    # rules = [GO, FDGO, DELAYGO]
     # figsize = (4, 4)
 
     fs = 6 # fontsize
@@ -253,13 +260,13 @@ def plot_hist_varprop_all(save_type, hdim_example=None, **kwargs):
             ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med, color='black')
             plt.locator_params(nbins=3)
             # xlabel = r'$\frac{Var({:s})}{[Var({:s})+Var({:s})]}$'.format(rule_name[rules[0]],rule_name[rules[0]],rule_name[rules[1]])
-            xlabel = 'FracVar({:s},{:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
+            xlabel = 'FTV({:s},{:s})'.format(rule_name[rules[0]], rule_name[rules[1]])
             # ax.set_xlabel(xlabel, fontsize=fs)
             ax.set_ylim(bottom=-0.02*hist_med.max())
-            ax.set_xticks([0,1])
+            ax.set_xticks([-1,1])
             ax.set_xticklabels([])
             ax.set_yticks([])
-            ax.set_xlim([0,1])
+            ax.set_xlim([-1,1])
             ax.xaxis.set_ticks_position('bottom')
             ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
             ax.spines["right"].set_visible(False)
@@ -269,6 +276,15 @@ def plot_hist_varprop_all(save_type, hdim_example=None, **kwargs):
     # plt.tight_layout()
     if save:
         plt.savefig('figure/plot_hist_varprop_all'+save_type+'.pdf', transparent=True)
+
+def plot_hist_varprop_selection_cont(save_type, save_type_end=None):
+    rules_list = [(CHOICE_MOD1, CHOICE_MOD2),
+                  (CHOICEATTEND_MOD1, CHOICEATTEND_MOD2),
+                  (CHOICE_MOD1, CHOICEATTEND_MOD1),
+                  (CHOICEDELAY_MOD1, CHOICE_MOD1)]
+    for rules in rules_list:
+        plot_hist_varprop(save_type=save_type, save_type_end=save_type_end, rules=rules,
+                          plot_legend=(rules==(CHOICE_MOD1, REACTANTI)), hdim_example=0)
 
 def get_random_rotation_variance(save_addon, data_type): ##TODO: Need more work
     # save_addon = 'allrule_weaknoise_300'
@@ -343,29 +359,27 @@ def compute_ntasks_selective():
 
 
 if __name__ == '__main__':
-    save_addon = 'allrule_weaknoise_400'
-    data_type = 'rule'
-
-    rules = [GO, INHGO, DELAYGO,\
-        CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT,\
-        CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,\
-        REMAP, INHREMAP, DELAYREMAP,\
-        DMSGO, DMSNOGO, DMCGO, DMCNOGO]
+    ############################# Compute Variance ############################
+    save_addon = 'allrule_softplus_0_300test'
+    data_type = 'epoch'
+    rules = range(N_RULE)
+    # compute_variance(save_addon, data_type, rules, fast_eval=True)
 
 
-    # compute_variance(save_addon, data_type, rules, random_rotation=True, fast_eval=True)
-
-
+    ############################# Fractional Variance #########################
     # save_type = 'allrule_weaknoise'
     save_type = 'allrule_softplus'
-    save_type_end = 'largeinput'
+    save_type_end = '_256paper'
     # save_type = 'allrule_tanh'
     # save_type = 'allrule_relu'
-    # plot_hist_varprop(save_type, rules=[DMSGO, DMCGO], hdim_example=400, save_type_end=save_type_end)
+    # plot_hist_varprop(save_type, rules=[CHOICEATTEND_MOD1, CHOICEATTEND_MOD2], hdim_example=200, save_type_end=save_type_end)
     plot_hist_varprop_all(save_type, save_type_end=save_type_end)
-    plot_hist_varprop_selection(save_type, hdim_example=400, save_type_end=save_type_end)
+    # plot_hist_varprop_selection(save_type, hdim_example=0, save_type_end=save_type_end)
 
 
-    # Study OIC & DMC
-    # rules = [OIC, DMC]
-    # plot_hist_varprop('oicdmconly_strongnoise', rules=rules, hdim_example=200)
+    # Fractional variance distributions for continual learning networks
+    save_type = 'cont_allrule'
+    save_type_end = '_0_1_1intsynrelu'
+    # plot_hist_varprop_selection_cont(save_type, save_type_end)
+
+
