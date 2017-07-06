@@ -21,7 +21,7 @@ from run import Run
 from network import get_perf
 from slowpoints import search_slowpoints
 
-save = True # TEMP
+save = False # TEMP
 
 def generate_surrogate_data():
     # Generate surrogate data
@@ -140,7 +140,8 @@ class UnitAnalysis(object):
         from performance import psychometric_choicefamily_2D
 
         # Rules for performance
-        rules_perf = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
+        # rules_perf = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
+        rules_perf = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
         lesion_group_list = [None, '1', '2', '12']
 
         perf_stores = OrderedDict()
@@ -155,7 +156,8 @@ class UnitAnalysis(object):
                 lesion_units = self.ind_lesions_orig[lesion_group]
 
             for rule in rules_perf:
-                perf, prop1s, cohs = psychometric_choicefamily_2D(self.save_addon, rule, lesion_units=lesion_units, n_coh=8, n_tar_loc=20)
+                perf, prop1s, cohs = psychometric_choicefamily_2D(
+                    self.save_addon, rule, lesion_units=lesion_units, n_coh=4, n_tar_loc=10)
                 perf_stores[lesion_group].append(perf)
 
             perf_stores[lesion_group] = np.array(perf_stores[lesion_group])
@@ -196,7 +198,8 @@ class UnitAnalysis(object):
         else:
             lesion_units = self.ind_lesions_orig[lesion_group]
 
-        perf, prop1s, cohs = psychometric_choicefamily_2D(self.save_addon, rule, lesion_units=lesion_units, n_coh=8, n_tar_loc=20)
+        perf, prop1s, cohs = psychometric_choicefamily_2D(
+            self.save_addon, rule, lesion_units=lesion_units, n_coh=8, n_tar_loc=20)
 
         title = rule_name[rule] + '\n' + self.lesion_group_names[lesion_group]
         save_name = rule_name[rule].replace(' ','')+\
@@ -469,7 +472,10 @@ class StateSpaceAnalysis(object):
             'regress_product'    : False, # regression of interaction terms
             'z_score'            : True,
             'fast_eval'          : True,
-            'surrogate_data'     : False}
+            'surrogate_data'     : False,
+            'sigma_rec'          : 0.,
+            'select_group'       : False,
+            'n_rep'              : 1}
 
         # Update settings with kwargs
         setting = default_setting
@@ -498,158 +504,195 @@ class StateSpaceAnalysis(object):
         n_rule = len(rules)
         n_regr = len(regr_names)
 
-        # Generate task parameters used
-        # Target location
-        tar1_loc  = np.pi/2
-        params, batch_size = self.gen_taskparams(tar1_loc, n_tar=6, n_rep=2)
 
-        x     = list() # Network input
-        y_loc = list() # Network target output location
+        # tar1_loc_list = np.arange(6)/6.*2*np.pi
+        tar1_loc_list = [0]
+        coef_maxt_list = list()
+        H_new_list = list()
 
-        # Start computing the neural activity
-        with Run(save_addon, sigma_rec=0, lesion_units=lesion_units, fast_eval=setting['fast_eval']) as R:
-            config = R.config
+        for tar1_loc in tar1_loc_list:
+            # Generate task parameters used
+            # Target location
+            # tar1_loc  = 0
+            # tar1_loc  = np.pi/2
+            # tar1_loc  = np.pi/4
+            params, batch_size = self.gen_taskparams(tar1_loc, n_tar=6, n_rep=setting['n_rep'])
+            tar1_locs = np.tile(params['tar1_locs'], n_rule)
 
-            for i, rule in enumerate(rules):
-                # Generating task information
-                task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=False)
-                x.append(task.x)
-                y_loc.append(task.y_loc)
+            x     = list() # Network input
+            y_loc = list() # Network target output location
 
-            x     = np.concatenate(x    , axis=1)
-            y_loc = np.concatenate(y_loc, axis=1)
+            # Start computing the neural activity
+            with Run(save_addon, sigma_rec=setting['sigma_rec'],
+                     lesion_units=lesion_units, fast_eval=setting['fast_eval']) as R:
+                config = R.config
 
-            # Get neural activity
-            H     = R.f_h(x)
-            y_sample     = R.f_y(H)
-            y_sample_loc = R.f_y_loc(y_sample)
+                for i, rule in enumerate(rules):
+                    # Generating task information
+                    task  = generate_onebatch(rule, R.config, 'psychometric', params=params, noise_on=True)
+                    x.append(task.x)
+                    y_loc.append(task.y_loc)
 
-        H_original = H.copy()
+                x     = np.concatenate(x    , axis=1)
+                y_loc = np.concatenate(y_loc, axis=1)
 
-        # Get performance and choices
-        perfs = get_perf(y_sample, y_loc)
-        # y_choice is 1 for choosing tar1_loc, otherwise -1
-        y_actual_choice = 2*(get_dist(y_sample_loc[-1]-tar1_loc)<np.pi/2) - 1
-        y_target_choice = 2*(get_dist(y_loc[-1]       -tar1_loc)<np.pi/2) - 1
+                # Get neural activity
+                H     = R.f_h(x)
+                y_sample     = R.f_y(H)
+                y_sample_loc = R.f_y_loc(y_sample)
 
-        ###################### Processing activity ##################################
+                self.w_rec = R.w_rec
 
-        # Downsample in time
-        dt_new = 50
-        every_t = int(dt_new/config['dt'])
-        # Only analyze the target epoch
-        epoch = task.epochs['tar1']
-        H = H[epoch[0]:epoch[1],...][::every_t,...]
+            # Get performance and choices
+            # perfs = get_perf(y_sample, y_loc)
+            # y_choice is 1 for choosing tar1_loc, otherwise -1
+            y_actual_choice = 2*(get_dist(y_sample_loc[-1]-tar1_locs)<np.pi/2) - 1
+            y_target_choice = 2*(get_dist(y_loc[-1]       -tar1_locs)<np.pi/2) - 1
 
-        config['dt_new'] = dt_new
+            ###################### Processing activity ##################################
 
-        nt, nb, nh = H.shape
+            # Downsample in time
+            dt_new = 50
+            every_t = int(dt_new/config['dt'])
+            # Only analyze the target epoch
+            epoch = task.epochs['tar1']
+            H = H[epoch[0]:epoch[1],...][int(every_t/2)::every_t,...]
 
-        # Analyze all units or only active units
-        if setting['analyze_allunits']:
-            ind_active = range(nh)
-        else:
-            if 'ind_active' in kwargs:
-                ind_active = kwargs['ind_active']
+            H_original = H.copy()
+
+            # TODO: Temporary
+            self.x = x[epoch[0]:epoch[1],...][::every_t,...]
+
+            config['dt_new'] = dt_new
+
+            nt, nb, nh = H.shape
+
+            # Analyze all units or only active units
+            if setting['analyze_allunits']:
+                ind_active = range(nh)
             else:
-                # The way to select these units are important
-                # ind_active = np.where(H.reshape((-1, nh)).var(axis=0) > 1e-4)[0]
-                ind_active = np.where(H[-1].var(axis=0) > 1e-3)[0]
-                # ind_active = np.where(H[2:].var(axis=1).mean(axis=0) > 1e-4)[0]
-
-        H = H.reshape((-1, nh))
-
-        H = H[:, ind_active]
-        nh = len(ind_active) # new nh
-
-        # Z-scoring response across time and trials (can have a strong impact on results)
-        if setting['z_score']:
-            self.meanh = H.mean(axis=0)
-            self.stdh  = H.std(axis=0)
-            H = H - self.meanh
-            H = H/self.stdh
-
-        # Transform back
-        H = H.reshape((nt, nb, nh))
+                if 'ind_active' in kwargs:
+                    ind_active = kwargs['ind_active']
+                else:
+                    # The way to select these units are important
+                    ind_active = np.where(H[-1].var(axis=0) > 1e-3)[0] # current setting
+                    # ind_active = np.where(H[-1].var(axis=0) > 1e-5)[0] # current setting
 
 
-        # Get neuronal preferences (+1 if activity is higher for choice=+1)
-        # preferences = (H[:, (y_actual_choice== 1)*(perfs==1), :].mean(axis=(0,1)) >
-        #                H[:, (y_actual_choice==-1)*(perfs==1), :].mean(axis=(0,1)))*2-1
+                    # ind_active = np.where(H.reshape((-1, nh)).var(axis=0) > 1e-10)[0]
+                    # ind_active = np.where(H.var(axis=1).mean(axis=0) > 1e-4)[0]
 
-        # preferences = (H[:, y_actual_choice== 1, :].mean(axis=(0,1)) >
-        #                H[:, y_actual_choice==-1, :].mean(axis=(0,1)))*2-1
+            if setting['select_group'] is not False:
+                ind_active = setting['select_group']
 
-        # preferences = (H[:, y_target_choice== 1, :].mean(axis=(0,1)) >
-        #                H[:, y_target_choice==-1, :].mean(axis=(0,1)))*2-1
+            H = H.reshape((-1, nh))
 
-        # preferences = (H[-1, y_actual_choice== 1, :].mean(axis=0) >
-        #                H[-1, y_actual_choice==-1, :].mean(axis=0))*2-1
+            H = H[:, ind_active]
+            nh = len(ind_active) # new nh
 
-        preferences = (H[-1, y_target_choice== 1, :].mean(axis=0) >
-                       H[-1, y_target_choice==-1, :].mean(axis=0))*2-1
+            # TODO: Temporary
+            self.H_orig_active = (H.copy()).reshape((nt, nb, nh))
 
+            # Z-scoring response across time and trials (can have a strong impact on results)
+            if setting['z_score']:
+                self.meanh = H.mean(axis=0)
+                self.stdh  = H.std(axis=0)
+                H = H - self.meanh
+                H = H/self.stdh
 
-        ########################## Define Regressors ##################################
-
-        # Coherences
-        tar_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
-        tar_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
-
-        # Regressors (Choice, Mod1 Cohs, Mod2 Cohs, Rule)
-        Regrs = np.zeros((n_rule * batch_size, n_regr))
-        Regrs[:, 0] = y_target_choice
-        Regrs[:, 1] = np.tile(tar_mod1_cohs/tar_mod1_cohs.max(), n_rule)
-        Regrs[:, 2] = np.tile(tar_mod2_cohs/tar_mod2_cohs.max(), n_rule)
-        Regrs[:, 3] = np.repeat([1, -1], batch_size) # +1 for Att 1, -1 for Att 2
-
-        # Get unique regressors
-        Regrs_new = np.vstack({tuple(row) for row in Regrs})
-        # Sort it
-        ind_sort = np.lexsort(Regrs_new[:, ::-1].T)
-        Regrs_new = Regrs_new[ind_sort, :]
-
-        n_cond = Regrs_new.shape[0]
-
-        H_new = np.zeros((nt, n_cond, nh))
-
-        for i_cond in range(n_cond):
-            regr = Regrs_new[i_cond, :]
-
-            if setting['redefine_choice']:
-                for pref in [1, -1]:
-                    batch_ind = ((Regrs[:,0]==pref*regr[0])*(Regrs[:,1]==pref*regr[1])*
-                                 (Regrs[:,2]==pref*regr[2])*(Regrs[:,3]==regr[3]))
-                    H_new[:, i_cond, preferences==pref] = H[:, batch_ind, :][:, :, preferences==pref].mean(axis=1)
-
-            else:
-                batch_ind = ((Regrs[:,0]==regr[0])*(Regrs[:,1]==regr[1])*
-                             (Regrs[:,2]==regr[2])*(Regrs[:,3]==regr[3]))
-                H_new[:, i_cond, :] = H[:, batch_ind, :].mean(axis=1)
+            # Transform back
+            H = H.reshape((nt, nb, nh))
 
 
+            # Get neuronal preferences (+1 if activity is higher for choice=+1)
+            # preferences = (H[:, (y_actual_choice== 1)*(perfs==1), :].mean(axis=(0,1)) >
+            #                H[:, (y_actual_choice==-1)*(perfs==1), :].mean(axis=(0,1)))*2-1
 
-        ################################### Regression ################################
-        from sklearn import linear_model
+            # preferences = (H[:, y_actual_choice== 1, :].mean(axis=(0,1)) >
+            #                H[:, y_actual_choice==-1, :].mean(axis=(0,1)))*2-1
 
-        # Time-independent coefficient vectors (n_unit, n_regress)
-        coef_maxt = np.zeros((nh, n_regr))
+            # preferences = (H[:, y_target_choice== 1, :].mean(axis=(0,1)) >
+            #                H[:, y_target_choice==-1, :].mean(axis=(0,1)))*2-1
 
-        # Looping over units
-        # Although this is slower, it's still quite fast, and it's clearer and more flexible
-        for i in range(nh):
-            # To satisfy sklearn standard
-            Y = np.swapaxes(H_new[:,:,i], 0, 1)
+            # preferences = (H[-1, y_actual_choice== 1, :].mean(axis=0) >
+            #                H[-1, y_actual_choice==-1, :].mean(axis=0))*2-1
 
-            # Linear regression
-            regr = linear_model.LinearRegression()
-            regr.fit(Regrs_new, Y)
+            preferences = (H[-1, y_target_choice== 1, :].mean(axis=0) >
+                           H[-1, y_target_choice==-1, :].mean(axis=0))*2-1
 
-            # Get time-independent coefficient vector
-            coef = regr.coef_
-            ind = np.argmax(np.sum(coef**2, axis=1))
-            coef_maxt[i, :] = coef[ind,:]
 
+            ########################## Define Regressors ##################################
+            # Coherences
+            tar_mod1_cohs = params['tar1_mod1_strengths'] - params['tar2_mod1_strengths']
+            tar_mod2_cohs = params['tar1_mod2_strengths'] - params['tar2_mod2_strengths']
+
+            # Get task variables
+            task_var = dict()
+            task_var['targ_dir'] = y_actual_choice
+            task_var['stim_dir']     = np.tile(tar_mod1_cohs/tar_mod1_cohs.max(), n_rule)
+            task_var['stim_col2dir'] = np.tile(tar_mod2_cohs/tar_mod2_cohs.max(), n_rule)
+            task_var['context']  = np.repeat([1, -1], batch_size) # +1 for Att 1, -1 for Att 2
+            task_var['correct']  = (y_actual_choice==y_target_choice).astype(int)
+
+            # Regressors (Choice, Mod1 Cohs, Mod2 Cohs, Rule)
+            Regrs = np.zeros((n_rule * batch_size, n_regr))
+            Regrs[:, 0] = y_target_choice
+            Regrs[:, 1] = task_var['stim_dir']
+            Regrs[:, 2] = task_var['stim_col2dir']
+            Regrs[:, 3] = task_var['context']
+
+            # Get unique regressors
+            Regrs_new = np.vstack({tuple(row) for row in Regrs})
+            # Sort it
+            ind_sort = np.lexsort(Regrs_new[:, ::-1].T)
+            Regrs_new = Regrs_new[ind_sort, :]
+
+            n_cond = Regrs_new.shape[0]
+
+            H_new = np.zeros((nt, n_cond, nh))
+
+            for i_cond in range(n_cond):
+                regr = Regrs_new[i_cond, :]
+
+                if setting['redefine_choice']:
+                    for pref in [1, -1]:
+                        batch_ind = ((Regrs[:,0]==pref*regr[0])*(Regrs[:,1]==pref*regr[1])*
+                                     (Regrs[:,2]==pref*regr[2])*(Regrs[:,3]==regr[3]))
+                        H_new[:, i_cond, preferences==pref] = H[:, batch_ind, :][:, :, preferences==pref].mean(axis=1)
+
+                else:
+                    batch_ind = ((Regrs[:,0]==regr[0])*(Regrs[:,1]==regr[1])*
+                                 (Regrs[:,2]==regr[2])*(Regrs[:,3]==regr[3]))
+                    H_new[:, i_cond, :] = H[:, batch_ind, :].mean(axis=1)
+
+
+
+            ################################### Regression ################################
+            from sklearn import linear_model
+
+            # Time-independent coefficient vectors (n_unit, n_regress)
+            coef_maxt = np.zeros((nh, n_regr))
+
+            # Looping over units
+            # Although this is slower, it's still quite fast, and it's clearer and more flexible
+            for i in range(nh):
+                # To satisfy sklearn standard
+                Y = np.swapaxes(H_new[:,:,i], 0, 1)
+
+                # Linear regression
+                regr = linear_model.LinearRegression()
+                regr.fit(Regrs_new, Y)
+
+                # Get time-independent coefficient vector
+                coef = regr.coef_
+                ind = np.argmax(np.sum(coef**2, axis=1))
+                coef_maxt[i, :] = coef[ind,:]
+
+            coef_maxt_list.append(coef_maxt)
+            H_new_list.append(H_new)
+
+        H_new = np.concatenate(H_new_list, axis=2) # Concatenate along units
+        coef_maxt = np.concatenate(coef_maxt_list, axis=0)
 
         # Orthogonalize with QR decomposition
         # Matrix q represents the orthogonalized task-related axes
@@ -671,6 +714,8 @@ class StateSpaceAnalysis(object):
 
         self.config     = config
         self.setting    = setting
+        self.task_var   = task_var
+        self.Regrs_orig = Regrs
         self.Regrs      = Regrs_new
         self.H          = H_new
         self.H_tran     = H_new_tran
@@ -679,21 +724,31 @@ class StateSpaceAnalysis(object):
         self.coef       = coef_maxt
         self.rules      = rules
         self.ind_active = ind_active
-        self.tar1_loc   = tar1_loc
+        self.tar1_locs  = tar1_locs
         self.q          = q
         self.lesion_units = lesion_units
         self.colors     = dict(zip([None, '1', '2', '12'],
                            sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
 
-
     @staticmethod
-    def gen_taskparams(tar1_loc, n_tar, n_rep):
-        # Generate task parameterse for state-space analysis
-        batch_size = n_rep * n_tar**2
-        batch_shape = (n_tar, n_tar, n_rep)
-        ind_tar_mod1, ind_tar_mod2, ind_rep = np.unravel_index(range(batch_size),batch_shape)
+    def gen_taskparams(tar1_loc, n_tar, n_rep=1, n_tarloc=10):
+        if tar1_loc is not None:
+            # Do not loop over tar1_loc
+            # Generate task parameterse for state-space analysis
+            batch_size = n_rep * n_tar**2
+            batch_shape = (n_tar, n_tar, n_rep)
+            ind_tar_mod1, ind_tar_mod2, ind_rep = np.unravel_index(range(batch_size),batch_shape)
 
-        tar1_locs = np.ones(batch_size)*tar1_loc
+            tar1_locs = np.ones(batch_size)*tar1_loc
+        else:
+            # Loop over tar1_loc
+            batch_size = n_rep * n_tar**2 * n_tarloc
+            batch_shape = (n_tar, n_tar, n_tarloc, n_rep)
+            ind_tar_mod1, ind_tar_mod2, ind_tarloc, ind_rep = \
+                np.unravel_index(range(batch_size),batch_shape)
+
+            tar1_locs = 2*np.pi*ind_tarloc/n_tarloc
+
         tar2_locs = (tar1_locs+np.pi) % (2*np.pi)
 
         # tar_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.3
@@ -708,8 +763,8 @@ class StateSpaceAnalysis(object):
                   'tar2_mod1_strengths' : 1 - tar_mod1_cohs,
                   'tar1_mod2_strengths' : 1 + tar_mod2_cohs,
                   'tar2_mod2_strengths' : 1 - tar_mod2_cohs,
-                  'tar_time'    : 1000}
-                  # If tar_time is long (~1600), we can reproduce the curving trajectories
+                  'tar_time'    : 800}
+
         return params, batch_size
 
     def sort_ind_bygroup(self):
@@ -737,6 +792,7 @@ class StateSpaceAnalysis(object):
 
     def sort_coefs_bygroup(self, coefs=None):
         # Sort coefs by group 1, 2, 12, and others
+        # If coefs is not None, then update coefs
 
         if coefs is None:
             coefs = dict() # Initialize
@@ -800,7 +856,7 @@ class StateSpaceAnalysis(object):
             save_name = 'beta_weights_sub'
             if fancy_color:
                 save_name = save_name + '_color'
-            plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
+            plt.savefig(os.path.join('figure',save_name+self.setting['save_addon']+'.pdf'), transparent=True)
         plt.show()
 
     def get_slowpoints(self):
@@ -1000,6 +1056,9 @@ class StateSpaceAnalysis(object):
                     ax.text(anc[0], anc[1], self.regr_names[pcs[0]], fontsize=fs, va='bottom')
                     ax.text(anc[0], anc[1], self.regr_names[pcs[1]], fontsize=fs, rotation=90, ha='right', va='top')
 
+                # ind = self.get_regr_ind(rule=rule) # for batch
+                # ax.plot(self.H_tran[:,ind,pcs[0]], self.H_tran[:,ind,pcs[1]],
+                #     '-', color='gray', alpha=0.5, linewidth=0.5)
 
                 # Loop over coherences to choice 1, from high to low
                 for i, coh in enumerate(np.unique(cohs)[::-1]):
@@ -1029,6 +1088,7 @@ class StateSpaceAnalysis(object):
 
                         ax.plot(h_plot[:,pcs[0]], h_plot[:,pcs[1]],
                                 '.-', markersize=2, color=colors[i], markeredgewidth=0.2, **kwargs)
+
 
                         if not plot_slowpoints:
                             continue
@@ -1131,6 +1191,62 @@ class StateSpaceAnalysis(object):
                 ax.xaxis.set_ticks_position('bottom')
                 ax.yaxis.set_ticks_position('left')
 
+    def plot_currents_intime(self):
+        for group_from in ['1', '2', '12']:
+            for group_to in ['1', '2', '12']:
+                self.plot_currents_intime_bygroup(group_from, group_to)
+
+    def plot_currents_intime_bygroup(self, group_from, group_to):
+
+        # Plot averaged unit activity in time
+
+        ind_group, ind_active_group = self.sort_ind_bygroup()
+
+        rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+
+        t_plot = np.arange(self.H.shape[0])*self.config['dt_new']/1000
+
+        # Plot the group averaged activity
+        fig, axarr = plt.subplots(1, 2, figsize=(4,2.0), sharey=True)
+        fig.suptitle('From group {:s} to group {:s} average'.format(group_from, group_to), fontsize=7)
+        for i_rule, rule in enumerate(rules):
+            ax = axarr[i_rule]
+            ind_trial = self.get_regr_ind(rule=rule)
+            h_group = self.H[:, ind_trial, :][:, :, ind_group[group_from]]
+            w_group = (self.w_rec[ind_group[group_to], :][:, ind_group[group_from]]).T
+
+            current_plot = np.dot(h_group, w_group)
+            # Average across trials
+            current_plot = current_plot.mean(axis=1)
+
+            # Average across units
+            current_plot_mean = current_plot.mean(axis=1)
+            _ = ax.plot(t_plot, current_plot_mean, color='black')
+
+            # for i in range(len(ind_group[group_to])):
+            #     _ = ax.plot(t_plot, current_plot[:,i], color='gray', alpha=0.1, linewidth=0.5)
+
+            for i_from in ind_group[group_from]:
+                for i_to in ind_group[group_to]:
+                    current = self.H[:, ind_trial, i_from] * self.w_rec[i_to, i_from]
+                    current = current.mean(axis=1)
+                    _ = ax.plot(t_plot, current, color='gray', alpha=0.1, linewidth=0.5)
+
+            ax.tick_params(axis='both', which='major', labelsize=7)
+            ax.locator_params(nbins=2)
+            ax.spines["right"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+
+        plt.tight_layout()
+
+        if save:
+            save_name = 'choiceatt_intime_'+self.setting['save_addon']+'_group'+group_from+'-'+group_to
+            plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
+
+        return
+
 
 def plot_groupsize(save_type):
     HDIMs = range(150, 1000)
@@ -1169,18 +1285,22 @@ def plot_groupsize(save_type):
     plt.savefig('figure/choiceattend_groupsize'+save_type+'.pdf', transparent=True)
 
 def plot_betaweights(save_type, save_type_end=None):
-    HDIMs = range(150, 1000)
+    vars = range(13, 15)
     coefs = {}
 
-    for HDIM in HDIMs:
-        save_addon = save_type+'_'+str(HDIM)
+    # sigma_rec = 0.15
+    sigma_rec = 0.0
+
+    for var in vars:
+        save_addon = save_type+'_'+str(var)
         if save_type_end is not None:
             save_addon = save_addon + save_type_end
         fname = 'data/config'+save_addon+'.pkl'
         if not os.path.isfile(fname):
             continue
 
-        ssa = StateSpaceAnalysis(save_addon, lesion_units=None, redefine_choice=True)
+        ssa = StateSpaceAnalysis(save_addon, lesion_units=None,
+                                 redefine_choice=True, sigma_rec=sigma_rec)
 
         # Update coefficient dictionary
         coefs = ssa.sort_coefs_bygroup(coefs)
@@ -1218,36 +1338,210 @@ def quick_statespace(save_addon):
     if save:
         plt.savefig('figure/choiceatt_quickstatespace.pdf',transparent=True)
 
-######################### Connectivity and Lesioning ##########################
-save_addon = 'allrule_softplus_400'
-# ua = UnitAnalysis(save_addon)
-# ua.plot_inout_connectivity(conn_type='rec')
-# ua.plot_inout_connectivity(conn_type='rule')
-# ua.plot_inout_connectivity(conn_type='output')
-# ua.prettyplot_hist_varprop()
-# ua.plot_performance_choicetasks()
+def _compute_frac_var(save_addon, **kwargs):
+    # FracVar analysis for Mante et al. experimental setup
 
-rule = CHOICEATTEND_MOD1
-# ua.plot_performance_2D(rule=rule)
-# for lesion_group in ['1', '2', '12', '1+2']:
-#     ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
+    # save_addon = 'allrule_softplus_340largeinput'
+    ssa = StateSpaceAnalysis(save_addon, z_score=False, **kwargs)
 
-# ua.plot_fullconnectivity()
+    h = ssa.H
 
-# plot_groupsize('allrule_weaknoise')
+    h_context1 = h[:,ssa.Regrs[:,3]== 1,:]
+    h_context2 = h[:,ssa.Regrs[:,3]==-1,:]
 
-################### State space ##############################################
-# Plot State space
-# ssa = StateSpaceAnalysis(save_addon, lesion_units=None)
-# ssa.plot_statespace(plot_slowpoints=True)
+    # Last time point variance
+    # h_var1 = h_context1[-1].var(axis=0)
+    # h_var2 = h_context2[-1].var(axis=0)
 
-# Plot beta weights
-save_type = 'allrule_softplus'
-plot_betaweights(save_type, save_type_end='largeinput')
+    h_var1 = h_context1.var(axis=1).mean(axis=0)
+    h_var2 = h_context2.var(axis=1).mean(axis=0)
 
-# Plot units in time
-# ssa = StateSpaceAnalysis(save_addon, lesion_units=None, z_score=False)
-# ssa.plot_units_intime()
+    var_noise = 0.0
+    h_var1, h_var2 = h_var1+var_noise, h_var2+var_noise
 
-# Quick state space analysis
-# quick_statespace(save_addon)
+    frac_var = (h_var1-h_var2)/(h_var1+h_var2)
+
+    return frac_var
+
+def compute_frac_var(save_type, save_type_end=None, var_list=None, **kwargs):
+    # save_type = 'allrule_softplus'
+    # kwargs = dict(save_type_end='largeinput')
+
+    if var_list is None:
+        var_list = range(200, 1000)
+    frac_vars = list()
+    vars = list()
+    for var in var_list:
+        save_addon = save_type+'_'+str(var)
+        if save_type_end is not None:
+            save_addon = save_addon + save_type_end
+
+        fname = os.path.join('data','config'+save_addon+'.pkl')
+        if not os.path.isfile(fname):
+            continue
+
+        frac_var = _compute_frac_var(save_addon, **kwargs)
+        frac_vars.append(frac_var)
+
+        # Store
+        vars.append(var)
+
+    tmp = np.concatenate(frac_vars)
+
+    _ = plt.hist(tmp)
+
+def run_all_analyses(save_addon):
+    from performance import plot_trainingprogress, plot_choicefamily_varytime, psychometric_choiceattend
+    plot_trainingprogress(save_addon)
+    for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
+        pass
+        # plot_choicefamily_varytime(save_addon, rule)
+
+    # psychometric_choiceattend(save_addon, no_ylabel=True)
+
+    ssa = StateSpaceAnalysis(save_addon, lesion_units=None, redefine_choice=False)
+    ssa.plot_statespace(plot_slowpoints=False)
+
+    ssa = StateSpaceAnalysis(save_addon, lesion_units=None,
+                                 redefine_choice=True)
+    # Update coefficient dictionary
+    coefs = ssa.sort_coefs_bygroup(dict())
+    ssa.plot_betaweights(coefs, fancy_color=True)
+
+    frac_var = _compute_frac_var(save_addon, analyze_allunits=False)
+    _ = plt.hist(frac_var, bins=10, range=(-1,1))
+
+    ua = UnitAnalysis(save_addon)
+    ua.plot_inout_connectivity(conn_type='rec')
+    ua.plot_inout_connectivity(conn_type='rule')
+    ua.plot_inout_connectivity(conn_type='input')
+    ua.plot_inout_connectivity(conn_type='output')
+    ua.prettyplot_hist_varprop()
+    # ua.plot_performance_choicetasks()
+
+
+
+if __name__ == '__main__':
+    ######################### Connectivity and Lesioning ##########################
+    # save_addon = 'attendonly_relu_randortho_200earlystop'
+    # save_addon = 'attendonly_softplus_200latest'
+    # ua = UnitAnalysis(save_addon)
+    # ua.plot_inout_connectivity(conn_type='rec')
+    # ua.plot_inout_connectivity(conn_type='rule')
+    # ua.plot_inout_connectivity(conn_type='input')
+    # ua.plot_inout_connectivity(conn_type='output')
+    # ua.prettyplot_hist_varprop()
+    # ua.plot_performance_choicetasks()
+
+    rule = CHOICEATTEND_MOD1
+    # ua.plot_performance_2D(rule=rule)
+    # for lesion_group in ['1', '2', '12', '1+2']:
+    #     ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
+
+    # ua.plot_fullconnectivity()
+
+    # plot_groupsize('allrule_weaknoise')
+
+    ################### State space ##############################################
+    # Plot State space
+    save_addon = 'attendonly_softplus_300latest'
+    # save_addon = 'attendonly_softplus_400latest'
+    # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, redefine_choice=False)
+    # ssa.plot_statespace(plot_slowpoints=False)
+
+    # Plot beta weights
+    save_type = 'attendonly_softplus_randortho'
+    # plot_betaweights(save_type, save_type_end='beta_anchor')
+
+    # Plot units in time
+    save_addon = 'allrule_softplus_400largeinput'
+    # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, z_score=False)
+    # ssa.plot_units_intime()
+    # ssa.plot_currents_intime()
+    # Quick state space analysis
+    # quick_statespace(save_addon)
+
+    ################### Modified state space ##############################################
+    # save_addon = 'allrule_softplus_200largeinput'
+    save_addon = 'attendonly_softplus_180latest'
+    # ua = UnitAnalysis(save_addon)
+    # ssa = StateSpaceAnalysis(save_addon, select_group=ua.ind_lesions_orig['12'])
+    # ssa = StateSpaceAnalysis(save_addon)
+    # ssa.plot_statespace(plot_slowpoints=False)
+
+    ################### Frac Var ##############################################
+    save_addon = 'attendonly_relu_randortho_300earlystop'
+    # save_addon = 'attendonly_softplus_randortho_10beta_anchor'
+    # save_addon = 'attendonly_softplus_randortho_0beta_anchor'    # save_addon = 'attendonly_softplus_200latest'
+    # frac_var = _compute_frac_var(save_addon, analyze_allunits=False, sigma_rec=0.5)
+    # _ = plt.hist(frac_var)
+
+    
+    # save_addon = 'attendonly_softplus_140tuesday'
+    # save_addon = 'attendonly_softplus_randortho_260tuesday'
+    # save_addon = 'attendonly_relu_260tuesday'
+    # save_addon = 'attendonly_softplus_randortho_2_anchor1'
+    save_addon = 'cont_type7_32ksiintsyn'
+    # save_addon = 'cont_test_test'
+    # run_all_analyses(save_addon)
+
+
+    ssa = StateSpaceAnalysis(save_addon, z_score=False)
+
+    h = ssa.H
+
+    h_context1 = h[:,ssa.Regrs[:,3]== 1,:]
+    h_context2 = h[:,ssa.Regrs[:,3]==-1,:]
+
+    # Last time point variance
+    # h_var1 = h_context1[-1].var(axis=0)
+    # h_var2 = h_context2[-1].var(axis=0)
+
+    h_var1 = h_context1.var(axis=1).mean(axis=0)
+    h_var2 = h_context2.var(axis=1).mean(axis=0)
+
+    var_noise = 0.0
+    h_var1, h_var2 = h_var1+var_noise, h_var2+var_noise
+
+    frac_var = (h_var1-h_var2)/(h_var1+h_var2)   
+    
+    ssa = StateSpaceAnalysis(save_addon, redefine_choice=True)
+
+
+    regr_names = ['Choice', 'Motion', 'Color', 'Rule']
+    fig, axarr = plt.subplots(4, 1, figsize=(1.6,5), sharex=True)
+    for i in range(4):
+        ax = axarr[i]
+        ax.scatter(frac_var, ssa.coef[:,i], s=3,
+                   facecolor='black', edgecolor='none')
+
+        ax.set_xlim([-1.1,1.1])
+        if i == 3:
+            ax.set_xticks([-1,0,1])
+            ax.set_xlabel('FracVar', fontsize=7)
+        else:
+            ax.set_xticks([-1,0,1],['']*3)
+        ax.set_ylim([-2,2])
+        ax.set_yticks([-2,0,2])
+        ax.set_ylabel(regr_names[i], fontsize=7)
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+        ax.tick_params(axis='both', which='major', labelsize=7)
+
+    plt.tight_layout()
+
+    
+
+    ################ Pretty Plotting of State-space Results #######################
+    # save_addon = 'attendonly_relu_260tuesday'
+    # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, redefine_choice=False, z_score=True)
+    # ssa.plot_statespace(plot_slowpoints=False)
+
+
+    ####################### Fractional Variance ###############################
+    # save_type = 'attendonly_softplus_randortho'
+    # save_type_end = '_anchor1'
+
+    # compute_frac_var(save_type, save_type_end, var_list=range(30))
