@@ -14,8 +14,11 @@ import matplotlib.pyplot as plt
 import time
 import seaborn.apionly as sns
 
-from task import *
-from run import Run, plot_singleneuron_intime
+import tensorflow as tf
+
+from task import rule_name, generate_trials
+from network import Model
+import tools
 
 save = True
 
@@ -37,21 +40,8 @@ def get_dim(h, zero_mean=False):
     return N_eff
 
 class TaskSetAnalysis(object):
-    def __init__(self, save_addon, rules=None, fast_eval=True):
+    def __init__(self, save_name, rules=None):
         ########################## Running the network ################################
-        if rules is None:
-            # Default value
-            rules = range(N_RULE)
-
-        # rules = [CHOICE_MOD1, CHOICE_MOD2]
-        # rules = [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
-        # rules = [REACTGO, FDGO, DELAYGO, ANTI, FDANTI, DELAYANTI]
-        # rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2]
-        # rules = [DMSGO, DMSNOGO]
-        # rules = [DMCGO, DMCNOGO]
-        # rules = [FDGO, FDANTI, DELAYGO, DELAYANTI]
-        ########################## Running the network ################################
-        n_rules = len(rules)
 
         # Stimulus-averaged traces
         h_stimavg_byrule  = OrderedDict()
@@ -59,14 +49,22 @@ class TaskSetAnalysis(object):
         # Last time points of epochs
         h_lastt_byepoch   = OrderedDict()
 
-        with Run(save_addon, sigma_rec=0, fast_eval=fast_eval) as R:
-            config = R.config
+        model = Model(save_name)
+        config = model.config
+
+        if rules is None:
+            # Default value
+            rules = config['rules']
+        n_rules = len(rules)
+
+        with tf.Session() as sess:
+            model.restore(sess)
             nx, nh, ny = config['shape']
 
             for rule in rules:
-                task = generate_onebatch(rule=rule, config=config, mode='test')
+                trial = generate_trials(rule=rule, config=config, mode='test')
 
-                h = R.f_h(task.x)
+                h = model.get_h(trial.x)
 
                 # Average across stimulus conditions
                 h_stimavg = h.mean(axis=1)
@@ -78,7 +76,7 @@ class TaskSetAnalysis(object):
                 # Average across stimulus conditions
                 h_stimavg_byrule[rule] = h_stimavg[t_start:, :]
 
-                for e_name, e_time in task.epochs.iteritems():
+                for e_name, e_time in trial.epochs.iteritems():
                     if 'fix' in e_name:
                         continue
 
@@ -94,7 +92,7 @@ class TaskSetAnalysis(object):
         self.h_stimavg_byrule  = h_stimavg_byrule
         self.h_stimavg_byepoch = h_stimavg_byepoch
         self.h_lastt_byepoch   = h_lastt_byepoch
-        self.save_addon = save_addon
+        self.save_name = save_name
 
     @staticmethod
     def filter(h, rules=None, epochs=None, non_rules=None, non_epochs=None,
@@ -160,7 +158,8 @@ class TaskSetAnalysis(object):
 
         elif dim_reduction_type == 'TSNE':
             from sklearn.manifold import TSNE
-            model = TSNE(n_components=2)
+            model = TSNE(n_components=2, init='pca',
+             verbose=1, method='exact', learning_rate=100, perplexity=5)
 
         elif dim_reduction_type == 'IsoMap':
             from sklearn.manifold import Isomap
@@ -209,21 +208,21 @@ class TaskSetAnalysis(object):
         texts = list()
 
         fig = plt.figure(figsize=figsize)
-        ax = fig.add_axes([0.05, 0.05, 0.75, 0.75])
+        ax = fig.add_axes([0.05, 0.05, 0.9, 0.9])
 
         # if plot_arrow:
-        #     if rules == [FDGO, FDANTI, DELAYGO, DELAYANTI]:
-        #         arrow_starts = [h[(FDANTI,'stim1')], h[(FDGO,'stim1')]]
-        #         arrow_ends   = [h[(DELAYANTI,'stim1')],
-        #                         -(h[(FDANTI,'stim1')] - h[(DELAYANTI,'stim1')]) + h[(FDGO,'stim1')]]
-        #     elif rules == [DMCGO, DMCNOGO, DMSGO, DMSNOGO]:
-        #         arrow_starts = [h[(DMSGO,'stim1')], h[(DMCGO,'stim1')]]
-        #         arrow_ends   = [h[(DMSNOGO,'stim1')],
-        #                         -(h[(DMSGO,'stim1')] - h[(DMSNOGO,'stim1')]) + h[(DMCGO,'stim1')]]
+        #     if rules == ['fdgo', 'fdanti', 'delaygo', 'delayanti']:
+        #         arrow_starts = [h[('fdanti','stim1')], h[('fdgo','stim1')]]
+        #         arrow_ends   = [h[('delayanti','stim1')],
+        #                         -(h[('fdanti','stim1')] - h[('delayanti','stim1')]) + h[('fdgo','stim1')]]
+        #     elif rules == ['dmcgo', 'dmcnogo', 'dmsgo', 'dmsnogo']:
+        #         arrow_starts = [h[('dmsgo','stim1')], h[('dmcgo','stim1')]]
+        #         arrow_ends   = [h[('dmsnogo','stim1')],
+        #                         -(h[('dmsgo','stim1')] - h[('dmsnogo','stim1')]) + h[('dmcgo','stim1')]]
         #
-        #     elif rules == [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]:
-        #         arrow_starts = [h[(CHOICE_INT,'stim1')], h[(CHOICE_INT,'stim1')]]
-        #         arrow_ends   = [h[(CHOICEATTEND_MOD1,'stim1')], h[(CHOICEATTEND_MOD2,'stim1')]]
+        #     elif rules == ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']:
+        #         arrow_starts = [h[('multidm','stim1')], h[('multidm','stim1')]]
+        #         arrow_ends   = [h[('contextdm1','stim1')], h[('contextdm2','stim1')]]
         #     else:
         #         ValueError('Arrows not provided')
         #
@@ -256,8 +255,14 @@ class TaskSetAnalysis(object):
                 ax.plot(val[:,dim0], val[:,dim1], color=color, alpha=0.5)
 
         if plot_label:
-            ax.set_xlabel(dim_reduction_type + ' dim. {:d}'.format(dim0+1), fontsize=fs)
-            ax.set_ylabel(dim_reduction_type + ' dim. {:d}'.format(dim1+1), fontsize=fs)
+            if dim_reduction_type == 'PCA':
+                xlabel = 'PC {:d}'.format(dim0+1)
+                ylabel = 'PC {:d}'.format(dim1+1)
+            else:
+                xlabel = dim_reduction_type + ' dim. {:d}'.format(dim0+1)
+                ylabel = dim_reduction_type + ' dim. {:d}'.format(dim1+1)
+            ax.set_xlabel(xlabel, fontsize=fs)
+            ax.set_ylabel(ylabel, fontsize=fs)
         ax.tick_params(axis='both', which='major', labelsize=fs)
         # plt.locator_params(nbins=3)
         ax.spines["right"].set_visible(False)
@@ -270,16 +275,16 @@ class TaskSetAnalysis(object):
 
         # Plot special points:
         # if plot_special_point:
-        #     if rules == [FDGO, FDANTI, DELAYGO, DELAYANTI]:
-        #         special_point = -(h[(FDANTI,'stim1')] - h[(DELAYANTI,'stim1')]) + h[(FDGO,'stim1')]
+        #     if rules == ['fdgo', 'fdanti', 'delaygo', 'delayanti']:
+        #         special_point = -(h[('fdanti','stim1')] - h[('delayanti','stim1')]) + h[('fdgo','stim1')]
         #
-        #     elif rules == [DMCGO, DMCNOGO, DMSGO, DMSNOGO]:
-        #         special_point = -(h[(DMSGO,'stim1')] - h[(DMSNOGO,'stim1')]) + h[(DMCGO,'stim1')]
+        #     elif rules == ['dmcgo', 'dmcnogo', 'dmsgo', 'dmsnogo']:
+        #         special_point = -(h[('dmsgo','stim1')] - h[('dmsnogo','stim1')]) + h[('dmcgo','stim1')]
         #
-        #     elif rules == [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]:
+        #     elif rules == ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']:
         #         special_point = np.concatenate(
-        #             ((h[(CHOICEATTEND_MOD1,'stim1')] + h[(CHOICE_INT,'stim1')])/2,
-        #             (h[(CHOICEATTEND_MOD2,'stim1')] + h[(CHOICE_INT,'stim1')])/2), axis=0)
+        #             ((h[('contextdm1','stim1')] + h[('multidm','stim1')])/2,
+        #             (h[('contextdm2','stim1')] + h[('multidm','stim1')])/2), axis=0)
         #
         #     else:
         #         ValueError('Special points not provided')
@@ -345,8 +350,8 @@ class TaskSetAnalysis(object):
                 self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
 
 def plot_dim():
-    save_addon = 'allrule_weaknoise_400'
-    tsa = TaskSetAnalysis(save_addon)
+    save_name = 'allrule_weaknoise_400'
+    tsa = TaskSetAnalysis(save_name)
     tsa.compute_dim()
     
     epoch_names = tsa.dim_lastt_byepoch.keys()
@@ -372,8 +377,8 @@ def plot_dim():
     plt.show()
 
 def plot_dimpair():
-    save_addon = 'allrule_weaknoise_400'
-    tsa = TaskSetAnalysis(save_addon)
+    save_name = 'allrule_weaknoise_400'
+    tsa = TaskSetAnalysis(save_name)
     tsa.compute_dim()
     tsa.compute_dim_pair()
 
@@ -422,8 +427,8 @@ def plot_dimpair():
     plt.savefig('figure/temp.pdf',transparent=True)
 
 def temp_quantify_composition():
-    save_addon = 'allrule_weaknoise_360'
-    tsa = TaskSetAnalysis(save_addon)
+    save_name = 'allrule_weaknoise_360'
+    tsa = TaskSetAnalysis(save_name)
 
     epochs = ['stim1']
     rules = None
@@ -498,14 +503,14 @@ def temp_quantify_composition():
     #         print('{:15s}'.format(rule_name[h_keys[j][0]])),
     #
     #
-    # aa = h2[(FDGO,'stim1')]-h2[(FDANTI,'stim1')]
-    # bb = h2[(DELAYGO,'stim1')]-h2[(DELAYANTI,'stim1')]
+    # aa = h2[('fdgo','stim1')]-h2[('fdanti','stim1')]
+    # bb = h2[('delaygo','stim1')]-h2[('delayanti','stim1')]
     #
-    # aa = h2[(DMCGO,'stim1')]-h2[(DMCNOGO,'stim1')]
-    # bb = h2[(DMSGO,'stim1')]-h2[(DMSNOGO,'stim1')]
+    # aa = h2[('dmcgo','stim1')]-h2[('dmcnogo','stim1')]
+    # bb = h2[('dmsgo','stim1')]-h2[('dmsnogo','stim1')]
     #
-    # aa = h2[(CHOICE_INT,'stim1')]-h2[(CHOICE_MOD2,'stim1')]
-    # bb = h2[(CHOICE_INT,'stim1')]-h2[(CHOICEATTEND_MOD2,'stim1')]
+    # aa = h2[('multidm','stim1')]-h2[('dm2','stim1')]
+    # bb = h2[('multidm','stim1')]-h2[('contextdm2','stim1')]
     #==============================================================================
 
 
@@ -542,119 +547,75 @@ def temp_quantify_composition():
         tsa.plot_taskspace(rules=rules, epochs=['stim1'], plot_text=True, figsize=(1.5,1.5),
                            markersize=3, plot_label=False, dim_reduction_type='PCA', get_lasttimepoint=True)
 
-def plot_weight_rule_PCA(save_addon):
-    # save_addon = 'allrule_weaknoise_480'
-    with Run(save_addon, sigma_rec=0) as R:
-        w_in  = R.w_in # for later sorting
-        w_out = R.w_out
-        config = R.config
-    nx, nh, ny = config['shape']
-    n_ring = config['N_RING']
+########################## Plotting task representation #######################
 
-    rules_list = [[FDGO, FDANTI, DELAYGO, DELAYANTI],
-                  [CHOICEDELAY_INT, CHOICEATTEND_MOD1, CHOICE_INT, CHOICEDELAYATTEND_MOD1],
-                  [CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2],
-                  [CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]]
+def compute_taskspace(save_name, setup, restore=False, representation='rate'):
+    if setup == 1:
+        rules = ['fdgo', 'fdanti', 'delaygo', 'delayanti']
+    elif setup == 2:
+        rules = ['contextdelaydm1', 'contextdelaydm2', 'contextdm1', 'contextdm2']
+    elif setup == 3:
+        rules = ['dmsgo', 'dmcgo', 'dmsnogo', 'dmcnogo']
+    elif setup == 4:
+        rules = ['contextdelaydm1', 'contextdelaydm2', 'multidelaydm', 'contextdm1', 'contextdm2', 'multidm']
+    elif setup == 5:
+        rules = ['contextdelaydm1', 'contextdelaydm2', 'multidelaydm', 'delaydm1', 'delaydm2',
+             'contextdm1', 'contextdm2', 'multidm', 'dm1', 'dm2',]
+    elif setup == 6:
+        rules = ['fdgo', 'delaygo', 'contextdm1', 'contextdelaydm1']
 
-    for rules in rules_list:
-        w_rules = w_in[:, 2*n_ring+1+np.array(rules)]
+    if representation == 'rate':
+        fname = 'taskset{:d}_space_'.format(setup)+save_name+'.pkl'
+        fname = os.path.join('data', fname)
+
+        if restore and os.path.isfile(fname):
+            print('Reloading results from '+fname)
+            with open(fname, 'rb') as f:
+                h_trans = pickle.load(f)
+
+        else:
+            tsa = TaskSetAnalysis(save_name, rules=rules)
+            h_trans = tsa.compute_taskspace(rules=rules, epochs=['stim1'],
+                                            dim_reduction_type='PCA', setup=setup)
+            with open(fname, 'wb') as f:
+                pickle.dump(h_trans, f)
+            print('Results stored at : '+fname)
+
+    elif representation == 'weight':
+        from task import get_rule_index
+
+        model = Model(save_name)
+        config = model.config
+        n_input, n_hidden, n_output = config['shape']
+        with tf.Session() as sess:
+            model.restore(sess)
+            var_list = sess.run(model.var_list)
+
+        # Get connectivity
+        w_in  = var_list[2][:n_input, :].T
+
+        rule_indices = [get_rule_index(r, config) for r in rules]
+        w_rules = w_in[:, rule_indices]
 
         from sklearn.decomposition import PCA
-        model = PCA(n_components=5)
+        model = PCA(n_components=2)
 
         # Transform data
         data_trans = model.fit_transform(w_rules.T)
-
-        plt.figure(figsize=(2,2))
-        for i, rule in enumerate(rules):
-            plt.scatter(data_trans[i,0],data_trans[i,1])
-            plt.text(data_trans[i,0],data_trans[i,1], rule_name[rule])
-            plt.axis('equal')
-        plt.show()
-
-
-def compute_taskspace_obsolete(save_addon=None, save_type=None, save_type_end=None, setup=1):
-    # save_type = 'allrule_softplus'
-    # save_type_end = 'largeinput'
-    # setup = 2
-    if setup == 1:
-        rules = [FDGO, FDANTI, DELAYGO, DELAYANTI]
-    elif setup == 2:
-        rules = [CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
-    elif setup == 3:
-        rules = [DMSGO, DMCGO, DMSNOGO, DMCNOGO]
-    elif setup == 4:
-        rules = [CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
-    elif setup == 5:
-        rules = [CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT, CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,
-             CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT, CHOICE_MOD1, CHOICE_MOD2,]
-    elif setup == 6:
-        rules = [FDGO, DELAYGO, CHOICEATTEND_MOD1, CHOICEDELAYATTEND_MOD1]
-
-    if save_addon is not None:
-        tsa = TaskSetAnalysis(save_addon, rules=rules)
-        h_trans = tsa.compute_taskspace(rules=rules, epochs=['stim1'],
-                                        dim_reduction_type='PCA', setup=setup)
-        return h_trans
-
-    vars = range(0,1000)
-    h_trans_all = dict()
-    i = 0
-    for var in vars:
-        save_addon = save_type+'_'+str(var)
-        if save_type_end is not None:
-            save_addon = save_addon + save_type_end
-        fname = 'data/config'+save_addon+'.pkl'
-        if not os.path.isfile(fname):
-            continue
-        i += 1
-
-        tsa = TaskSetAnalysis(save_addon, rules=rules)
-        h_trans = tsa.compute_taskspace(rules=rules, epochs=['stim1'],
-                                        dim_reduction_type='PCA', setup=setup)
-        if i == 1:
-            for key, val in h_trans.iteritems():
-                h_trans_all[key] = val
-        else:
-            for key, val in h_trans.iteritems():
-                h_trans_all[key] = np.concatenate((h_trans_all[key], val), axis=0)
-    return h_trans_all
-
-def compute_taskspace(save_addon, setup, restore=False):
-    if setup == 1:
-        rules = [FDGO, FDANTI, DELAYGO, DELAYANTI]
-    elif setup == 2:
-        rules = [CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
-    elif setup == 3:
-        rules = [DMSGO, DMCGO, DMSNOGO, DMCNOGO]
-    elif setup == 4:
-        rules = [CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
-    elif setup == 5:
-        rules = [CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT, CHOICEDELAY_MOD1, CHOICEDELAY_MOD2,
-             CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT, CHOICE_MOD1, CHOICE_MOD2,]
-    elif setup == 6:
-        rules = [FDGO, DELAYGO, CHOICEATTEND_MOD1, CHOICEDELAYATTEND_MOD1]
-
-    fname = 'taskset{:d}_space_'.format(setup)+save_addon+'.pkl'
-    fname = os.path.join('data', fname)
-
-    if restore and os.path.isfile(fname):
-        print('Reloading results from '+fname)
-        with open(fname, 'rb') as f:
-            h_trans = pickle.load(f)
+        
+        # Turn into dictionary, and consistent with previous code
+        h_trans = OrderedDict()
+        for i, r in enumerate(rules):
+            # shape will be (1,2), and the key is added an epoch value only for consistency
+            h_trans[(r,'stim1')] = np.array([data_trans[i]])
 
     else:
-        tsa = TaskSetAnalysis(save_addon, rules=rules)
-        h_trans = tsa.compute_taskspace(rules=rules, epochs=['stim1'],
-                                        dim_reduction_type='PCA', setup=setup)
-        with open(fname, 'wb') as f:
-            pickle.dump(h_trans, f)
-        print('Results stored at : '+fname)
+        raise ValueError()
 
     return h_trans
 
 
-def _plot_taskspace(h_trans, save_name='temp', plot_example=False, lxy=None,
+def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
                     plot_arrow=True, **kwargs):
     from performance import rule_color
     figsize = (1.7,1.7)
@@ -699,11 +660,11 @@ def _plot_taskspace(h_trans, save_name='temp', plot_example=False, lxy=None,
         maxv1 = np.max([maxv1, np.max(abs(val[:,dim1]))])
 
     if kwargs['setup'] == 1:
-        arrow_starts = [h_trans[(FDGO,'stim1')], h_trans[(FDANTI,'stim1')]]
-        arrow_ends   = [h_trans[(DELAYGO,'stim1')], h_trans[(DELAYANTI,'stim1')]]
+        arrow_starts = [h_trans[('fdgo','stim1')], h_trans[('fdanti','stim1')]]
+        arrow_ends   = [h_trans[('delaygo','stim1')], h_trans[('delayanti','stim1')]]
     elif kwargs['setup'] == 2:
-        arrow_starts = [h_trans[(CHOICEATTEND_MOD1,'stim1')], h_trans[(CHOICEDELAYATTEND_MOD1,'stim1')]]
-        arrow_ends   = [h_trans[(CHOICEATTEND_MOD2,'stim1')], h_trans[(CHOICEDELAYATTEND_MOD2,'stim1')]]
+        arrow_starts = [h_trans[('contextdm1','stim1')], h_trans[('contextdelaydm1','stim1')]]
+        arrow_ends   = [h_trans[('contextdm2','stim1')], h_trans[('contextdelaydm2','stim1')]]
     else:
         plot_arrow = False
 
@@ -748,24 +709,31 @@ def _plot_taskspace(h_trans, save_name='temp', plot_example=False, lxy=None,
     ax.set_ylabel(pc_name+' {:d}'.format(dim1+1), fontsize=fs, labelpad=-5)
 
     if save:
-        plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
+        plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
     plt.show()
 
     return (lx, ly)
 
-def plot_taskspace(save_addon, setup=1, restore=True):
-    h_trans = compute_taskspace(save_addon, setup, restore=restore)
-    save_name = 'taskset{:d}_space_'.format(setup)+save_addon
+def plot_taskspace(save_name, setup=1, restore=True, representation='rate'):
+    h_trans = compute_taskspace(save_name, setup, restore=restore, representation=representation)
+    save_name = 'taskset{:d}_space_'.format(setup)+save_name
     _plot_taskspace(h_trans, save_name, setup=setup)
 
-def plot_taskspace_group(save_type, save_type_end=None, setup=1, restore=True, flip_sign=True):
+def plot_taskspace_group(save_pattern, setup=1, restore=True, representation='rate', flip_sign=True):
+    '''Plot task space for a group of networks
 
-    save_addons, _ = get_valid_saveaddons(save_type, save_type_end)
+    Args:
+        save_pattern : should be a pattern for the networks, support Unix shell-style wildcard
+    '''
+
+    save_names = tools.valid_save_names(save_pattern)
+    print('Analyzing models : ')
+    print(save_names)
 
     h_trans_all = OrderedDict()
     i = 0
-    for save_addon in save_addons:
-        h_trans = compute_taskspace(save_addon, setup, restore=restore)
+    for save_name in save_names:
+        h_trans = compute_taskspace(save_name, setup, restore=restore, representation=representation)
 
         if flip_sign:
             if setup != 1:
@@ -797,15 +765,14 @@ def plot_taskspace_group(save_type, save_type_end=None, setup=1, restore=True, f
                 h_trans_all[key] = np.concatenate((h_trans_all[key], val), axis=0)
         i += 1
 
-    save_name = 'taskset{:d}_space_'.format(setup)+save_type
-    if save_type_end is not None:
-        save_name = save_name + save_type_end
+    fig_name = 'taskset{:d}_{:s}space'.format(setup, representation)
 
-    lxy = _plot_taskspace(h_trans_all, save_name, setup=setup)
-    save_name = save_name + '_example'
-    lxy = _plot_taskspace(h_trans_all, save_name, setup=setup, plot_example=True, lxy=lxy)
+    lxy = _plot_taskspace(h_trans_all, fig_name, setup=setup)
+    fig_name = fig_name + '_example'
+    lxy = _plot_taskspace(h_trans_all, fig_name, setup=setup, plot_example=True, lxy=lxy)
 
-def run_network_replacerule(save_addon, rule, replace_rule, rule_strength):
+#################### Replacing rule ##########################################
+def run_network_replacerule(save_name, rule, replace_rule, rule_strength):
     '''
     Run the network but with replaced rule input weight
     :param rule: the rule to run
@@ -818,8 +785,10 @@ def run_network_replacerule(save_addon, rule, replace_rule, rule_strength):
     '''
     from network import get_perf
 
-    with Run(save_addon, fast_eval=True) as R:
-        config = R.config
+    model = Model(save_name)
+    config = model.config
+    with tf.Session() as sess:
+        model.restore(sess)
 
         # Get performance
         batch_size_test = 1000
@@ -827,14 +796,21 @@ def run_network_replacerule(save_addon, rule, replace_rule, rule_strength):
         batch_size_test_rep = int(batch_size_test/n_rep)
         perf_rep = list()
         for i_rep in range(n_rep):
-            task = generate_onebatch(rule, config, 'random', batch_size=batch_size_test_rep,
+            trial = generate_trials(rule, config, 'random', batch_size=batch_size_test_rep,
                                      replace_rule=replace_rule, rule_strength=rule_strength)
-            h = R.f_h(task.x)
-            y_hat = R.f_y(h)
-            perf = get_perf(y_hat, task.y_loc)
-            perf_rep.append(perf.mean())
+
+            y_hat_test = model.get_y(trial.x)
+            perf_rep.append(np.mean(get_perf(y_hat_test, trial.y_loc)))
 
     return np.mean(perf_rep), rule_strength
+
+    #     # Get performance
+    #     trial = generate_trials(rule, config, 'test',
+    #                              replace_rule=replace_rule, rule_strength=rule_strength)
+    #
+    #     y_hat_test = model.get_y(trial.x)
+    #
+    # return np.mean(get_perf(y_hat_test, trial.y_loc)), rule_strength
 
 def replace_rule_name(replace_rule, rule_strength):
     # little helper function
@@ -858,12 +834,12 @@ def replace_rule_name(replace_rule, rule_strength):
     name = name[:-1]
     return name
 
-def compute_replacerule_performance(save_addon, setup, restore=False):
+def compute_replacerule_performance(save_name, setup, restore=False):
     #Compute the performance of one task given a replaced rule input
 
     if setup == 1:
-        rule = DELAYANTI
-        replace_rule = np.array([DELAYANTI, FDANTI, DELAYGO, FDGO])
+        rule = 'delayanti'
+        replace_rule = np.array(['delayanti', 'fdanti', 'delaygo', 'fdgo'])
 
         rule_strengths = \
             [[1,0,0,0],
@@ -872,9 +848,9 @@ def compute_replacerule_performance(save_addon, setup, restore=False):
              [0,1,1,-1]]
 
     elif setup == 2:
-        rule = CHOICEDELAYATTEND_MOD1
-        replace_rule = np.array([CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2,
-                                 CHOICEATTEND_MOD1, CHOICEATTEND_MOD2])
+        rule = 'contextdelaydm1'
+        replace_rule = np.array(['contextdelaydm1', 'contextdelaydm2',
+                                 'contextdm1', 'contextdm2'])
 
         rule_strengths = \
             [[1,0,0,0],
@@ -884,8 +860,8 @@ def compute_replacerule_performance(save_addon, setup, restore=False):
              [0,1,1,-1]]
 
     elif setup == 3:
-        rule = DMSGO
-        replace_rule = np.array([DMSGO, DMCGO, DMSNOGO, DMCNOGO])
+        rule = 'dmsgo'
+        replace_rule = np.array(['dmsgo', 'dmcgo', 'dmsnogo', 'dmcnogo'])
         rule_strengths = \
             [[1,0,0,0],
              [0,1,0,0],
@@ -895,7 +871,7 @@ def compute_replacerule_performance(save_addon, setup, restore=False):
     else:
         raise ValueError('Unknown setup value')
 
-    fname = 'taskset{:d}_perf_'.format(setup)+save_addon+'.pkl'
+    fname = 'taskset{:d}_perf_'.format(setup)+save_name+'.pkl'
     fname = os.path.join('data', fname)
 
     if restore and os.path.isfile(fname):
@@ -908,7 +884,7 @@ def compute_replacerule_performance(save_addon, setup, restore=False):
         perfs = list()
         names = list()
         for rule_strength in rule_strengths:
-            perf, _ = run_network_replacerule(save_addon, rule, replace_rule, rule_strength)
+            perf, _ = run_network_replacerule(save_name, rule, replace_rule, rule_strength)
             perfs.append(perf)
             names.append(replace_rule_name(replace_rule, rule_strength))
 
@@ -922,20 +898,20 @@ def compute_replacerule_performance(save_addon, setup, restore=False):
 
     return perfs, rule, names
 
-def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, save_name=None):
+def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, fig_name=None):
     save = True
 
     fs = 7
     width = 0.3
     fig = plt.figure(figsize=(1.6,2.2))
     ax = fig.add_axes([0.55,0.05,0.35,0.7])
-    b0 = ax.barh(np.arange(len(perfs))-width/2, perfs[::-1],
+    b0 = ax.barh(np.arange(len(perfs)), perfs[::-1],
            height=width, color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
     if perfs_all is not None:
         n_net = perfs_all.shape[0]
         for i in range(len(perfs)):
             ax.plot(perfs_all[:,-i-1], [i]*n_net, 'o',
-                    color=sns.xkcd_palette(['cerulean'])[0], alpha=0.3, markersize=2)
+                    color='black', alpha=0.15, markersize=2)
     ax.set_yticks(np.arange(len(perfs)))
     ax.set_yticklabels(names[::-1], rotation=0, horizontalalignment='right')
     ax.set_ylabel('Rule input', fontsize=fs, labelpad=3)
@@ -953,34 +929,33 @@ def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, sav
     ax.set_xticks([0,0.5,1.0])
     ax.set_xlim([0,1.05])
     ax.set_ylim([-0.5,len(perfs)-0.5])
-    if save_name is None:
-        save_name = 'taskset{:d}_perf_'.format(setup)
+    if fig_name is None:
+        fig_name = 'taskset{:d}_perf_'.format(setup)
     if save:
-        plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
+        plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
     plt.show()
 
-def plot_replacerule_performance(save_addon, setup, perfs_all=None, save_name=None, restore=True):
-    perfs, rule, names = compute_replacerule_performance(save_addon, setup, restore)
-    _plot_replacerule_performance(perfs, rule, names, setup, perfs_all, save_name)
+def plot_replacerule_performance(save_name, setup, perfs_all=None, fig_name=None, restore=True):
+    perfs, rule, names = compute_replacerule_performance(save_name, setup, restore)
+    _plot_replacerule_performance(perfs, rule, names, setup, perfs_all, fig_name)
 
-
-def plot_replacerule_performance_group(save_type, save_type_end=None, setup=1, restore=True):
-    save_addons, _ = get_valid_saveaddons(save_type, save_type_end)
+def plot_replacerule_performance_group(save_pattern, setup=1, restore=True):
+    save_names = tools.valid_save_names(save_pattern)
+    print('Analyzing models : ')
+    print(save_names)
 
     perfs_plot = list()
-    for save_addon in save_addons:
-        perfs, rule, names = compute_replacerule_performance(save_addon, setup, restore)
+    for save_name in save_names:
+        perfs, rule, names = compute_replacerule_performance(save_name, setup, restore)
         perfs_plot.append(perfs)
 
     perfs_plot = np.array(perfs_plot)
     perfs_median = np.median(perfs_plot, axis=0)
 
-    save_name = 'taskset{:d}_perf_'.format(setup)+save_type
-    if save_type_end is not None:
-        save_name = save_name + save_type_end
+    fig_name = 'taskset{:d}_perf'.format(setup)
 
     print(perfs_median)
-    _plot_replacerule_performance(perfs_median, rule, names, setup, perfs_all=perfs_plot, save_name=save_name)
+    _plot_replacerule_performance(perfs_median, rule, names, setup, perfs_all=perfs_plot, fig_name=fig_name)
 
 
 if __name__ == '__main__':
@@ -989,33 +964,33 @@ if __name__ == '__main__':
     # setup = 1
     # compute_and_plot_replacerule_performance_type(save_type, setup, save_type_end=None)
 
-    save_addon = 'allrule_softplus_2_200tasksetmon'
-    # plot_taskspaces(save_addon, get_lasttimepoint=True)
-    # plot_weight_rule_PCA(save_addon)
+    save_name = '2_256migrate'
+    # plot_taskspace(save_name)
+    # plot_weight_rule_PCA(save_name)
     # for setup in range(7):
 
     # plot_dim()
     # plot_dimpair()
 
-    # save_addon = 'choicefamily_softplus_340'
-    # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2]
-    # rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
-    # rules = [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+    # save_name = 'choicefamily_softplus_340'
+    # rules = ['contextdm1', 'contextdm2', 'dm1', 'dm2']
+    # rules = ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']
+    # rules = ['delaydm1', 'delaydm2', 'contextdm1', 'contextdm2']
 
-    save_addon = 'allrule_relu_0main'
-    # rules = [CHOICE_INT, CHOICEDELAY_INT, CHOICEATTEND_MOD1, CHOICEDELAYATTEND_MOD1]
-    # tsa = TaskSetAnalysis(save_addon, rules=rules)
+    save_name = '0_256migrate'
+    # rules = ['multidm', 'multidelaydm', 'contextdm1', 'contextdelaydm1']
+    # tsa = TaskSetAnalysis(save_name, rules=rules)
     # tsa.plot_taskspace(rules=rules,
     #                    epochs=['stim1'], plot_text=True,
     #                            save_append='type'+str(4), figsize=(1.5,1.5),
     #                            markersize=3, plot_label=False, dim_reduction_type='PCA',
     #                            plot_special_point=False, plot_arrow=False, get_lasttimepoint=True)
-    # plot_weight_rule_PCA(save_addon)
+    # plot_weight_rule_PCA(save_name)
 
 
     ######################### Plotting task space for all tasks ##################
-    save_addon = 'allrule_softplus_0_256paper'
-    tsa = TaskSetAnalysis(save_addon)
+    save_name = '0_256migrate'
+    tsa = TaskSetAnalysis(save_name)
     tsa.compute_and_plot_taskspace(epochs=['stim1'], dim_reduction_type='PCA')
     # tsa.compute_and_plot_taskspace(epochs=['stim1', 'delay1', 'go1'], dim_reduction_type='MDS')
 
@@ -1027,26 +1002,27 @@ if __name__ == '__main__':
     ##################### Plotting task space with selected tasks #################
     ################# & Plotting performance with replaced rule #################
 
-    st, ste = 'allrule_softplus', '_256paper'
+    save_pattern = '*256migrate'
     # setups = [1] # Go, Anti family
     # setups = [2] # Ctx DM family
     setups = [1, 2]
     # setups = [3]
     for setup in setups:
         pass
-        # plot_taskspace_group(save_type=st, save_type_end=ste, setup=setup, restore=True)
-        # plot_replacerule_performance_group(save_type=st, save_type_end=ste, setup=setup, restore=True)
+        # plot_taskspace_group(save_pattern, setup=setup, restore=True, representation='rate')
+        # plot_taskspace_group(save_pattern, setup=setup, restore=True, representation='weight')
+        # plot_replacerule_performance_group(save_pattern, setup=setup, restore=True)
 
     #################### Plotting trajectories in task space #####################
-    save_addon = 'allrule_softplus_0_300mainfri'
+    save_name = 'allrule_softplus_0_300mainfri'
 #==============================================================================
 #     rules = []
-#     rules+= [REACTGO, FDGO, DELAYGO]
-#     rules+= [ANTI, FDANTI, DELAYANTI]
-#     # rules += [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2]
-#     # rules+= [CHOICE_MOD1, CHOICE_MOD2, CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_INT]
-#     # rules+= [CHOICEDELAY_MOD1, CHOICEDELAY_MOD2, CHOICEDELAYATTEND_MOD1, CHOICEDELAYATTEND_MOD2, CHOICEDELAY_INT]
-#     tsa = TaskSetAnalysis(save_addon, rules=rules)
+#     rules+= ['reactgo', 'fdgo', 'delaygo']
+#     rules+= ['reactanti', 'fdanti', 'delayanti']
+#     # rules += ['contextdm1', 'contextdm2', 'contextdelaydm1', 'contextdelaydm2']
+#     # rules+= ['dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm']
+#     # rules+= ['delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm']
+#     tsa = TaskSetAnalysis(save_name, rules=rules)
 #     h_trans = tsa.compute_taskspace(rules=rules, epochs=None,
 #                                     dim_reduction_type='PCA', get_lasttimepoint=False)
 # 
@@ -1067,4 +1043,3 @@ if __name__ == '__main__':
 #         color = np.array(rule_color[rule])
 #         plt.plot(val[:, dim0], val[:, dim1], color=color, lw=lw)
 #==============================================================================
-
