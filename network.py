@@ -14,11 +14,9 @@ from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.util import nest
-from tensorflow.python.ops.math_ops import sigmoid, tanh
 from tensorflow.python.ops import rnn
 from tensorflow.python.ops.rnn_cell_impl import RNNCell, _linear
 
-############################ Helper functions #################################
 
 def gen_ortho_matrix(dim, rng=None):
     '''Generate random orthogonal matrix
@@ -35,24 +33,25 @@ def gen_ortho_matrix(dim, rng=None):
         D = np.sign(x[0])
         x[0] += D*np.sqrt((x*x).sum())
         # Householder transformation
-        Hx = -D*(np.eye(dim-n+1)
-                 - 2.*np.outer(x, x)/(x*x).sum())
+        Hx = -D*(np.eye(dim-n+1) - 2.*np.outer(x, x)/(x*x).sum())
         mat = np.eye(dim)
         mat[n-1:, n-1:] = Hx
         H = np.dot(H, mat)
     return H
+
 
 def popvec(y):
     '''
     Population vector read out
     Assuming the last dimension is the dimension to be collapsed
     '''
-    pref = np.arange(0, 2*np.pi, 2*np.pi/y.shape[-1]) # preferences
+    pref = np.arange(0, 2*np.pi, 2*np.pi/y.shape[-1])  # preferences
     temp_sum = y.sum(axis=-1)
     temp_cos = np.sum(y*np.cos(pref), axis=-1)/temp_sum
     temp_sin = np.sum(y*np.sin(pref), axis=-1)/temp_sum
     loc = np.arctan2(temp_sin, temp_cos)
     return np.mod(loc, 2*np.pi)
+
 
 def get_perf(y_hat, y_loc):
     '''
@@ -66,8 +65,8 @@ def get_perf(y_hat, y_loc):
     y_hat = y_hat[-1]
 
     # Fixation and location of y_hat
-    y_hat_fix = y_hat[...,0]
-    y_hat_loc = popvec(y_hat[...,1:])
+    y_hat_fix = y_hat[..., 0]
+    y_hat_loc = popvec(y_hat[..., 1:])
 
     # Fixating? Correctly saccading?
     fixating = y_hat_fix > 0.5
@@ -83,16 +82,20 @@ def get_perf(y_hat, y_loc):
     perf = should_fix * fixating + (1-should_fix) * corr_loc * (1-fixating)
     return perf
 
-######################## Additional RNN cells #################################
 
 class LeakyRNNCell(RNNCell):
-    """The most basic Leaky RNN cell.
-    """
-    # TODO: clean up unnecessary options
-    # TODO: Move things out of __init__
+    """The most basic Leaky RNN cell."""
 
-    def __init__(self, num_units, n_input, alpha, sigma_rec=0, input_size=None,
-                 activation='softplus', w_rec_init='diag', rng=None, reuse=None):
+    def __init__(self,
+                 num_units,
+                 n_input,
+                 alpha,
+                 sigma_rec=0,
+                 input_size=None,
+                 activation='softplus',
+                 w_rec_init='diag',
+                 rng=None,
+                 reuse=None):
         super(LeakyRNNCell, self).__init__(_reuse=reuse)
 
         if input_size is not None:
@@ -106,24 +109,24 @@ class LeakyRNNCell(RNNCell):
             self._bias_start = 0.
             self._w_in_start = 1.0
             if self._w_rec_init == 'diag':
-                self._w_rec_start= 0.54
+                self._w_rec_start = 0.54
             elif self._w_rec_init == 'randortho':
-                self._w_rec_start= 1.0
+                self._w_rec_start = 1.0
             elif self._w_rec_init == 'randgauss':
                 self._w_rec_start = 1.0
         elif activation == 'tanh':
             self._activation = tf.tanh
             self._bias_start = 0.
             self._w_in_start = 1.0
-            self._w_rec_start= 1.0
+            self._w_rec_start = 1.0
         elif activation == 'relu':
             self._activation = tf.nn.relu
             self._bias_start = 0.5
             self._w_in_start = 1.0
             if self._w_rec_init == 'diag':
-                self._w_rec_start= 0.54
+                self._w_rec_start = 0.54
             elif self._w_rec_init == 'randortho':
-                self._w_rec_start= 0.5
+                self._w_rec_start = 0.5
             elif self._w_rec_init == 'randgauss':
                 self._w_rec_start = 1.0
         elif activation == 'suplin':
@@ -131,9 +134,9 @@ class LeakyRNNCell(RNNCell):
             self._bias_start = 0.5
             self._w_in_start = 1.0
             if self._w_rec_init == 'diag':
-                self._w_rec_start= 0.01 # Only using this now
+                self._w_rec_start = 0.01  # Only using this now
             elif self._w_rec_init == 'randortho':
-                self._w_rec_start= 1.0
+                self._w_rec_start = 1.0
             elif self._w_rec_init == 'randgauss':
                 self._w_rec_start = 1.0
         else:
@@ -147,14 +150,16 @@ class LeakyRNNCell(RNNCell):
 
         # Generate initialization matrix
         n_hidden = self._num_units
-        w_in0 = self.rng.randn(n_input, n_hidden)/np.sqrt(n_input)*self._w_in_start
+        w_in0 = (self.rng.randn(n_input, n_hidden) /
+                 np.sqrt(n_input) * self._w_in_start)
 
         if self._w_rec_init == 'diag':
             w_rec0 = self._w_rec_start*np.eye(n_hidden)
         elif self._w_rec_init == 'randortho':
             w_rec0 = self._w_rec_start*gen_ortho_matrix(n_hidden, rng=self.rng)
         elif self._w_rec_init == 'randgauss':
-            w_rec0 = self._w_rec_start*self.rng.randn(n_hidden, n_hidden)/np.sqrt(n_hidden)
+            w_rec0 = (self._w_rec_start * 
+                      self.rng.randn(n_hidden, n_hidden)/np.sqrt(n_hidden))
 
         matrix0 = np.concatenate((w_in0, w_rec0), axis=0)
 
@@ -170,10 +175,14 @@ class LeakyRNNCell(RNNCell):
         return self._num_units
 
     def call(self, inputs, state):
-        """Leaky RNN: output = new_state = (1-alpha)*state + alpha*activation(W * input + U * state + B)."""
-        # TODO: the variable scope can potentially be taken away
+        """Leaky RNN.
+
+        output = new_state = 
+        (1-alpha)*state + alpha*activation(W * input + U * state + B).
+        """
         with vs.variable_scope("leaky_rnn_cell",
-                            initializer=self._initializer, reuse=self._reuse):
+                               initializer=self._initializer,
+                               reuse=self._reuse):
 
             output = (1-self._alpha)*state + \
     self._alpha*self._activation(_linear([inputs, state], self._num_units, True) + \
@@ -183,9 +192,16 @@ class LeakyRNNCell(RNNCell):
 
 
 class LeakyGRUCell(RNNCell):
-    """Leaky Gated Recurrent Unit cell (see for example Song, Yang, Wang eLife 2017)."""
+    """Leaky Gated Recurrent Unit cell.
+    
+    See for example Song, Yang, Wang eLife 2017 for reference
+    """
 
-    def __init__(self, num_units, alpha, sigma_rec=0, input_size=None,
+    def __init__(self,
+                 num_units,
+                 alpha,
+                 sigma_rec=0,
+                 input_size=None,
                  activation=tanh,
                  reuse=None,
                  kernel_initializer=None,
@@ -235,7 +251,11 @@ class LeakyGRUCell(RNNCell):
 class EILeakyGRUCell(RNNCell):
     """Excitatory-inhibitory Leaky GRU cell."""
 
-    def __init__(self, num_units, alpha, sigma_rec=0, input_size=None,
+    def __init__(self,
+                 num_units,
+                 alpha,
+                 sigma_rec=0,
+                 input_size=None,
                  activation=tanh,
                  reuse=None,
                  kernel_initializer=None,
@@ -352,36 +372,34 @@ class EILeakyGRUCell(RNNCell):
         tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma, dtype=tf.float32)
         return new_h, new_h
 
-################################ Customized session ###########################
 
 class Model(object):
-    '''
-    The model.
-    '''
+    '''The model.'''
+
     def __init__(self, config, sigma_rec=None, dt=None):
         '''
         Initializing the model with information from config
 
         Args:
-        config: a string or a dictionary
-        If config is a string, then attempt to load configuration from file
-        If config is a dictionary, use it as the configuration
+          config: a string or a dictionary
+          If config is a string, then attempt to load configuration from file
+          If config is a dictionary, use it as the configuration
 
-        sigma_rec, if not None, will overwrite the sigma_rec passed by config
+          sigma_rec, if not None, will overwrite the sigma_rec passed by config
         '''
 
         # Reset tensorflow graphs
-        tf.reset_default_graph() # must be in the beginning
+        tf.reset_default_graph()  # must be in the beginning
 
         if isinstance(config, str):
             # Attempts to load configuration
-            config_path = os.path.join('data','config_'+config+'.pkl')
+            config_path = os.path.join('data', 'config_'+config+'.pkl')
             # For backward compatability
             if not os.path.isfile(config_path):
-                config_path = os.path.join('data','config'+config+'.pkl')
+                config_path = os.path.join('data', 'config'+config+'.pkl')
             print('Loading configuration from : ' + config_path)
             # Load config
-            with open(config_path,'rb') as f:
+            with open(config_path, 'rb') as f:
                 config = pickle.load(f)
 
         else:
@@ -394,7 +412,7 @@ class Model(object):
             print('Warning: Random seed not specified')
 
         if sigma_rec is not None:
-            print('Overwrite original sigma_rec with {:0.3f}'.format(sigma_rec))
+            print('Overwrite sigma_rec with {:0.3f}'.format(sigma_rec))
             config['sigma_rec'] = sigma_rec
 
         if dt is not None:
@@ -403,12 +421,11 @@ class Model(object):
 
         config['alpha'] = 1.0*config['dt']/config['tau']
 
-
         # Network Parameters
         n_input, n_hidden, n_output = config['shape']
 
         # Input, target output, and cost mask
-        self.x = tf.placeholder("float", [None, None, n_input]) # time * batch * n_input
+        self.x = tf.placeholder("float", [None, None, n_input])
         self.y = tf.placeholder("float", [None, n_output])
         if config['loss_type'] == 'lsq':
             self.c_mask = tf.placeholder("float", [None, n_output])
@@ -428,89 +445,86 @@ class Model(object):
         else:
             raise NotImplementedError()
 
-
         with tf.variable_scope("output"):
             # Using default initialization `glorot_uniform_initializer`
             w_out = tf.get_variable('weights', [n_hidden, n_output], dtype=tf.float32)
-            b_out = tf.get_variable('biases', [n_output], dtype=tf.float32,
-                                    initializer=init_ops.constant_initializer(0.0, dtype=tf.float32))
-
+            b_out = tf.get_variable(
+                    'biases', [n_output], dtype=tf.float32,
+                    initializer=tf.constant_initializer(0.0, dtype=tf.float32))
 
         # Recurrent activity
         if config['rnn_type'] == 'LeakyRNN':
-            cell = LeakyRNNCell(n_hidden, n_input, config['alpha'], sigma_rec=config['sigma_rec'],
-                                activation=config['activation'], w_rec_init=config['w_rec_init'],
+            cell = LeakyRNNCell(n_hidden, n_input, config['alpha'],
+                                sigma_rec=config['sigma_rec'],
+                                activation=config['activation'],
+                                w_rec_init=config['w_rec_init'],
                                 rng=config['rng'])
-
         elif config['rnn_type'] == 'LeakyGRU':
-            cell = LeakyGRUCell(n_hidden, config['alpha'],
-                                sigma_rec=config['sigma_rec'], activation=f_activation)
-
+            cell = LeakyGRUCell(
+                    n_hidden, config['alpha'],
+                    sigma_rec=config['sigma_rec'], activation=f_activation)
         elif config['rnn_type'] == 'EILeakyGRU':
-            cell = EILeakyGRUCell(n_hidden, config['alpha'],
-                                  sigma_rec=config['sigma_rec'], activation=f_activation)
-
+            cell = EILeakyGRUCell(
+                    n_hidden, config['alpha'],
+                    sigma_rec=config['sigma_rec'], activation=f_activation)
         elif config['rnn_type'] == 'LSTM':
             cell = tf.contrib.rnn.LSTMCell(n_hidden, activation=f_activation)
 
         elif config['rnn_type'] == 'GRU':
             cell = tf.contrib.rnn.GRUCell(n_hidden, activation=f_activation)
-
         else:
             raise NotImplementedError()
 
-        self.h, states = rnn.dynamic_rnn(cell, self.x, dtype=tf.float32, time_major=True) # time_major is important
+        # Dynamic rnn with time major
+        self.h, states = rnn.dynamic_rnn(
+                cell, self.x, dtype=tf.float32, time_major=True)
 
         # Output
         if config['loss_type'] == 'lsq':
-            self.y_hat = tf.sigmoid(tf.matmul(tf.reshape(self.h, (-1, n_hidden)), w_out) + b_out)
+            self.y_hat = tf.sigmoid(tf.matmul(
+                    tf.reshape(self.h, (-1, n_hidden)), w_out) + b_out)
             # Loss
-            self.cost_lsq = tf.reduce_mean(tf.square((self.y-self.y_hat)*self.c_mask))
+            self.cost_lsq = tf.reduce_mean(
+                    tf.square((self.y-self.y_hat)*self.c_mask))
         else:
             # y_hat_ shape (n_time*n_batch, n_unit)
-            y_hat_ = tf.matmul(tf.reshape(self.h, (-1, n_hidden)), w_out) + b_out
+            y_hat_ = tf.matmul(
+                    tf.reshape(self.h, (-1, n_hidden)), w_out) + b_out
             self.y_hat = tf.nn.softmax(y_hat_)
             # Actually the cross-entropy cost
-            self.cost_lsq = tf.reduce_mean(self.c_mask*
-                                           tf.nn.softmax_cross_entropy_with_logits(labels=self.y, logits=y_hat_))
+            self.cost_lsq = tf.reduce_mean(
+                    self.c_mask * tf.nn.softmax_cross_entropy_with_logits(
+                            labels=self.y, logits=y_hat_))
 
-        # scope = tf.get_variable_scope().name
-        # self.var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=scope)
         self.var_list = tf.trainable_variables()
 
         # Regularization terms
         self.cost_reg = tf.constant(0.)
         if config['l1_h'] > 0:
-            self.cost_reg += tf.reduce_mean(tf.abs(self.h))*config['l1_h'] # Regularizer
+            self.cost_reg += tf.reduce_mean(tf.abs(self.h))*config['l1_h']
         if config['l2_h'] > 0:
-            self.cost_reg += tf.sqrt(tf.reduce_mean(tf.square(self.h)))*config['l2_h'] # maddy changed          
-            
-            #orig robert.--
-            #self.cost_reg += tf.reduce_mean(tf.square(self.h))*config['l2_h'] # TODO: Check if this is correct           
-        #if config['l2_weight'] > 0:
-        #    self.cost_reg += config['l2_weight']*tf.add_n(
-        #        [tf.nn.l2_loss(v) for v in self.var_list if 'weight' in v.name]) # TODO: Need to fix this
-                
-        if config['l1_weight'] > 0: #maddy added check
+            self.cost_reg += tf.sqrt(
+                    tf.reduce_mean(tf.square(self.h)))*config['l2_h']
+
+        if config['l1_weight'] > 0:
             self.cost_reg += config['l1_weight']*tf.reduce_mean(
                 [tf.reduce_mean(tf.abs(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
             #config['l1_weight']*tf.add_n([tf.reduce_mean(tf.abs(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
         if config['l2_weight'] > 0: #maddy added check
             self.cost_reg += config['l2_weight']*tf.reduce_mean(
-              [ tf.sqrt(tf.reduce_mean(tf.square(v))) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
-            #config['l2_weight']*tf.add_n([tf.reduce_mean(tf.square(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
-          
-            
+              [tf.sqrt(tf.reduce_mean(tf.square(v))) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])          
+
         # Create an optimizer.
-        self.opt = tf.train.AdamOptimizer(learning_rate=config['learning_rate'])
+        self.opt = tf.train.AdamOptimizer(
+                learning_rate=config['learning_rate'])
         # Set cost
         self.set_optimizer()
 
         # Variable saver
-        self.saver    = tf.train.Saver(self.var_list)
+        self.saver = tf.train.Saver(self.var_list)
 
-        self.config   = config
-        self.sess     = None
+        self.config = config
+        self.sess = None
 
     def initialize(self, sess=None):
         '''initialize the model for training'''
@@ -526,20 +540,25 @@ class Model(object):
         if sess is None:
             sess = tf.get_default_session()
         self.sess = sess
-        self.saver.restore(sess, os.path.join('data', self.config['save_name']+'.ckpt'))
+        self.saver.restore(
+                sess, os.path.join('data', self.config['save_name']+'.ckpt'))
 
     def save(self):
         '''save the model'''
-        save_path = self.saver.save(self.sess, os.path.join('data', self.config['save_name']+'.ckpt'))
+        save_path = self.saver.save(
+                self.sess,
+                os.path.join('data', self.config['save_name']+'.ckpt'))
         print("Model saved in file: %s" % save_path)
 
     def get_h(self, x):
         '''get the recurrent unit activities'''
-        return self.sess.run(self.h, feed_dict={self.x : x})
+        return self.sess.run(self.h, feed_dict={self.x: x})
 
     def get_y_from_h(self, h):
         '''get the output from recurrent activities'''
-        return self.sess.run(self.y_hat, feed_dict={self.h : h}).reshape((h.shape[0],h.shape[1],-1))
+        return self.sess.run(
+                self.y_hat,
+                feed_dict={self.h: h}).reshape((h.shape[0], h.shape[1], -1))
 
     def get_y(self, x):
         '''get the output from input'''
@@ -547,14 +566,16 @@ class Model(object):
 
     def get_y_loc(self, y):
         '''get the response location from the output'''
-        return popvec(y[...,1:])
+        return popvec(y[..., 1:])
 
     def set_optimizer(self, extra_cost=None):
-        '''Recompute the optimizer to reflect the latest cost function
+        '''Recompute the optimizer to reflect the latest cost function.
+
         This is useful when the cost function is modified throughout training
 
         Args:
-            extra_cost : tensorflow variable, added to the lsq and regularization cost
+            extra_cost : tensorflow variable, 
+            added to the lsq and regularization cost
         '''
         cost = self.cost_lsq + self.cost_reg
         if extra_cost is not None:
@@ -587,9 +608,8 @@ class Model(object):
         w_rec = sess.run(self.var_list[2])
 
         # check if the recurrent and output connection has the correct shape
-        assert w_out.shape==(n_hidden, n_output)
-        assert w_rec.shape==(n_input+n_hidden, n_hidden)
-
+        assert w_out.shape == (n_hidden, n_output)
+        assert w_rec.shape == (n_input+n_hidden, n_hidden)
 
         # Set output projections from these units to zero
         w_out[units, :] = 0
@@ -602,5 +622,3 @@ class Model(object):
         if verbose:
             print('Lesioned units:')
             print(units)
-
-        return

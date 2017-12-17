@@ -143,7 +143,7 @@ if __name__ == '__main__':
     CA = clustering.Analysis(save_name, data_type='rule')
     # CA.plot_example_unit()
     # CA.plot_variance()
-    # CA.plot_2Dvisualization()
+    CA.plot_2Dvisualization()
     # CA.plot_lesions()
 
     # import variance

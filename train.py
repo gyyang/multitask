@@ -133,10 +133,6 @@ def update_intsyn2():
         ]
 
 
-
-
-
-
 def do_eval(sess, model, log, rule_train):
     config = model.config
     if not hasattr(rule_train, '__iter__'):
@@ -155,7 +151,8 @@ def do_eval(sess, model, log, rule_train):
         creg_tmp = list()
         perf_tmp = list()
         for i_rep in range(n_rep):
-            trial = generate_trials(rule_test, config, 'random', batch_size=batch_size_test_rep)
+            trial = generate_trials(
+                rule_test, config, 'random', batch_size=batch_size_test_rep)
             y_hat_test = model.get_y(trial.x)
             feed_dict = {model.x: trial.x,
                          model.y: trial.y.reshape(
@@ -164,7 +161,8 @@ def do_eval(sess, model, log, rule_train):
             c_lsq, c_reg = sess.run([model.cost_lsq, model.cost_reg],
                                     feed_dict=feed_dict)
 
-            # Cost is first summed over time, and averaged across batch and units
+            # Cost is first summed over time,
+            # and averaged across batch and units
             # We did the averaging over time through c_mask
 
             # IMPORTANT CHANGES: take overall mean
@@ -177,8 +175,8 @@ def do_eval(sess, model, log, rule_train):
         log['creg_'+rule_test].append(np.mean(creg_tmp))
         log['perf_'+rule_test].append(np.mean(perf_tmp))
         print('{:15s}'.format(rule_test) +
-              '| cost {:0.6f}'.format(np.mean(clsq_tmp))  +
-              '| c_reg {:0.6f}'.format(np.mean(creg_tmp))  +
+              '| cost {:0.6f}'.format(np.mean(clsq_tmp)) +
+              '| c_reg {:0.6f}'.format(np.mean(creg_tmp)) +
               '  | perf {:0.2f}'.format(np.mean(perf_tmp)))
         sys.stdout.flush()
 
@@ -321,6 +319,7 @@ def train(save_name,
         config['rule_start'] = 1+num_ring*n_eachring
         config['shape'] = (n_input, n_hidden, n_output)
         config['save_name'] = save_name
+        config['batch_size_test'] = batch_size_test
         config['rule_trains'] = rule_trains
         config['rule_probs'] = rule_probs
         config['rules'] = rule_tests
@@ -366,14 +365,7 @@ def train(save_name,
         intsyn = False
 
     # Store results
-    trials = []
-    rule_now = []
-    times = []
-    cost_tests = {rule: [] for rule in rule_tests}
-    creg_tests = {rule: [] for rule in rule_tests}
-    perf_tests = {rule: [] for rule in rule_tests}
-    cost_conts = []
-    log = defaultdict(list())
+    log = defaultdict(list)
 
     # Record time
     t_start = time.time()
@@ -398,9 +390,9 @@ def train(save_name,
             model.set_optimizer()
 
         # Looping
-        step_total = 1
+        step_total = 0
         for i_rule_train, rule_train in enumerate(rule_trains):
-            step = 1
+            step = 0
 
             # At the beginning of new tasks
             if intsyn:
@@ -409,6 +401,17 @@ def train(save_name,
             # Keep training until reach max iterations
             while step * batch_size_train <= rule_train_iters[i_rule_train]:
                 try:
+                    # Validation
+                    if step % display_step == 0:
+                        log['trials'].append(step_total*batch_size_train)
+                        log['times'].append(time.time()-t_start)
+                        log['rule_now'].append(rule_train)
+                        log = do_eval(sess, model, log, rule_train)
+                        if log['perf_avg'][-1] > model.config['target_perf']:
+                            print('Perf reached the target: {:0.2f}'.format(
+                                config['target_perf']))
+                            break
+
                     # Training
                     if not hasattr(rule_train, '__iter__'):
                         rule_train_now = rule_train
@@ -431,17 +434,6 @@ def train(save_name,
                         sess.run(model.optimizer, feed_dict=feed_dict)
                     else:
                         update_intsyn2()
-
-                    # Validation
-                    if step % display_step == 0:
-                        log['trials'].append(step_total*batch_size_train)
-                        log['times'].append(time.time()-t_start)
-                        log['rule_now'].append(rule_train)
-                        log = do_eval(sess, model, log, rule_train, rule_tests)
-                        if log['perf_avg'] > model.config['target_perf']:
-                            print('Perf reached the target: {:0.2f}'.format(
-                                config['target_perf']))
-                            break
 
                     step += 1
                     step_total += 1
@@ -537,7 +529,7 @@ def to_savename(
 
 if __name__ == '__main__':
     pass
-    run_analysis = ['compare']
+    run_analysis = []
     train('debug', n_hidden=64, seed=2, activation='tanh',
           rnn_type='LeakyGRU', run_analysis=run_analysis)
 
