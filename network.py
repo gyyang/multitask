@@ -202,7 +202,7 @@ class LeakyGRUCell(RNNCell):
                  alpha,
                  sigma_rec=0,
                  input_size=None,
-                 activation=tanh,
+                 activation=tf.tanh,
                  reuse=None,
                  kernel_initializer=None,
                  bias_initializer=None):
@@ -256,7 +256,7 @@ class EILeakyGRUCell(RNNCell):
                  alpha,
                  sigma_rec=0,
                  input_size=None,
-                 activation=tanh,
+                 activation=tf.tanh,
                  reuse=None,
                  kernel_initializer=None,
                  bias_initializer=None):
@@ -376,71 +376,71 @@ class EILeakyGRUCell(RNNCell):
 class Model(object):
     '''The model.'''
 
-    def __init__(self, config, sigma_rec=None, dt=None):
+    def __init__(self, hparams, sigma_rec=None, dt=None):
         '''
-        Initializing the model with information from config
+        Initializing the model with information from hparams
 
         Args:
-          config: a string or a dictionary
-          If config is a string, then attempt to load configuration from file
-          If config is a dictionary, use it as the configuration
+          hparams: a string or a dictionary
+          If hparams is a string, then attempt to load hparamsuration from file
+          If hparams is a dictionary, use it as the hparamsuration
 
-          sigma_rec, if not None, will overwrite the sigma_rec passed by config
+          sigma_rec, if not None, will overwrite the sigma_rec passed by hparams
         '''
 
         # Reset tensorflow graphs
         tf.reset_default_graph()  # must be in the beginning
 
-        if isinstance(config, str):
-            # Attempts to load configuration
-            config_path = os.path.join('data', 'config_'+config+'.pkl')
+        if isinstance(hparams, str):
+            # Attempts to load hparamsuration
+            hparams_path = os.path.join('data', 'hparams_'+hparams+'.pkl')
             # For backward compatability
-            if not os.path.isfile(config_path):
-                config_path = os.path.join('data', 'config'+config+'.pkl')
-            print('Loading configuration from : ' + config_path)
-            # Load config
-            with open(config_path, 'rb') as f:
-                config = pickle.load(f)
+            if not os.path.isfile(hparams_path):
+                hparams_path = os.path.join('data', 'hparams'+hparams+'.pkl')
+            print('Loading hparamsuration from : ' + hparams_path)
+            # Load hparams
+            with open(hparams_path, 'rb') as f:
+                hparams = pickle.load(f)
 
         else:
-            # directly use the given configuration
-            assert isinstance(config, dict)
+            # directly use the given hparamsuration
+            assert isinstance(hparams, dict)
 
-        if config['seed'] is not None:
-            tf.set_random_seed(config['seed'])
+        if hparams['seed'] is not None:
+            tf.set_random_seed(hparams['seed'])
         else:
             print('Warning: Random seed not specified')
 
         if sigma_rec is not None:
             print('Overwrite sigma_rec with {:0.3f}'.format(sigma_rec))
-            config['sigma_rec'] = sigma_rec
+            hparams['sigma_rec'] = sigma_rec
 
         if dt is not None:
             print('Overwrite original dt with {:0.1f}'.format(dt))
-            config['dt'] = dt
+            hparams['dt'] = dt
 
-        config['alpha'] = 1.0*config['dt']/config['tau']
+        hparams['alpha'] = 1.0*hparams['dt']/hparams['tau']
 
         # Network Parameters
-        n_input, n_hidden, n_output = config['shape']
+        n_input, n_hidden, n_output = hparams['shape']
 
         # Input, target output, and cost mask
         self.x = tf.placeholder("float", [None, None, n_input])
         self.y = tf.placeholder("float", [None, n_output])
-        if config['loss_type'] == 'lsq':
+        if hparams['loss_type'] == 'lsq':
             self.c_mask = tf.placeholder("float", [None, n_output])
         else:
             # Mask on time
             self.c_mask = tf.placeholder("float", [None])
 
         # Activation functions
-        if config['activation'] == 'softplus':
+        if hparams['activation'] == 'softplus':
             f_activation = tf.nn.softplus
-        elif config['activation'] == 'relu':
+        elif hparams['activation'] == 'relu':
             f_activation = tf.nn.relu
-        elif config['activation'] == 'tanh':
+        elif hparams['activation'] == 'tanh':
             f_activation = tf.nn.tanh
-        elif config['activation'] == 'elu':
+        elif hparams['activation'] == 'elu':
             f_activation = tf.nn.elu
         else:
             raise NotImplementedError()
@@ -453,24 +453,24 @@ class Model(object):
                     initializer=tf.constant_initializer(0.0, dtype=tf.float32))
 
         # Recurrent activity
-        if config['rnn_type'] == 'LeakyRNN':
-            cell = LeakyRNNCell(n_hidden, n_input, config['alpha'],
-                                sigma_rec=config['sigma_rec'],
-                                activation=config['activation'],
-                                w_rec_init=config['w_rec_init'],
-                                rng=config['rng'])
-        elif config['rnn_type'] == 'LeakyGRU':
+        if hparams['rnn_type'] == 'LeakyRNN':
+            cell = LeakyRNNCell(n_hidden, n_input, hparams['alpha'],
+                                sigma_rec=hparams['sigma_rec'],
+                                activation=hparams['activation'],
+                                w_rec_init=hparams['w_rec_init'],
+                                rng=hparams['rng'])
+        elif hparams['rnn_type'] == 'LeakyGRU':
             cell = LeakyGRUCell(
-                    n_hidden, config['alpha'],
-                    sigma_rec=config['sigma_rec'], activation=f_activation)
-        elif config['rnn_type'] == 'EILeakyGRU':
+                    n_hidden, hparams['alpha'],
+                    sigma_rec=hparams['sigma_rec'], activation=f_activation)
+        elif hparams['rnn_type'] == 'EILeakyGRU':
             cell = EILeakyGRUCell(
-                    n_hidden, config['alpha'],
-                    sigma_rec=config['sigma_rec'], activation=f_activation)
-        elif config['rnn_type'] == 'LSTM':
+                    n_hidden, hparams['alpha'],
+                    sigma_rec=hparams['sigma_rec'], activation=f_activation)
+        elif hparams['rnn_type'] == 'LSTM':
             cell = tf.contrib.rnn.LSTMCell(n_hidden, activation=f_activation)
 
-        elif config['rnn_type'] == 'GRU':
+        elif hparams['rnn_type'] == 'GRU':
             cell = tf.contrib.rnn.GRUCell(n_hidden, activation=f_activation)
         else:
             raise NotImplementedError()
@@ -480,7 +480,7 @@ class Model(object):
                 cell, self.x, dtype=tf.float32, time_major=True)
 
         # Output
-        if config['loss_type'] == 'lsq':
+        if hparams['loss_type'] == 'lsq':
             self.y_hat = tf.sigmoid(tf.matmul(
                     tf.reshape(self.h, (-1, n_hidden)), w_out) + b_out)
             # Loss
@@ -500,30 +500,30 @@ class Model(object):
 
         # Regularization terms
         self.cost_reg = tf.constant(0.)
-        if config['l1_h'] > 0:
-            self.cost_reg += tf.reduce_mean(tf.abs(self.h))*config['l1_h']
-        if config['l2_h'] > 0:
+        if hparams['l1_h'] > 0:
+            self.cost_reg += tf.reduce_mean(tf.abs(self.h))*hparams['l1_h']
+        if hparams['l2_h'] > 0:
             self.cost_reg += tf.sqrt(
-                    tf.reduce_mean(tf.square(self.h)))*config['l2_h']
+                    tf.reduce_mean(tf.square(self.h)))*hparams['l2_h']
 
-        if config['l1_weight'] > 0:
-            self.cost_reg += config['l1_weight']*tf.reduce_mean(
+        if hparams['l1_weight'] > 0:
+            self.cost_reg += hparams['l1_weight']*tf.reduce_mean(
                 [tf.reduce_mean(tf.abs(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
-            #config['l1_weight']*tf.add_n([tf.reduce_mean(tf.abs(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
-        if config['l2_weight'] > 0: #maddy added check
-            self.cost_reg += config['l2_weight']*tf.reduce_mean(
+            #hparams['l1_weight']*tf.add_n([tf.reduce_mean(tf.abs(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
+        if hparams['l2_weight'] > 0: #maddy added check
+            self.cost_reg += hparams['l2_weight']*tf.reduce_mean(
               [tf.sqrt(tf.reduce_mean(tf.square(v))) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])          
 
         # Create an optimizer.
         self.opt = tf.train.AdamOptimizer(
-                learning_rate=config['learning_rate'])
+                learning_rate=hparams['learning_rate'])
         # Set cost
         self.set_optimizer()
 
         # Variable saver
         self.saver = tf.train.Saver(self.var_list)
 
-        self.config = config
+        self.hparams = hparams
         self.sess = None
 
     def initialize(self, sess=None):
@@ -541,13 +541,13 @@ class Model(object):
             sess = tf.get_default_session()
         self.sess = sess
         self.saver.restore(
-                sess, os.path.join('data', self.config['save_name']+'.ckpt'))
+                sess, os.path.join('data', self.hparams['save_name']+'.ckpt'))
 
     def save(self):
         '''save the model'''
         save_path = self.saver.save(
                 self.sess,
-                os.path.join('data', self.config['save_name']+'.ckpt'))
+                os.path.join('data', self.hparams['save_name']+'.ckpt'))
         print("Model saved in file: %s" % save_path)
 
     def get_h(self, x):
@@ -592,7 +592,7 @@ class Model(object):
         Args:
             units : can be None, an integer index, or a list of integer indices
         '''
-        if self.config['rnn_type'] != 'LeakyRNN':
+        if self.hparams['rnn_type'] != 'LeakyRNN':
             raise ValueError('Only supporting LearkyRNN for now')
 
         if units is None:
@@ -602,7 +602,7 @@ class Model(object):
         else:
             units = np.array(units)
 
-        n_input, n_hidden, n_output = self.config['shape']
+        n_input, n_hidden, n_output = self.hparams['shape']
 
         w_out = sess.run(self.var_list[0])
         w_rec = sess.run(self.var_list[2])

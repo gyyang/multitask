@@ -29,20 +29,20 @@ def save_log(log, save_name):
     with open(os.path.join('data', 'log_'+save_name+'.pkl'), 'wb') as f:
         pickle.dump(log, f)
 
-def load_config(save_name):
-    '''Load the configuration file of model save_name'''
-    fname = os.path.join('data','config_'+save_name+'.pkl')
+def load_hparams(save_name):
+    '''Load the hparamsuration file of model save_name'''
+    fname = os.path.join('data','hparams_'+save_name+'.pkl')
     if not os.path.isfile(fname):
         return None
 
     with open(fname, 'rb') as f:
-        config = pickle.load(f)
-    return config
+        hparams = pickle.load(f)
+    return hparams
 
-def save_config(config, save_name):
-    '''Save the configuration file of model save_name'''
-    with open(os.path.join('data', 'config_'+save_name+'.pkl'), 'wb') as f:
-        pickle.dump(config, f)
+def save_hparams(hparams, save_name):
+    '''Save the hparamsuration file of model save_name'''
+    with open(os.path.join('data', 'hparams_'+save_name+'.pkl'), 'wb') as f:
+        pickle.dump(hparams, f)
 
 
 def mkdir_p(path):

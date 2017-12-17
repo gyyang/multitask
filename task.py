@@ -86,10 +86,6 @@ class Trial(object):
 
         self._sigma_x = config['sigma_x']*np.sqrt(2/config['alpha'])
 
-        # Following code only for backwardcompatability
-        if 'ruleset' not in self.config:
-            self.config['ruleset'] = 'all'
-
     def expand(self, var):
         if not hasattr(var, '__iter__'):
             var = [var] * self.batch_size
@@ -107,25 +103,25 @@ class Trial(object):
 
         for i in range(self.batch_size):
             if loc_type == 'fix_in':
-                self.x[ons[i]:offs[i], i, 0] = 1
+                self.x[ons[i]: offs[i], i, 0] = 1
             elif loc_type == 'stim':
                 # Assuming that mods[i] starts from 1
-                self.x[ons[i]:offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
+                self.x[ons[i]: offs[i], i, 1+(mods[i]-1)*self.n_eachring:1+mods[i]*self.n_eachring] \
                     += self.add_x_loc(locs[i])*strengths[i]
             elif loc_type == 'fix_out':
                 # Notice this shouldn't be set at 1, because the output is logistic and saturates at 1
                 if self.config['loss_type'] == 'lsq':
-                    self.y[ons[i]:offs[i], i, 0] = 0.8
+                    self.y[ons[i]: offs[i], i, 0] = 0.8
                 else:
-                    self.y[ons[i]:offs[i], i, 0] = 1.0
+                    self.y[ons[i]: offs[i], i, 0] = 1.0
             elif loc_type == 'out':
                 if self.config['loss_type'] == 'lsq':
-                    self.y[ons[i]:offs[i], i, 1:] += self.add_y_loc(locs[i])*strengths[i]
+                    self.y[ons[i]: offs[i], i, 1:] += self.add_y_loc(locs[i])*strengths[i]
                 else:
                     y_tmp = self.add_y_loc(locs[i])
                     y_tmp /= np.sum(y_tmp)
-                    self.y[ons[i]:offs[i], i, 1:] += y_tmp
-                self.y_loc[ons[i]:offs[i], i] = locs[i]
+                    self.y[ons[i]: offs[i], i, 1:] += y_tmp
+                self.y_loc[ons[i]: offs[i], i] = locs[i]
             else:
                 raise ValueError('Unknown loc_type')
 

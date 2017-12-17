@@ -15,23 +15,25 @@ from network import Model, get_perf
 import tools
 
 
-def get_defaultconfig():
-    '''Get a default configuration.
+def get_default_hparams(ruleset):
+    '''Get a default hparamsuration.
 
     Useful for debugging.
 
     Returns:
-        config : a dictionary containing training configuration
+        hparams : a dictionary containing training hparamsuration
     '''
-    ruleset = 'mante'
-
     from task import get_num_ring, get_num_rule, rules_dict
     num_ring = get_num_ring(ruleset)
     n_rule = get_num_rule(ruleset)
 
     n_eachring = 32
     n_input, n_output = 1+num_ring*n_eachring+n_rule, n_eachring+1
-    config = {
+    hparams = {
+            # batch size for training
+            'batch_size_train': 64,
+            # batch_size for testing
+            'batch_size_test': 256,
             # Type of RNNs: LeakyRNN, LeakyGRU, EILeakyGRU, GRU, LSTM
             'rnn_type': 'LeakyRNN',
             # Type of loss functions
@@ -49,21 +51,19 @@ def get_defaultconfig():
             # input noise
             'sigma_x': 0.01,
             # leaky_rec weight initialization, diag, randortho, randgauss
-            # 'w_rec_init'  : 'diag',
+            'w_rec_init'  : 'diag',
             # a default weak regularization prevents instability
-            # 'l1_h'        : 1.0*0.0001,
+            'l1_h'        : 1.0*0.0001,
             # l2 regularization on activity
-            # 'l2_h'        : 1.0*0,
+            'l2_h'        : 1.0*0,
             # l2 regularization on weight
-            # 'l2_weight'   : 0.0001*0,
+            'l1_weight'   : 0.0001*0,
+            # l2 regularization on weight
+            'l2_weight'   : 0.0001*0,
             # l2 regularization on deviation from initialization
             'l2_weight_init': 0.0001*0,
             # Stopping performance
             'target_perf': 1.,
-            # random seed
-            'seed': 0,
-            # random number generator
-            'rng': None,
             # number of units each ring
             'n_eachring': n_eachring,
             # number of rings
@@ -74,16 +74,35 @@ def get_defaultconfig():
             'shape': (n_input, 64, n_output),
             # name to save
             'save_name': 'test',
-            # rules to train
-            'rule_trains': rules_dict[ruleset],
-            # rules to test
-            'rules': rules_dict[ruleset],
             # learning rate
             'learning_rate': 0.01,
             # intelligent synapses parameters, tuple (c, ksi)
             'param_intsyn': None
             }
-    return config
+    hparams['ruleset'] = ruleset
+    hparams['n_input'] = n_input
+    hparams['n_output'] = n_output
+    
+    # Rules to train and test. Rules in a set are trained together
+    hparams['rule_trains'] = [rules_dict[ruleset]]
+    hparams['rules'] = rules_dict[ruleset]
+
+    # Assign probabilities for rule_trains.
+    rule_prob_map = dict()
+
+    # Turn into rule_trains format
+    rule_probs = list()
+    for rule_train in hparams['rule_trains']:
+        if not hasattr(rule_train, '__iter__'):
+            rule_probs.append(None)
+        else:
+            # Set default as 1.
+            rule_prob = np.array(
+                    [rule_prob_map.get(r, 1.) for r in rule_train])
+            rule_probs.append(rule_prob/np.sum(rule_prob))
+    hparams['rule_probs'] = rule_probs
+    
+    return hparams
 
 
 def update_intsyn():
@@ -134,7 +153,7 @@ def update_intsyn2():
 
 
 def do_eval(sess, model, log, rule_train):
-    config = model.config
+    hparams = model.hparams
     if not hasattr(rule_train, '__iter__'):
         rule_name_print = rule_train
     else:
@@ -144,19 +163,19 @@ def do_eval(sess, model, log, rule_train):
           '  | Time {:0.2f} s'.format(log['times'][-1]) +
           '  | Now training '+rule_name_print)
 
-    for rule_test in config['rules']:
+    for rule_test in hparams['rules']:
         n_rep = 16
-        batch_size_test_rep = int(config['batch_size_test']/n_rep)
+        batch_size_test_rep = int(hparams['batch_size_test']/n_rep)
         clsq_tmp = list()
         creg_tmp = list()
         perf_tmp = list()
         for i_rep in range(n_rep):
             trial = generate_trials(
-                rule_test, config, 'random', batch_size=batch_size_test_rep)
+                rule_test, hparams, 'random', batch_size=batch_size_test_rep)
             y_hat_test = model.get_y(trial.x)
             feed_dict = {model.x: trial.x,
                          model.y: trial.y.reshape(
-                             (-1, config['shape'][2])),
+                             (-1, hparams['shape'][2])),
                          model.c_mask: trial.c_mask}
             c_lsq, c_reg = sess.run([model.cost_lsq, model.cost_reg],
                                     feed_dict=feed_dict)
@@ -190,77 +209,34 @@ def do_eval(sess, model, log, rule_train):
     # Saving the model
     model.save()
 
-    tools.save_log(log, config['save_name'])
+    tools.save_log(log, hparams['save_name'])
 
     return log
 
 
 def train(save_name,
+          hparams=None,
+          max_steps=1000000,
+          display_step=100,
           ruleset='mante',
-          n_hidden=64,
-          learning_rate=0.01,
-          reuse=False,
-          seed=None,
-          target_perf=0.9,
-          activation='tanh',
-          rnn_type='LeakyGRU',
-          param_intsyn=None,
-          batch_size_train=64,
-          batch_size_test=128,
-          display_step=500,
-          training_iters=150000,
-          rule_trains=None,
-          rule_tests=None,
-          rule_prob_map=None,
           run_analysis=None,
-          w_rec_init='diag',
-          l1_h=0,
-          l2_h=0,
-          l1_weight=0,
-          l2_weight=0,
-          sigma_rec=0.05,
-          sigma_x=0.01,
-          **kwargs):
+          reuse=False,
+          seed=0,
+          ):
     '''Train the network
 
     Args:
         save_name : model will be saved as save_name.ckpt
-        n_hidden : number of hidden units
-        learning_rate : learning rate
-        reuse : if True, attempt to load a saved model from file
-        seed : random seed
-        target_perf : target performance
-        activation : activation function
-        rnn_type : type of recurrent network
-        param_intsyn : parameteres for continual learning, currently disabled
-
-        batch_size_train : batch size for training
-        batch_size_test : batch size for testing
-        display_step : number of batches between each display
-        training_iters : maximum training iterations
-
-        rule_trains : list of lists of trained rules.
-         rule_trains = [list1, list2, list3, ...].
-         Lists are trained sequentially.
-         Within each list, rules are trained simultaneously
-
-        rule_tests : list of rules to compute performance
-        rule_prob_map : dictionary of relative probabilities of rules
-            appearing during training
-
-        run_analysis : list of strings deciding the analysis
-            to be ran at the end
-
-        w_rec_init   : diag, randortho, randgauss, only used for leaky_rec
-        l1_h         : a default weak regularization on activity
-            prevents instability
-        l2_h         : l2 regularization on activity
-        l1_weight    : l1 regularization on weight
-        l2_weight    : l2 regularization on weight
+        hparams: dictionary of hyperparameters
+        max_steps: int, maximum number of training steps
+        display_step: int, display steps
+        ruleset: the set of rules to train
+        reuse: boolean. If True, reload previous checkpoints
+        seed: int, random seed to be used
 
     Returns:
         model is stored at save_name.ckpt
-        training configuration is stored at 'config_'+'save_name.ckpt'
+        training hparamsuration is stored at 'hparams_'+'save_name.ckpt'
         training progress is stored at 'log_'+'save_name.ckpt'
 
     '''
@@ -269,97 +245,42 @@ def train(save_name,
 
     # Network parameters
     # Number of units each ring has
-    from task import get_num_ring, get_num_rule, rules_dict
-    num_ring = get_num_ring(ruleset)
-    n_rule = get_num_rule(ruleset)
-    n_eachring = 32
-    n_input, n_output = 1+num_ring*n_eachring+n_rule, n_eachring+1
-
-    # Rules to train and test. Rules in a set are trained together
-    if rule_trains is None:
-        # automatically train all rules
-        rule_trains = [rules_dict[ruleset]]
-
-    if rule_tests is None:
-        rule_tests = rules_dict[ruleset]
-
-    # Assign probabilities for rule_trains.
-    if rule_prob_map is None:
-        rule_prob_map = dict()
-
-    # Turn into rule_trains format
-    rule_probs = list()
-    for rule_train in rule_trains:
-        if not hasattr(rule_train, '__iter__'):
-            rule_probs.append(None)
-        else:
-            # Set default as 1.
-            rule_prob = np.array(
-                    [rule_prob_map.get(r, 1.) for r in rule_train])
-            rule_probs.append(rule_prob/np.sum(rule_prob))
-
     if reuse:
         # Build the model from save_name
-        model = Model(config=save_name)
-        config = model.config
+        model = Model(hparams=save_name)
+        hparams = model.hparams
 
     else:
         # Random number generator used
-        rng = np.random.RandomState(seed)
+        default_hparams = get_default_hparams(ruleset)
+        if hparams is not None:
+            default_hparams.update(hparams)
+        hparams = default_hparams
+        hparams['seed'] = seed
+        hparams['rng'] = np.random.RandomState(seed)
 
-        config = get_defaultconfig()
-        config['ruleset'] = ruleset
-        config['rnn_type'] = rnn_type
-        config['activation'] = activation
-        config['target_perf'] = target_perf
-        config['seed'] = seed
-        config['rng'] = rng
-        config['n_eachring'] = n_eachring
-        config['num_ring'] = num_ring
-        config['rule_start'] = 1+num_ring*n_eachring
-        config['shape'] = (n_input, n_hidden, n_output)
-        config['save_name'] = save_name
-        config['batch_size_test'] = batch_size_test
-        config['rule_trains'] = rule_trains
-        config['rule_probs'] = rule_probs
-        config['rules'] = rule_tests
-        config['learning_rate'] = learning_rate
-        config['param_intsyn'] = param_intsyn
-        config['w_rec_init'] = w_rec_init
-        config['l1_h'] = l1_h
-        config['l2_h'] = l2_h
-        config['l1_weight'] = l1_weight
-        config['l2_weight'] = l2_weight
-        config['sigma_rec'] = sigma_rec
-        config['sigma_x'] = sigma_x
-
-        # Allow for additional configuration options
-        for key, val in kwargs.iteritems():
-            config[key] = val
-
-        tools.save_config(config, save_name)
+        tools.save_hparams(hparams, save_name)
 
         # Build the model
-        model = Model(config=config)
+        model = Model(hparams=hparams)
 
-    # Display configuration
-    for key, val in config.iteritems():
+    # Display hparamsuration
+    for key, val in hparams.iteritems():
         print('{:20s} = '.format(key) + str(val))
 
     # Number of training iterations for each rule
     rule_train_iters = []
-    for rule_train in rule_trains:
+    for rule_train in hparams['rule_trains']:
         if not hasattr(rule_train, '__iter__'):
             tmp = 1
         else:
             tmp = len(rule_train)
-        rule_train_iters.append(tmp*training_iters)
-    print(rule_train_iters)
+        rule_train_iters.append(tmp*max_steps)
 
     # Using continual learning or not
-    if (param_intsyn is not None) and (param_intsyn[0] > 0):
+    if (hparams['param_intsyn'] is not None) and (hparams['param_intsyn'][0] > 0):
         intsyn = True
-        c_intsyn, ksi_intsyn = param_intsyn
+        c_intsyn, ksi_intsyn = hparams['param_intsyn']
         print('Using continual learning')
     else:
         intsyn = False
@@ -378,20 +299,20 @@ def train(save_name,
             model.initialize(sess)
 
         # penalty on deviation from initial weight
-        if config['l2_weight_init'] > 0:
+        if hparams['l2_weight_init'] > 0:
             # TODO: Need checking
             pass
             anchor_vars = sess.run(model.var_list)
 
             for v, v_val in zip(model.var_list, anchor_vars):
-                model.cost_reg += (config['l2_weight_init'] *
+                model.cost_reg += (hparams['l2_weight_init'] *
                                    tf.reduce_sum(tf.square(v-v_val)))
 
             model.set_optimizer()
 
         # Looping
         step_total = 0
-        for i_rule_train, rule_train in enumerate(rule_trains):
+        for i_rule_train, rule_train in enumerate(hparams['rule_trains']):
             step = 0
 
             # At the beginning of new tasks
@@ -399,35 +320,35 @@ def train(save_name,
                 update_intsyn()
 
             # Keep training until reach max iterations
-            while step * batch_size_train <= rule_train_iters[i_rule_train]:
+            while (step * hparams['batch_size_train'] <=
+                   rule_train_iters[i_rule_train]):
                 try:
                     # Validation
                     if step % display_step == 0:
-                        log['trials'].append(step_total*batch_size_train)
+                        log['trials'].append(step_total*hparams['batch_size_train'])
                         log['times'].append(time.time()-t_start)
                         log['rule_now'].append(rule_train)
                         log = do_eval(sess, model, log, rule_train)
-                        if log['perf_avg'][-1] > model.config['target_perf']:
+                        if log['perf_avg'][-1] > model.hparams['target_perf']:
                             print('Perf reached the target: {:0.2f}'.format(
-                                config['target_perf']))
+                                hparams['target_perf']))
                             break
 
                     # Training
                     if not hasattr(rule_train, '__iter__'):
                         rule_train_now = rule_train
                     else:
-                        rule_train_now = config['rng'].choice(
-                                rule_train, p=rule_probs[i_rule_train])
-
+                        rule_train_now = hparams['rng'].choice(
+                                rule_train, p=hparams['rule_probs'][i_rule_train])
                     # Generate a random batch of trials. 
                     # Each batch has the same trial length
                     trial = generate_trials(
-                            rule_train_now, config, 'random',
-                            batch_size=batch_size_train)
+                            rule_train_now, hparams, 'random',
+                            batch_size=hparams['batch_size_train'])
 
                     # Generating feed_dict.
                     feed_dict = {model.x: trial.x,
-                                 model.y: trial.y.reshape((-1, n_output)),
+                                 model.y: trial.y.reshape((-1, hparams['n_output'])),
                                  model.c_mask: trial.c_mask}
 
                     if not intsyn:
@@ -444,6 +365,8 @@ def train(save_name,
 
         print("Optimization Finished!")
 
+
+def analysis(run_analysis):
     # Run a set of standard analysis
     if run_analysis is None:
         run_analysis = list()
@@ -530,8 +453,8 @@ def to_savename(
 if __name__ == '__main__':
     pass
     run_analysis = []
-    train('debug', n_hidden=64, seed=2, activation='tanh',
-          rnn_type='LeakyGRU', run_analysis=run_analysis)
+    # TODO: Why is contextdm2 worse than contextdm1?
+    train('debug', seed=4, display_step=500, run_analysis=run_analysis)
 
 #==============================================================================
 #     #maddy added - start
