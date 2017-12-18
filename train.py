@@ -10,6 +10,7 @@ from collections import defaultdict
 import numpy as np
 import tensorflow as tf
 
+import task
 from task import generate_trials
 from network import Model, get_perf
 import tools
@@ -23,9 +24,8 @@ def get_default_hparams(ruleset):
     Returns:
         hparams : a dictionary containing training hparamsuration
     '''
-    from task import get_num_ring, get_num_rule, rules_dict
-    num_ring = get_num_ring(ruleset)
-    n_rule = get_num_rule(ruleset)
+    num_ring = task.get_num_ring(ruleset)
+    n_rule = task.get_num_rule(ruleset)
 
     n_eachring = 32
     n_input, n_output = 1+num_ring*n_eachring+n_rule, n_eachring+1
@@ -51,15 +51,15 @@ def get_default_hparams(ruleset):
             # input noise
             'sigma_x': 0.01,
             # leaky_rec weight initialization, diag, randortho, randgauss
-            'w_rec_init'  : 'diag',
+            'w_rec_init': 'diag',
             # a default weak regularization prevents instability
-            'l1_h'        : 1.0*0.0001,
+            'l1_h': 1.0*0.0001,
             # l2 regularization on activity
-            'l2_h'        : 1.0*0,
+            'l2_h': 1.0*0,
             # l2 regularization on weight
-            'l1_weight'   : 0.0001*0,
+            'l1_weight': 0.0001*0,
             # l2 regularization on weight
-            'l2_weight'   : 0.0001*0,
+            'l2_weight': 0.0001*0,
             # l2 regularization on deviation from initialization
             'l2_weight_init': 0.0001*0,
             # Stopping performance
@@ -82,10 +82,10 @@ def get_default_hparams(ruleset):
     hparams['ruleset'] = ruleset
     hparams['n_input'] = n_input
     hparams['n_output'] = n_output
-    
+
     # Rules to train and test. Rules in a set are trained together
-    hparams['rule_trains'] = [rules_dict[ruleset]]
-    hparams['rules'] = rules_dict[ruleset]
+    hparams['rule_trains'] = [task.rules_dict[ruleset]]
+    hparams['rules'] = task.rules_dict[ruleset]
 
     # Assign probabilities for rule_trains.
     rule_prob_map = dict()
@@ -101,7 +101,7 @@ def get_default_hparams(ruleset):
                     [rule_prob_map.get(r, 1.) for r in rule_train])
             rule_probs.append(rule_prob/np.sum(rule_prob))
     hparams['rule_probs'] = rule_probs
-    
+
     return hparams
 
 
@@ -152,7 +152,15 @@ def update_intsyn2():
         ]
 
 
-def do_eval(sess, model, log, rule_train):
+def do_eval(sess, model, log, rule_train, train_dir):
+    """Do evaluation.
+
+    Args:
+        sess: tensorflow session
+        model: Model class instance
+        log: dictionary that stores the log
+        rule_train: string or list of strings, the rules being trained
+    """
     hparams = model.hparams
     if not hasattr(rule_train, '__iter__'):
         rule_name_print = rule_train
@@ -174,8 +182,7 @@ def do_eval(sess, model, log, rule_train):
                 rule_test, hparams, 'random', batch_size=batch_size_test_rep)
             y_hat_test = model.get_y(trial.x)
             feed_dict = {model.x: trial.x,
-                         model.y: trial.y.reshape(
-                             (-1, hparams['shape'][2])),
+                         model.y: trial.y,
                          model.c_mask: trial.c_mask}
             c_lsq, c_reg = sess.run([model.cost_lsq, model.cost_reg],
                                     feed_dict=feed_dict)
@@ -183,8 +190,6 @@ def do_eval(sess, model, log, rule_train):
             # Cost is first summed over time,
             # and averaged across batch and units
             # We did the averaging over time through c_mask
-
-            # IMPORTANT CHANGES: take overall mean
             perf_test = np.mean(get_perf(y_hat_test, trial.y_loc))
             clsq_tmp.append(c_lsq)
             creg_tmp.append(c_reg)
@@ -207,26 +212,25 @@ def do_eval(sess, model, log, rule_train):
     log['perf_avg'].append(perf_tests_mean)
 
     # Saving the model
-    model.save()
+    model.save(train_dir)
 
     tools.save_log(log, hparams['save_name'])
 
     return log
 
 
-def train(save_name,
+def train(train_dir,
           hparams=None,
           max_steps=1000000,
           display_step=100,
           ruleset='mante',
-          run_analysis=None,
           reuse=False,
           seed=0,
           ):
     '''Train the network
 
     Args:
-        save_name : model will be saved as save_name.ckpt
+        train_dir: str, training directory
         hparams: dictionary of hyperparameters
         max_steps: int, maximum number of training steps
         display_step: int, display steps
@@ -236,16 +240,17 @@ def train(save_name,
 
     Returns:
         model is stored at save_name.ckpt
-        training hparamsuration is stored at 'hparams_'+'save_name.ckpt'
+        training configuration is stored at 'hparams_'+'save_name.ckpt'
         training progress is stored at 'log_'+'save_name.ckpt'
 
     '''
 
-    tools.mkdir_p('data')
+    tools.mkdir_p(train_dir)
 
     # Network parameters
     # Number of units each ring has
     if reuse:
+        raise NotImplementedError()  # temporarily disable
         # Build the model from save_name
         model = Model(hparams=save_name)
         hparams = model.hparams
@@ -259,7 +264,7 @@ def train(save_name,
         hparams['seed'] = seed
         hparams['rng'] = np.random.RandomState(seed)
 
-        tools.save_hparams(hparams, save_name)
+        tools.save_hparams(hparams, train_dir)
 
         # Build the model
         model = Model(hparams=hparams)
@@ -278,12 +283,9 @@ def train(save_name,
         rule_train_iters.append(tmp*max_steps)
 
     # Using continual learning or not
-    if (hparams['param_intsyn'] is not None) and (hparams['param_intsyn'][0] > 0):
-        intsyn = True
+    if hparams['param_intsyn']:
         c_intsyn, ksi_intsyn = hparams['param_intsyn']
         print('Using continual learning')
-    else:
-        intsyn = False
 
     # Store results
     log = defaultdict(list)
@@ -301,7 +303,6 @@ def train(save_name,
         # penalty on deviation from initial weight
         if hparams['l2_weight_init'] > 0:
             # TODO: Need checking
-            pass
             anchor_vars = sess.run(model.var_list)
 
             for v, v_val in zip(model.var_list, anchor_vars):
@@ -316,7 +317,7 @@ def train(save_name,
             step = 0
 
             # At the beginning of new tasks
-            if intsyn:
+            if hparams['param_intsyn']:
                 update_intsyn()
 
             # Keep training until reach max iterations
@@ -325,10 +326,11 @@ def train(save_name,
                 try:
                     # Validation
                     if step % display_step == 0:
-                        log['trials'].append(step_total*hparams['batch_size_train'])
+                        trial = step_total*hparams['batch_size_train']
+                        log['trials'].append(trial)
                         log['times'].append(time.time()-t_start)
                         log['rule_now'].append(rule_train)
-                        log = do_eval(sess, model, log, rule_train)
+                        log = do_eval(sess, model, log, rule_train, train_dir)
                         if log['perf_avg'][-1] > model.hparams['target_perf']:
                             print('Perf reached the target: {:0.2f}'.format(
                                 hparams['target_perf']))
@@ -338,9 +340,9 @@ def train(save_name,
                     if not hasattr(rule_train, '__iter__'):
                         rule_train_now = rule_train
                     else:
-                        rule_train_now = hparams['rng'].choice(
-                                rule_train, p=hparams['rule_probs'][i_rule_train])
-                    # Generate a random batch of trials. 
+                        p = hparams['rule_probs'][i_rule_train]
+                        rule_train_now = hparams['rng'].choice(rule_train, p=p)
+                    # Generate a random batch of trials.
                     # Each batch has the same trial length
                     trial = generate_trials(
                             rule_train_now, hparams, 'random',
@@ -348,13 +350,13 @@ def train(save_name,
 
                     # Generating feed_dict.
                     feed_dict = {model.x: trial.x,
-                                 model.y: trial.y.reshape((-1, hparams['n_output'])),
+                                 model.y: trial.y,
                                  model.c_mask: trial.c_mask}
 
-                    if not intsyn:
-                        sess.run(model.optimizer, feed_dict=feed_dict)
-                    else:
+                    if hparams['param_intsyn']:
                         update_intsyn2()
+                    else:
+                        sess.run(model.optimizer, feed_dict=feed_dict)             
 
                     step += 1
                     step_total += 1
@@ -364,42 +366,6 @@ def train(save_name,
                     break
 
         print("Optimization Finished!")
-
-
-def analysis(run_analysis):
-    # Run a set of standard analysis
-    if run_analysis is None:
-        run_analysis = list()
-
-    if 'var' in run_analysis:
-        # Compute variance
-        from variance import compute_variance
-        compute_variance(save_name)
-        compute_variance(save_name, random_rotation=True)
-        print('Computed variance')
-
-    if 'psy' in run_analysis:
-        # Psychometric analysis
-        import performance
-        for rule in ['dm1', 'contextdm1', 'multidm']:
-            if rule in rule_tests:
-                performance.compute_choicefamily_varytime(save_name, rule)
-
-    if 'compare' in run_analysis:
-        # Compute similarity with data and store results
-        from contextdm_analysis import run_score
-        log['score_train'], log['score_test'] = run_score(save_name)
-        print('Data matching score : {:0.3f}'.format(log['score_test'].mean()))
-
-        with open(os.path.join('data', 'log_'+save_name+'.pkl'), 'wb') as f:
-            pickle.dump(log, f)
-
-    if 'taskset' in run_analysis:
-        # Run analysis for task representation
-        from taskset import compute_taskspace, compute_replacerule_performance
-        for setup in [1, 2]:
-            compute_taskspace(save_name, setup, restore=False)
-            compute_replacerule_performance(save_name, setup, restore=False)
 
 
 # function to create save_name TODO(gryang): move to tools?
@@ -454,7 +420,7 @@ if __name__ == '__main__':
     pass
     run_analysis = []
     # TODO: Why is contextdm2 worse than contextdm1?
-    train('debug', seed=4, display_step=500, run_analysis=run_analysis)
+    train('debug', seed=4, display_step=500)
 
 #==============================================================================
 #     #maddy added - start

@@ -426,7 +426,7 @@ class Model(object):
 
         # Input, target output, and cost mask
         self.x = tf.placeholder("float", [None, None, n_input])
-        self.y = tf.placeholder("float", [None, n_output])
+        self.y = tf.placeholder("float", [None, None, n_output])
         if hparams['loss_type'] == 'lsq':
             self.c_mask = tf.placeholder("float", [None, n_output])
         else:
@@ -480,12 +480,13 @@ class Model(object):
                 cell, self.x, dtype=tf.float32, time_major=True)
 
         # Output
+        y_shaped = tf.reshape(self.y, (-1, n_output))
         if hparams['loss_type'] == 'lsq':
             self.y_hat = tf.sigmoid(tf.matmul(
                     tf.reshape(self.h, (-1, n_hidden)), w_out) + b_out)
             # Loss
             self.cost_lsq = tf.reduce_mean(
-                    tf.square((self.y-self.y_hat)*self.c_mask))
+                    tf.square((y_shaped-self.y_hat)*self.c_mask))
         else:
             # y_hat_ shape (n_time*n_batch, n_unit)
             y_hat_ = tf.matmul(
@@ -494,7 +495,7 @@ class Model(object):
             # Actually the cross-entropy cost
             self.cost_lsq = tf.reduce_mean(
                     self.c_mask * tf.nn.softmax_cross_entropy_with_logits(
-                            labels=self.y, logits=y_hat_))
+                            labels=y_shaped, logits=y_hat_))
 
         self.var_list = tf.trainable_variables()
 
@@ -534,20 +535,20 @@ class Model(object):
         self.sess = sess
         sess.run(tf.global_variables_initializer())
 
-    def restore(self, sess=None):
+    def restore(self, save_dir, sess=None):
         '''restore the model'''
         assert self.sess is None
         if sess is None:
             sess = tf.get_default_session()
         self.sess = sess
         self.saver.restore(
-                sess, os.path.join('data', self.hparams['save_name']+'.ckpt'))
+                sess, os.path.join(save_dir, 'model.ckpt'))
 
-    def save(self):
+    def save(self, save_dir):
         '''save the model'''
         save_path = self.saver.save(
                 self.sess,
-                os.path.join('data', self.hparams['save_name']+'.ckpt'))
+                os.path.join(save_dir, 'model.ckpt'))
         print("Model saved in file: %s" % save_path)
 
     def get_h(self, x):
