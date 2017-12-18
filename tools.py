@@ -4,6 +4,7 @@ import os
 import errno
 import fnmatch
 import pickle
+import json
 
 
 def valid_save_names(save_pattern):
@@ -32,20 +33,19 @@ def save_log(log, save_name):
 
 def load_hparams(save_dir):
     """Load the hparamsuration file of model save_name"""
-    # TODO: change to json format
-    fname = os.path.join(save_dir, 'hparams.pkl')
+    fname = os.path.join(save_dir, 'hparams.json')
     if not os.path.isfile(fname):
         return None
 
     with open(fname, 'rb') as f:
-        hparams = pickle.load(f)
+        hparams = json.load(f)
     return hparams
 
 
 def save_hparams(hparams, save_dir):
     """Save the hparamsuration file of model save_name"""
-    with open(os.path.join(save_dir, 'hparams.pkl'), 'wb') as f:
-        pickle.dump(hparams, f)
+    with open(os.path.join(save_dir, 'hparams.json'), 'wb') as f:
+        json.dump(hparams, f)
 
 
 def mkdir_p(path):

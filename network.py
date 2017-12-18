@@ -376,7 +376,7 @@ class EILeakyGRUCell(RNNCell):
 class Model(object):
     """The model."""
 
-    def __init__(self, hparams, sigma_rec=None, dt=None):
+    def __init__(self, hparams, rng=None, sigma_rec=None, dt=None):
         """
         Initializing the model with information from hparams
 
@@ -410,6 +410,9 @@ class Model(object):
             tf.set_random_seed(hparams['seed'])
         else:
             print('Warning: Random seed not specified')
+
+        if rng is None:
+            rng = np.random.RandomState()
 
         if sigma_rec is not None:
             print('Overwrite sigma_rec with {:0.3f}'.format(sigma_rec))
@@ -447,7 +450,8 @@ class Model(object):
 
         with tf.variable_scope("output"):
             # Using default initialization `glorot_uniform_initializer`
-            w_out = tf.get_variable('weights', [n_hidden, n_output], dtype=tf.float32)
+            w_out = tf.get_variable(
+                'weights', [n_hidden, n_output], dtype=tf.float32)
             b_out = tf.get_variable(
                     'biases', [n_output], dtype=tf.float32,
                     initializer=tf.constant_initializer(0.0, dtype=tf.float32))
@@ -458,7 +462,7 @@ class Model(object):
                                 sigma_rec=hparams['sigma_rec'],
                                 activation=hparams['activation'],
                                 w_rec_init=hparams['w_rec_init'],
-                                rng=hparams['rng'])
+                                rng=rng)
         elif hparams['rnn_type'] == 'LeakyGRU':
             cell = LeakyGRUCell(
                     n_hidden, hparams['alpha'],
@@ -475,9 +479,17 @@ class Model(object):
         else:
             raise NotImplementedError()
 
+        # Whether or not repeat inputs
+        if hparams['in_type'] == 'normal':
+            in_rnn = self.x
+        elif hparams['in_type'] == 'multi':
+            in_rnn = self.x
+        else:
+            raise NotImplementedError()
+
         # Dynamic rnn with time major
         self.h, states = rnn.dynamic_rnn(
-                cell, self.x, dtype=tf.float32, time_major=True)
+                cell, in_rnn, dtype=tf.float32, time_major=True)
 
         # Output
         y_shaped = tf.reshape(self.y, (-1, n_output))

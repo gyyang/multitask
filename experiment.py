@@ -43,7 +43,8 @@ import train
 
 def train_mante_local():
     """Local training of only the Mante task."""
-    train.train('data/debug', hparams={'loss_type': 'lsq'}, ruleset='mante', seed=0)
+    hparams = {'learning_rate': 0.001, 'in_type': 'multi'}
+    train.train('data/debug', hparams=hparams, ruleset='mante', seed=0)
 
 
 def train_all_local():

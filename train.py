@@ -34,6 +34,8 @@ def get_default_hparams(ruleset):
             'batch_size_train': 64,
             # batch_size for testing
             'batch_size_test': 256,
+            # input type: normal, multi
+            'in_type': 'normal',
             # Type of RNNs: LeakyRNN, LeakyGRU, EILeakyGRU, GRU, LSTM
             'rnn_type': 'LeakyRNN',
             # Type of loss functions
@@ -99,7 +101,7 @@ def get_default_hparams(ruleset):
             # Set default as 1.
             rule_prob = np.array(
                     [rule_prob_map.get(r, 1.) for r in rule_train])
-            rule_probs.append(rule_prob/np.sum(rule_prob))
+            rule_probs.append(list(rule_prob/np.sum(rule_prob)))
     hparams['rule_probs'] = rule_probs
 
     return hparams
@@ -160,6 +162,7 @@ def do_eval(sess, model, log, rule_train, train_dir):
         model: Model class instance
         log: dictionary that stores the log
         rule_train: string or list of strings, the rules being trained
+        train_dir: string, training directory
     """
     hparams = model.hparams
     if not hasattr(rule_train, '__iter__'):
@@ -222,7 +225,7 @@ def do_eval(sess, model, log, rule_train, train_dir):
 def train(train_dir,
           hparams=None,
           max_steps=1000000,
-          display_step=100,
+          display_step=500,
           ruleset='mante',
           reuse=False,
           seed=0,
@@ -262,12 +265,13 @@ def train(train_dir,
             default_hparams.update(hparams)
         hparams = default_hparams
         hparams['seed'] = seed
-        hparams['rng'] = np.random.RandomState(seed)
+        rng = np.random.RandomState(seed)
 
         tools.save_hparams(hparams, train_dir)
+        hparams['rng'] = rng
 
         # Build the model
-        model = Model(hparams=hparams)
+        model = Model(hparams=hparams, rng=rng)
 
     # Display hparamsuration
     for key, val in hparams.iteritems():
@@ -341,7 +345,7 @@ def train(train_dir,
                         rule_train_now = rule_train
                     else:
                         p = hparams['rule_probs'][i_rule_train]
-                        rule_train_now = hparams['rng'].choice(rule_train, p=p)
+                        rule_train_now = rng.choice(rule_train, p=p)
                     # Generate a random batch of trials.
                     # Each batch has the same trial length
                     trial = generate_trials(
