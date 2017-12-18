@@ -9,14 +9,14 @@ import tools
 
 
 def main_train(nunit, seed, incomplete_set=False):
-    '''Training setup for paper.
+    """Training setup for paper.
 
     Args:
         nunit: int, number of units.
         seed: int, seed.
         incomplete_set : if True,
             do not train 'delayanti' and 'contextdelaydm1'
-    '''
+    """
     from train import train
     save_name = '{:d}_{:d}paper'.format(seed, nunit)
 
@@ -55,14 +55,14 @@ def main_train(nunit, seed, incomplete_set=False):
 
 
 def cont_train(c, ksi, seed, save_name, seq=True):
-    '''Sequantial training setup for paper
+    """Sequantial training setup for paper
 
     Args:
         c, ksi : parameters for continual learning
         seed: int, random seed.
         save_name: string, name of file to be saved.
         seq: bool, sequential or not.
-    '''
+    """
     from train import train
     param_intsyn = (c, ksi)
 

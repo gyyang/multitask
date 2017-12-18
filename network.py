@@ -19,10 +19,10 @@ from tensorflow.python.ops.rnn_cell_impl import RNNCell, _linear
 
 
 def gen_ortho_matrix(dim, rng=None):
-    '''Generate random orthogonal matrix
+    """Generate random orthogonal matrix
     Taken from scipy.stats.ortho_group
     Copied here from compatibilty with older versions of scipy
-    '''
+    """
     H = np.eye(dim)
     for n in range(1, dim):
         if rng is None:
@@ -41,10 +41,10 @@ def gen_ortho_matrix(dim, rng=None):
 
 
 def popvec(y):
-    '''
+    """
     Population vector read out
     Assuming the last dimension is the dimension to be collapsed
-    '''
+    """
     pref = np.arange(0, 2*np.pi, 2*np.pi/y.shape[-1])  # preferences
     temp_sum = y.sum(axis=-1)
     temp_cos = np.sum(y*np.cos(pref), axis=-1)/temp_sum
@@ -54,12 +54,12 @@ def popvec(y):
 
 
 def get_perf(y_hat, y_loc):
-    '''
+    """
     Get performance
     :param y_hat: Actual output. Time, Batch, Unit
     :param y_loc: Target output location (-1 for fixation). Time, Batch
     :return:
-    '''
+    """
     # Only look at last time points
     y_loc = y_loc[-1]
     y_hat = y_hat[-1]
@@ -374,10 +374,10 @@ class EILeakyGRUCell(RNNCell):
 
 
 class Model(object):
-    '''The model.'''
+    """The model."""
 
     def __init__(self, hparams, sigma_rec=None, dt=None):
-        '''
+        """
         Initializing the model with information from hparams
 
         Args:
@@ -386,7 +386,7 @@ class Model(object):
           If hparams is a dictionary, use it as the hparamsuration
 
           sigma_rec, if not None, will overwrite the sigma_rec passed by hparams
-        '''
+        """
 
         # Reset tensorflow graphs
         tf.reset_default_graph()  # must be in the beginning
@@ -528,7 +528,7 @@ class Model(object):
         self.sess = None
 
     def initialize(self, sess=None):
-        '''initialize the model for training'''
+        """initialize the model for training"""
         assert self.sess is None
         if sess is None:
             sess = tf.get_default_session()
@@ -536,7 +536,7 @@ class Model(object):
         sess.run(tf.global_variables_initializer())
 
     def restore(self, save_dir, sess=None):
-        '''restore the model'''
+        """restore the model"""
         assert self.sess is None
         if sess is None:
             sess = tf.get_default_session()
@@ -545,39 +545,39 @@ class Model(object):
                 sess, os.path.join(save_dir, 'model.ckpt'))
 
     def save(self, save_dir):
-        '''save the model'''
+        """save the model"""
         save_path = self.saver.save(
                 self.sess,
                 os.path.join(save_dir, 'model.ckpt'))
         print("Model saved in file: %s" % save_path)
 
     def get_h(self, x):
-        '''get the recurrent unit activities'''
+        """get the recurrent unit activities"""
         return self.sess.run(self.h, feed_dict={self.x: x})
 
     def get_y_from_h(self, h):
-        '''get the output from recurrent activities'''
+        """get the output from recurrent activities"""
         return self.sess.run(
                 self.y_hat,
                 feed_dict={self.h: h}).reshape((h.shape[0], h.shape[1], -1))
 
     def get_y(self, x):
-        '''get the output from input'''
+        """get the output from input"""
         return self.get_y_from_h(self.get_h(x))
 
     def get_y_loc(self, y):
-        '''get the response location from the output'''
+        """get the response location from the output"""
         return popvec(y[..., 1:])
 
     def set_optimizer(self, extra_cost=None):
-        '''Recompute the optimizer to reflect the latest cost function.
+        """Recompute the optimizer to reflect the latest cost function.
 
         This is useful when the cost function is modified throughout training
 
         Args:
             extra_cost : tensorflow variable, 
             added to the lsq and regularization cost
-        '''
+        """
         cost = self.cost_lsq + self.cost_reg
         if extra_cost is not None:
             cost += extra_cost
@@ -588,11 +588,11 @@ class Model(object):
         self.optimizer = self.opt.apply_gradients(capped_gvs)
 
     def lesion_units(self, sess, units, verbose=False):
-        '''Lesion units given by units
+        """Lesion units given by units
 
         Args:
             units : can be None, an integer index, or a list of integer indices
-        '''
+        """
         if self.hparams['rnn_type'] != 'LeakyRNN':
             raise ValueError('Only supporting LearkyRNN for now')
 

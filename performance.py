@@ -505,7 +505,7 @@ def plot_finalperformance_lr():
 ################ Psychometric - Varying Coherence #############################
 
 def _psychometric_dm(save_name, rule, params_list, batch_shape):
-    '''Base function for computing psychometric performance in 2AFC tasks
+    """Base function for computing psychometric performance in 2AFC tasks
 
     Args:
         save_name : model name
@@ -516,7 +516,7 @@ def _psychometric_dm(save_name, rule, params_list, batch_shape):
 
     Return:
         ydatas: list of performances
-    '''
+    """
     print('Starting psychometric analysis of the {:s} task...'.format(rule_name[rule]))
 
     model = Model(save_name)
@@ -750,12 +750,12 @@ def psychometric_intrepro(save_name):
         plt.show()
 
 def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
-    '''
+    """
     Standard function for plotting the psychometric curves
 
     xdatas, ydatas, labels, and colors are all lists. Each list contains
     properties for each curve.
-    '''
+    """
     fs = 6
     fig = plt.figure(figsize=(1.8,1.3))
     ax = fig.add_axes([0.25,0.25,0.65,0.65])
@@ -1141,13 +1141,13 @@ def psychometric_delaychoice_varytime(save_name, rule):
                                xlabel='Delay time (ms)')
 
 def plot_psychometric_varytime(xdatas, ydatas, figname, labels, colors, **kwargs):
-    '''
+    """
     Standard function for plotting the psychometric curves
     Here the stimulus-present time is varied
 
     xdatas, ydatas, labels, and colors are all lists. Each list contains
     properties for each curve.
-    '''
+    """
     fs = 7
     fig = plt.figure(figsize=(2.5,1.5))
     ax = fig.add_axes([0.2,0.25,0.4,0.6])
@@ -1229,13 +1229,13 @@ def psychometric_choice_varyloc(save_name, **kwargs):
                               legtitle='Tar1 - Tar2',rule=CHOICE_MOD1, **kwargs)
 
 def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
-    '''
+    """
     Standard function for plotting the psychometric curves
     Here the stimulus-present time is varied
 
     xdatas, ydatas, labels, and colors are all lists. Each list contains
     properties for each curve.
-    '''
+    """
     fig = plt.figure(figsize=(2,1.5))
     ax = fig.add_axes([0.25,0.25,0.65,0.65])
     for i in range(len(xdatas)):

@@ -24,7 +24,7 @@ from task import get_dist, generate_trials
 save = True
 
 class Analysis(object):
-    '''Analyze the Anti tasks'''
+    """Analyze the Anti tasks"""
     def __init__(self, save_name):
         self.save_name = save_name
         ############################### Run Model and Load Data #######################
@@ -86,13 +86,13 @@ class Analysis(object):
         # ind_anti_orig = ind_orig[ind_anti] # Indices of anti units in the original matrix
 
     def plot_example_unit(self):
-        '''Plot activity of an example unit'''
+        """Plot activity of an example unit"""
         from standard_analysis import pretty_singleneuron_plot
         pretty_singleneuron_plot(self.save_name, ['fdanti', 'fdgo'], self.ind_anti_orig[2],
                                  save=save, ylabel_firstonly = True)
 
     def plot_inout_connections(self):
-        '''Plot the input connections from stimulus units and the output connections to response units '''
+        """Plot the input connections from stimulus units and the output connections to response units """
         n_eachring = self.config['n_eachring']
         w_in, w_out = self.w_in, self.w_out
 
@@ -150,7 +150,7 @@ class Analysis(object):
                 plt.savefig('figure/conn_'+unit_type+'.pdf', transparent=True)
 
     def plot_rule_connections(self):
-        '''Plot connectivity from the rule input units'''
+        """Plot connectivity from the rule input units"""
 
         # Rule index for the connectivity
         from task import get_rule_index
@@ -181,7 +181,7 @@ class Analysis(object):
             plt.show()
 
     def plot_rec_connections(self):
-        '''Plot connectivity between recurrent units'''
+        """Plot connectivity between recurrent units"""
 
         n_eachring = self.config['n_eachring']
         w_in, w_rec, w_out = self.w_in, self.w_rec, self.w_out
@@ -288,7 +288,7 @@ class Analysis(object):
 # ########### Plot Causal Manipulation Results  #############################
 
     def plot_lesions(self):
-        '''Plot results of lesioning'''
+        """Plot results of lesioning"""
 
         n_hidden = self.config['shape'][1]
         # Randomly select a group to lesion. The group has the same size as the anti group

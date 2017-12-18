@@ -335,7 +335,7 @@ class Analysis(object):
                                      epoch=None, save=save, ylabel_firstonly=True)
 
     def plot_connectivity_byclusters(self):
-        '''Plot connectivity of the model'''
+        """Plot connectivity of the model"""
         nx, _, ny = self.config['shape']
         ind_active = self.ind_active
 
