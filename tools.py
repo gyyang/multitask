@@ -1,21 +1,20 @@
-"""
-Utility functions
-"""
+"""Utility functions."""
 
 import os
 import errno
 import fnmatch
 import pickle
 
+
 def valid_save_names(save_pattern):
-    '''Get valid save_names given a save pattern'''
+    """Get valid save_names given a save pattern"""
 
     # Get all model names that match patterns (strip off .ckpt.meta at the end)
     return [f[:-10] for f in os.listdir('data/') if fnmatch.fnmatch(f, save_pattern+'.ckpt.meta')]
 
 
 def load_log(save_name):
-    '''Load the log file of model save_name'''
+    """Load the log file of model save_name"""
     fname = os.path.join('data','log_'+save_name+'.pkl')
     if not os.path.isfile(fname):
         return None
@@ -24,14 +23,17 @@ def load_log(save_name):
         log = pickle.load(f)
     return log
 
+
 def save_log(log, save_name):
-    '''Save the log file of model save_name'''
+    """Save the log file of model save_name"""
     with open(os.path.join('data', 'log_'+save_name+'.pkl'), 'wb') as f:
         pickle.dump(log, f)
 
-def load_hparams(save_name):
-    '''Load the hparamsuration file of model save_name'''
-    fname = os.path.join('data','hparams_'+save_name+'.pkl')
+
+def load_hparams(save_dir):
+    """Load the hparamsuration file of model save_name"""
+    # TODO: change to json format
+    fname = os.path.join(save_dir, 'hparams.pkl')
     if not os.path.isfile(fname):
         return None
 
@@ -39,9 +41,10 @@ def load_hparams(save_name):
         hparams = pickle.load(f)
     return hparams
 
-def save_hparams(hparams, save_name):
-    '''Save the hparamsuration file of model save_name'''
-    with open(os.path.join('data', 'hparams_'+save_name+'.pkl'), 'wb') as f:
+
+def save_hparams(hparams, save_dir):
+    """Save the hparamsuration file of model save_name"""
+    with open(os.path.join(save_dir, 'hparams.pkl'), 'wb') as f:
         pickle.dump(hparams, f)
 
 
