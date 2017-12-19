@@ -428,6 +428,7 @@ class Model(object):
         n_input, n_hidden, n_output = hparams['shape']
 
         # Input, target output, and cost mask
+        # Shape: [Time, Batch, Num_units]
         self.x = tf.placeholder("float", [None, None, n_input])
         self.y = tf.placeholder("float", [None, None, n_output])
         if hparams['loss_type'] == 'lsq':
@@ -436,29 +437,22 @@ class Model(object):
             # Mask on time
             self.c_mask = tf.placeholder("float", [None])
 
-        # Activation functions
-        if hparams['activation'] == 'softplus':
-            f_activation = tf.nn.softplus
-        elif hparams['activation'] == 'relu':
-            f_activation = tf.nn.relu
-        elif hparams['activation'] == 'tanh':
-            f_activation = tf.nn.tanh
-        elif hparams['activation'] == 'elu':
-            f_activation = tf.nn.elu
+        # Whether or not repeat inputs
+        if hparams['in_type'] == 'normal':
+            in_rnn = self.x
+        elif hparams['in_type'] == 'multi':
+            in_rnn = self.x[:, :, :hparams['rule_start']]
+
         else:
             raise NotImplementedError()
 
-        with tf.variable_scope("output"):
-            # Using default initialization `glorot_uniform_initializer`
-            w_out = tf.get_variable(
-                'weights', [n_hidden, n_output], dtype=tf.float32)
-            b_out = tf.get_variable(
-                    'biases', [n_output], dtype=tf.float32,
-                    initializer=tf.constant_initializer(0.0, dtype=tf.float32))
+        # Activation functions
+        f_activation = getattr(tf.nn, hparams['activation'])
 
         # Recurrent activity
         if hparams['rnn_type'] == 'LeakyRNN':
-            cell = LeakyRNNCell(n_hidden, n_input, hparams['alpha'],
+            n_in_rnn = in_rnn.get_shape().as_list()[-1]
+            cell = LeakyRNNCell(n_hidden, n_in_rnn, hparams['alpha'],
                                 sigma_rec=hparams['sigma_rec'],
                                 activation=hparams['activation'],
                                 w_rec_init=hparams['w_rec_init'],
@@ -479,19 +473,19 @@ class Model(object):
         else:
             raise NotImplementedError()
 
-        # Whether or not repeat inputs
-        if hparams['in_type'] == 'normal':
-            in_rnn = self.x
-        elif hparams['in_type'] == 'multi':
-            in_rnn = self.x
-        else:
-            raise NotImplementedError()
-
         # Dynamic rnn with time major
         self.h, states = rnn.dynamic_rnn(
                 cell, in_rnn, dtype=tf.float32, time_major=True)
 
         # Output
+        with tf.variable_scope("output"):
+            # Using default initialization `glorot_uniform_initializer`
+            w_out = tf.get_variable(
+                'weights', [n_hidden, n_output], dtype=tf.float32)
+            b_out = tf.get_variable(
+                    'biases', [n_output], dtype=tf.float32,
+                    initializer=tf.constant_initializer(0.0, dtype=tf.float32))
+
         y_shaped = tf.reshape(self.y, (-1, n_output))
         if hparams['loss_type'] == 'lsq':
             self.y_hat = tf.sigmoid(tf.matmul(
