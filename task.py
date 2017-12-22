@@ -68,21 +68,22 @@ class Trial(object):
         '''
 
         self.float_type = 'float32' # This should be the default
-        self.config     = config
-        self.dt         = self.config['dt']
+        self.config = config
+        self.dt = self.config['dt']
 
         self.n_eachring = self.config['n_eachring']
-        self.n_input, _, self.n_output = self.config['shape']
-        self.pref       = np.arange(0,2*np.pi,2*np.pi/self.n_eachring) # preferences
+        self.n_input = self.config['n_input']
+        self.n_output = self.config['n_output']
+        self.pref  = np.arange(0,2*np.pi,2*np.pi/self.n_eachring) # preferences
 
         self.batch_size = batch_size
-        self.tdim       = tdim
-        self.x          = np.zeros((tdim, batch_size, self.n_input), dtype=self.float_type)
-        self.y          = np.zeros((tdim, batch_size, self.n_output), dtype=self.float_type)
+        self.tdim = tdim
+        self.x = np.zeros((tdim, batch_size, self.n_input), dtype=self.float_type)
+        self.y = np.zeros((tdim, batch_size, self.n_output), dtype=self.float_type)
         if self.config['loss_type'] == 'lsq':
-            self.y[:,:,:]   = 0.05
+            self.y[:,:,:] = 0.05
         # y_loc is the stimulus location of the output, -1 for fixation, (0,2 pi) for response
-        self.y_loc      = -np.ones((tdim, batch_size)      , dtype=self.float_type)
+        self.y_loc = -np.ones((tdim, batch_size)      , dtype=self.float_type)
 
         self._sigma_x = config['sigma_x']*np.sqrt(2/config['alpha'])
 

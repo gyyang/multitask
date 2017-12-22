@@ -184,9 +184,10 @@ class LeakyRNNCell(RNNCell):
                                initializer=self._initializer,
                                reuse=self._reuse):
 
-            output = (1-self._alpha)*state + \
-    self._alpha*self._activation(_linear([inputs, state], self._num_units, True) + \
-    tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma, dtype=tf.float32))
+            output = (
+                (1-self._alpha)*state + self._alpha*self._activation(
+                _linear([inputs, state], self._num_units, True) +
+                tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma)))
 
         return output, output
 
@@ -244,7 +245,7 @@ class LeakyGRUCell(RNNCell):
 
         # leaky version of GRU
         new_h = (1-self._alpha*u) * state + self._alpha * u * c + \
-            tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma, dtype=tf.float32)
+            tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma)
         return new_h, new_h
 
 
@@ -369,7 +370,7 @@ class EILeakyGRUCell(RNNCell):
 
         # leaky version of GRU
         new_h = (1-self._alpha*u) * state + self._alpha * u * c + \
-        tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma, dtype=tf.float32)
+        tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma)
         return new_h, new_h
 
 
@@ -424,79 +425,72 @@ class Model(object):
 
         hparams['alpha'] = 1.0*hparams['dt']/hparams['tau']
 
-        # Network Parameters
-        n_input, n_hidden, n_output = hparams['shape']
-
         # Input, target output, and cost mask
         # Shape: [Time, Batch, Num_units]
+        if hparams['in_type'] == 'normal':
+            n_input = hparams['n_input']
+        elif hparams['in_type'] == 'multi':
+            n_input = hparams['rule_start'] * hparams['n_rule']
         self.x = tf.placeholder("float", [None, None, n_input])
-        self.y = tf.placeholder("float", [None, None, n_output])
+        self.y = tf.placeholder("float", [None, None, hparams['n_output']])
         if hparams['loss_type'] == 'lsq':
-            self.c_mask = tf.placeholder("float", [None, n_output])
+            self.c_mask = tf.placeholder("float", [None, hparams['n_output']])
         else:
             # Mask on time
             self.c_mask = tf.placeholder("float", [None])
 
-        # Whether or not repeat inputs
-        if hparams['in_type'] == 'normal':
-            in_rnn = self.x
-        elif hparams['in_type'] == 'multi':
-            in_rnn = self.x[:, :, :hparams['rule_start']]
-
-        else:
-            raise NotImplementedError()
-
         # Activation functions
-        f_activation = getattr(tf.nn, hparams['activation'])
+        f_act = getattr(tf.nn, hparams['activation'])
 
         # Recurrent activity
         if hparams['rnn_type'] == 'LeakyRNN':
-            n_in_rnn = in_rnn.get_shape().as_list()[-1]
-            cell = LeakyRNNCell(n_hidden, n_in_rnn, hparams['alpha'],
+            n_in_rnn = self.x.get_shape().as_list()[-1]
+            cell = LeakyRNNCell(hparams['n_rnn'], n_in_rnn,
+                                hparams['alpha'],
                                 sigma_rec=hparams['sigma_rec'],
                                 activation=hparams['activation'],
                                 w_rec_init=hparams['w_rec_init'],
                                 rng=rng)
         elif hparams['rnn_type'] == 'LeakyGRU':
             cell = LeakyGRUCell(
-                    n_hidden, hparams['alpha'],
-                    sigma_rec=hparams['sigma_rec'], activation=f_activation)
+                    hparams['n_rnn'], hparams['alpha'],
+                    sigma_rec=hparams['sigma_rec'], activation=f_act)
         elif hparams['rnn_type'] == 'EILeakyGRU':
             cell = EILeakyGRUCell(
-                    n_hidden, hparams['alpha'],
-                    sigma_rec=hparams['sigma_rec'], activation=f_activation)
+                    hparams['n_rnn'], hparams['alpha'],
+                    sigma_rec=hparams['sigma_rec'], activation=f_act)
         elif hparams['rnn_type'] == 'LSTM':
-            cell = tf.contrib.rnn.LSTMCell(n_hidden, activation=f_activation)
+            cell = tf.contrib.rnn.LSTMCell(hparams['n_rnn'], activation=f_act)
 
         elif hparams['rnn_type'] == 'GRU':
-            cell = tf.contrib.rnn.GRUCell(n_hidden, activation=f_activation)
+            cell = tf.contrib.rnn.GRUCell(hparams['n_rnn'], activation=f_act)
         else:
             raise NotImplementedError()
 
         # Dynamic rnn with time major
         self.h, states = rnn.dynamic_rnn(
-                cell, in_rnn, dtype=tf.float32, time_major=True)
+                cell, self.x, dtype=tf.float32, time_major=True)
 
         # Output
         with tf.variable_scope("output"):
             # Using default initialization `glorot_uniform_initializer`
             w_out = tf.get_variable(
-                'weights', [n_hidden, n_output], dtype=tf.float32)
+                'weights', [hparams['n_rnn'], hparams['n_output']], dtype=tf.float32)
             b_out = tf.get_variable(
-                    'biases', [n_output], dtype=tf.float32,
+                    'biases', [hparams['n_output']], dtype=tf.float32,
                     initializer=tf.constant_initializer(0.0, dtype=tf.float32))
 
-        y_shaped = tf.reshape(self.y, (-1, n_output))
+        y_shaped = tf.reshape(self.y, (-1, hparams['n_output']))
         if hparams['loss_type'] == 'lsq':
             self.y_hat = tf.sigmoid(tf.matmul(
-                    tf.reshape(self.h, (-1, n_hidden)), w_out) + b_out)
+                    tf.reshape(self.h, (-1, hparams['n_rnn'])), w_out) + b_out)
             # Loss
             self.cost_lsq = tf.reduce_mean(
                     tf.square((y_shaped-self.y_hat)*self.c_mask))
         else:
             # y_hat_ shape (n_time*n_batch, n_unit)
             y_hat_ = tf.matmul(
-                    tf.reshape(self.h, (-1, n_hidden)), w_out) + b_out
+                    tf.reshape(self.h, (-1, hparams['n_rnn'])), w_out) + b_out
             self.y_hat = tf.nn.softmax(y_hat_)
             # Actually the cross-entropy cost
             self.cost_lsq = tf.reduce_mean(
@@ -609,14 +603,14 @@ class Model(object):
         else:
             units = np.array(units)
 
-        n_input, n_hidden, n_output = self.hparams['shape']
+        n_input, n_rnn, n_output = self.hparams['shape']
 
         w_out = sess.run(self.var_list[0])
         w_rec = sess.run(self.var_list[2])
 
         # check if the recurrent and output connection has the correct shape
-        assert w_out.shape == (n_hidden, n_output)
-        assert w_rec.shape == (n_input+n_hidden, n_hidden)
+        assert w_out.shape == (n_rnn, n_output)
+        assert w_rec.shape == (n_input+n_rnn, n_rnn)
 
         # Set output projections from these units to zero
         w_out[units, :] = 0

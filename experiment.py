@@ -2,8 +2,12 @@
 
 from __future__ import division
 
+import os
 import numpy as np
 import train
+
+# TODO: make this flexible
+DATAPATH = os.path.join(os.getcwd(), 'data')
 
 # def analysis(run_analysis):
 #     # Run a set of standard analysis
@@ -44,16 +48,20 @@ import train
 def train_mante_local():
     """Local training of only the Mante task."""
     hparams = {'learning_rate': 0.001, 'in_type': 'multi'}
-    train.train('data/debug', hparams=hparams, ruleset='mante', seed=0)
+    train_dir = os.path.join(DATAPATH, 'debug')
+    train.train(train_dir, hparams=hparams, ruleset='mante', seed=0)
 
 
 def train_all_local():
     """Local training of all tasks."""
-    train.train('data/debug', ruleset='all', seed=0)
+    train_dir = os.path.join(DATAPATH, 'debug')
+    train.train(train_dir, ruleset='all', seed=0)
 
 
 def train_vary_hparams(i):
     """Vary the hyperparameters.
+
+    This experiment loops over a set of hyperparameters.
 
     Args:
         i: int, the index of the hyperparameters list
@@ -77,10 +85,12 @@ def train_vary_hparams(i):
     for key, index in zip(keys, indices):
         hparams[key] = hp_ranges[key][index]
 
-    train.train('data/debug'+str(i), hparams, ruleset='mante')
+    train_dir = os.path.join(DATAPATH, 'debug', str(i))
+    train.train(train_dir, hparams, ruleset='mante', max_steps=5000)
 
 
 if __name__ == '__main__':
-    train_mante_local()
+    # train_mante_local()
     # train_all_local()
-    # train_vary_hparams(61)
+    for i in range(10):
+        train_vary_hparams(i)

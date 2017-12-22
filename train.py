@@ -70,10 +70,18 @@ def get_default_hparams(ruleset):
             'n_eachring': n_eachring,
             # number of rings
             'num_ring': num_ring,
+            # number of rules
+            'n_rule': n_rule,
             # first input index for rule units
             'rule_start': 1+num_ring*n_eachring,
-            # input, recurrent, output shape
-            'shape': (n_input, 64, n_output),
+            # number of input units
+            'n_input': n_input,
+            # number of output units
+            'n_output': n_output,
+            # number of recurrent units
+            'n_rnn': 64,
+            # number of input units
+            'ruleset': ruleset,
             # name to save
             'save_name': 'test',
             # learning rate
@@ -81,9 +89,6 @@ def get_default_hparams(ruleset):
             # intelligent synapses parameters, tuple (c, ksi)
             'param_intsyn': None
             }
-    hparams['ruleset'] = ruleset
-    hparams['n_input'] = n_input
-    hparams['n_output'] = n_output
 
     # Rules to train and test. Rules in a set are trained together
     hparams['rule_trains'] = [task.rules_dict[ruleset]]
@@ -154,6 +159,32 @@ def update_intsyn2():
         ]
 
 
+def gen_feed_dict(model, trial, hparams):
+    if hparams['in_type'] == 'normal':
+        feed_dict = {model.x: trial.x,
+                     model.y: trial.y,
+                     model.c_mask: trial.c_mask}
+    elif hparams['in_type'] == 'multi':
+        n_time, batch_size = trial.x.shape[:2]
+        new_shape = [n_time,
+                     batch_size,
+                     hparams['rule_start']*hparams['n_rule']]
+
+        x = np.zeros(new_shape, dtype=np.float32)
+        for i in range(batch_size):
+            ind_rule = np.argmax(trial.x[0, i, hparams['rule_start']:])
+            i_start = ind_rule*hparams['rule_start']
+            x[:, i, i_start:i_start+hparams['rule_start']] = \
+                trial.x[:, i, :hparams['rule_start']]
+
+        feed_dict = {model.x: x,
+                     model.y: trial.y,
+                     model.c_mask: trial.c_mask}
+
+    return feed_dict
+
+
+
 def do_eval(sess, model, log, rule_train, train_dir):
     """Do evaluation.
 
@@ -183,11 +214,9 @@ def do_eval(sess, model, log, rule_train, train_dir):
         for i_rep in range(n_rep):
             trial = generate_trials(
                 rule_test, hparams, 'random', batch_size=batch_size_test_rep)
-            y_hat_test = model.get_y(trial.x)
-            feed_dict = {model.x: trial.x,
-                         model.y: trial.y,
-                         model.c_mask: trial.c_mask}
-            c_lsq, c_reg = sess.run([model.cost_lsq, model.cost_reg],
+            # y_hat_test = model.get_y(trial.x)
+            feed_dict = gen_feed_dict(model, trial, hparams)
+            c_lsq, c_reg, y_hat_test = sess.run([model.cost_lsq, model.cost_reg, model.y_hat],
                                     feed_dict=feed_dict)
 
             # Cost is first summed over time,
@@ -353,9 +382,7 @@ def train(train_dir,
                             batch_size=hparams['batch_size_train'])
 
                     # Generating feed_dict.
-                    feed_dict = {model.x: trial.x,
-                                 model.y: trial.y,
-                                 model.c_mask: trial.c_mask}
+                    feed_dict = gen_feed_dict(model, trial, hparams)
 
                     if hparams['param_intsyn']:
                         update_intsyn2()
