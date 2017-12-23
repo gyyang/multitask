@@ -20,19 +20,23 @@ import tools
 save = True
 
 def compute_variance(save_name, rules=None, random_rotation=False):
-    ########################## Running the network ################################
+    """Compute variance for all tasks.
+
+    Args:
+        save_name: str, the path of the model directory
+    """
     h_all_byrule  = OrderedDict()
     h_all_byepoch = OrderedDict()
     model = Model(save_name, sigma_rec=0)
-    config = model.config
+    hparams = model.hparams
 
     if rules is None:
-        rules = config['rules']
+        rules = hparams['rules']
 
     with tf.Session() as sess:
         model.restore(sess)
 
-        n_input, n_hidden, n_output = config['shape']
+        n_input, n_hidden, n_output = hparams['shape']
 
         if random_rotation:
             # Generate random orthogonal matrix
@@ -40,7 +44,7 @@ def compute_variance(save_name, rules=None, random_rotation=False):
             random_ortho_matrix = ortho_group.rvs(dim=n_hidden)
 
         for rule in rules:
-            trial = generate_trials(rule=rule, config=config, mode='test', noise_on=False)
+            trial = generate_trials(rule=rule, hparams=hparams, mode='test', noise_on=False)
             h = model.get_h(trial.x)
             if random_rotation:
                 h = np.dot(h, random_ortho_matrix) # randomly rotate
@@ -255,10 +259,10 @@ def plot_hist_varprop_all(save_pattern, plot_control=True):
 
     save_names = tools.valid_save_names(save_pattern)
 
-    config_path = os.path.join('data','config_'+save_names[0]+'.pkl')
-    with open(config_path,'rb') as f:
-        config = pickle.load(f)
-    rules = config['rules']
+    hparams_path = os.path.join('data','hparams_'+save_names[0]+'.pkl')
+    with open(hparams_path,'rb') as f:
+        hparams = pickle.load(f)
+    rules = hparams['rules']
 
     figsize = (7, 7)
 
