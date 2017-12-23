@@ -19,24 +19,24 @@ import tools
 
 save = True
 
-def compute_variance(save_name, rules=None, random_rotation=False):
+def compute_variance(model_dir, rules=None, random_rotation=False):
     """Compute variance for all tasks.
 
     Args:
-        save_name: str, the path of the model directory
+        model_dir: str, the path of the model directory
     """
     h_all_byrule  = OrderedDict()
     h_all_byepoch = OrderedDict()
-    model = Model(save_name, sigma_rec=0)
+    model = Model(model_dir, sigma_rec=0)
     hparams = model.hparams
 
     if rules is None:
         rules = hparams['rules']
 
     with tf.Session() as sess:
-        model.restore(sess)
+        model.restore()
 
-        n_input, n_hidden, n_output = hparams['shape']
+        n_hidden = hparams['n_rnn']
 
         if random_rotation:
             # Generate random orthogonal matrix
@@ -44,7 +44,7 @@ def compute_variance(save_name, rules=None, random_rotation=False):
             random_ortho_matrix = ortho_group.rvs(dim=n_hidden)
 
         for rule in rules:
-            trial = generate_trials(rule=rule, hparams=hparams, mode='test', noise_on=False)
+            trial = generate_trials(rule, hparams, 'test', noise_on=False)
             h = model.get_h(trial.x)
             if random_rotation:
                 h = np.dot(h, random_ortho_matrix) # randomly rotate

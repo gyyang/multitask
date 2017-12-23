@@ -381,7 +381,6 @@ class Model(object):
     def __init__(self,
                  save_dir,
                  hparams=None,
-                 rng=None,
                  sigma_rec=None,
                  dt=None):
         """
@@ -396,17 +395,11 @@ class Model(object):
         # Reset tensorflow graphs
         tf.reset_default_graph()  # must be in the beginning
 
-        # TODO(gryang): this behavior is weird, change it.
         if hparams is None:
             hparams = tools.load_hparams(save_dir)
 
-        if hparams['seed'] is not None:
-            tf.set_random_seed(hparams['seed'])
-        else:
-            print('Warning: Random seed not specified')
-
-        if rng is None:
-            rng = np.random.RandomState()
+        tf.set_random_seed(hparams['seed'])
+        rng = np.random.RandomState(hparams['seed'])
 
         if sigma_rec is not None:
             print('Overwrite sigma_rec with {:0.3f}'.format(sigma_rec))
@@ -525,15 +518,12 @@ class Model(object):
         sess = tf.get_default_session()
         sess.run(tf.global_variables_initializer())
 
-    def restore(self, save_dir, sess=None):
+    def restore(self):
         """restore the model"""
-        assert self.sess is None
-        if sess is None:
-            sess = tf.get_default_session()
-        self.sess = sess
-        print(os.path.join(save_dir, 'model.ckpt'))
-        self.saver.restore(
-                sess, os.path.join(save_dir, 'model.ckpt'))
+        sess = tf.get_default_session()
+        save_path = os.path.join(self.save_dir, 'model.ckpt')
+        self.saver.restore(sess, save_path)
+        print("Model restored from file: %s" % save_path)
 
     def save(self):
         """Save the model."""

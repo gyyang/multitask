@@ -297,10 +297,9 @@ def train(train_dir,
         rng = np.random.RandomState(seed)
 
         tools.save_hparams(hparams, train_dir)
-        hparams['rng'] = rng
 
         # Build the model
-        model = Model(train_dir, hparams=hparams, rng=rng)
+        model = Model(train_dir, hparams=hparams)
 
     # Display hparamsuration
     for key, val in hparams.iteritems():
