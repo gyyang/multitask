@@ -17,6 +17,7 @@ from tensorflow.python.util import nest
 from tensorflow.python.ops import rnn
 from tensorflow.python.ops.rnn_cell_impl import RNNCell, _linear
 
+import tools
 
 def gen_ortho_matrix(dim, rng=None):
     """Generate random orthogonal matrix
@@ -377,35 +378,27 @@ class EILeakyGRUCell(RNNCell):
 class Model(object):
     """The model."""
 
-    def __init__(self, hparams, rng=None, sigma_rec=None, dt=None):
+    def __init__(self,
+                 save_dir,
+                 hparams=None,
+                 rng=None,
+                 sigma_rec=None,
+                 dt=None):
         """
         Initializing the model with information from hparams
 
         Args:
-          hparams: a string or a dictionary
-          If hparams is a string, then attempt to load hparamsuration from file
-          If hparams is a dictionary, use it as the hparamsuration
-
-          sigma_rec, if not None, will overwrite the sigma_rec passed by hparams
+            save_dir: string, directory of the model
+            hparams: a dictionary or None
+            sigma_rec: if not None, overwrite the sigma_rec passed by hparams
         """
 
         # Reset tensorflow graphs
         tf.reset_default_graph()  # must be in the beginning
 
-        if isinstance(hparams, str):
-            # Attempts to load hparamsuration
-            hparams_path = os.path.join('data', 'hparams_'+hparams+'.pkl')
-            # For backward compatability
-            if not os.path.isfile(hparams_path):
-                hparams_path = os.path.join('data', 'hparams'+hparams+'.pkl')
-            print('Loading hparamsuration from : ' + hparams_path)
-            # Load hparams
-            with open(hparams_path, 'rb') as f:
-                hparams = pickle.load(f)
-
-        else:
-            # directly use the given hparamsuration
-            assert isinstance(hparams, dict)
+        # TODO(gryang): this behavior is weird, change it.
+        if hparams is None:
+            hparams = tools.load_hparams(save_dir)
 
         if hparams['seed'] is not None:
             tf.set_random_seed(hparams['seed'])
@@ -524,15 +517,12 @@ class Model(object):
         # Variable saver
         self.saver = tf.train.Saver(self.var_list)
 
+        self.save_dir = save_dir
         self.hparams = hparams
-        self.sess = None
 
-    def initialize(self, sess=None):
-        """initialize the model for training"""
-        assert self.sess is None
-        if sess is None:
-            sess = tf.get_default_session()
-        self.sess = sess
+    def initialize(self):
+        """Initialize the model for training."""
+        sess = tf.get_default_session()
         sess.run(tf.global_variables_initializer())
 
     def restore(self, save_dir, sess=None):
@@ -541,14 +531,15 @@ class Model(object):
         if sess is None:
             sess = tf.get_default_session()
         self.sess = sess
+        print(os.path.join(save_dir, 'model.ckpt'))
         self.saver.restore(
                 sess, os.path.join(save_dir, 'model.ckpt'))
 
-    def save(self, save_dir):
-        """save the model"""
-        save_path = self.saver.save(
-                self.sess,
-                os.path.join(save_dir, 'model.ckpt'))
+    def save(self):
+        """Save the model."""
+        sess = tf.get_default_session()
+        save_path = os.path.join(self.save_dir, 'model.ckpt')
+        self.saver.save(sess, save_path)
         print("Model saved in file: %s" % save_path)
 
     def get_h(self, x):

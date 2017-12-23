@@ -86,7 +86,7 @@ def train_vary_hparams(i):
         hparams[key] = hp_ranges[key][index]
 
     train_dir = os.path.join(DATAPATH, 'debug', str(i))
-    train.train(train_dir, hparams, ruleset='mante', max_steps=5000)
+    train.train(train_dir, hparams, ruleset='mante', max_steps=2000)
 
 
 if __name__ == '__main__':
@@ -94,3 +94,4 @@ if __name__ == '__main__':
     # train_all_local()
     for i in range(10):
         train_vary_hparams(i)
+

@@ -244,7 +244,7 @@ def do_eval(sess, model, log, rule_train, train_dir):
     log['perf_avg'].append(perf_tests_mean)
 
     # Saving the model
-    model.save(train_dir)
+    model.save()
 
     tools.save_log(log, hparams['save_name'])
 
@@ -284,7 +284,7 @@ def train(train_dir,
     if reuse:
         raise NotImplementedError()  # temporarily disable
         # Build the model from save_name
-        model = Model(hparams=save_name)
+        model = Model(train_dir)
         hparams = model.hparams
 
     else:
@@ -300,7 +300,7 @@ def train(train_dir,
         hparams['rng'] = rng
 
         # Build the model
-        model = Model(hparams=hparams, rng=rng)
+        model = Model(train_dir, hparams=hparams, rng=rng)
 
     # Display hparamsuration
     for key, val in hparams.iteritems():
@@ -331,7 +331,7 @@ def train(train_dir,
         if reuse:
             model.restore(sess)
         else:
-            model.initialize(sess)
+            model.initialize()
 
         # penalty on deviation from initial weight
         if hparams['l2_weight_init'] > 0:

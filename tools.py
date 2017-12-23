@@ -32,7 +32,7 @@ def save_log(log, save_name):
 
 
 def load_hparams(save_dir):
-    """Load the hparamsuration file of model save_name"""
+    """Load the hyper-parameter file of model save_name"""
     fname = os.path.join(save_dir, 'hparams.json')
     if not os.path.isfile(fname):
         return None
@@ -43,7 +43,7 @@ def load_hparams(save_dir):
 
 
 def save_hparams(hparams, save_dir):
-    """Save the hparamsuration file of model save_name"""
+    """Save the hyper-parameter file of model save_name"""
     with open(os.path.join(save_dir, 'hparams.json'), 'wb') as f:
         json.dump(hparams, f)
 
