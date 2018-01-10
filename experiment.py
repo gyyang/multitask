@@ -55,7 +55,8 @@ def train_mante_local():
 def train_all_local():
     """Local training of all tasks."""
     train_dir = os.path.join(DATAPATH, 'debug')
-    train.train(train_dir, ruleset='all', seed=0)
+    rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
+    train.train(train_dir, ruleset='all', rule_prob_map=rule_prob_map, seed=0)
 
 
 def train_vary_hparams(i):

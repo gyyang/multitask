@@ -392,6 +392,8 @@ def train(train_dir,
         max_steps: int, maximum number of training steps
         display_step: int, display steps
         ruleset: the set of rules to train
+        rule_trains: list of rules to train, if None then all rules possible
+        rule_prob_map: None or dictionary of relative rule probability
         reuse: boolean. If True, reload previous checkpoints
         seed: int, random seed to be used
 
@@ -404,25 +406,12 @@ def train(train_dir,
 
     # Network parameters
     # Number of units each ring has
-    if reuse:
-        raise NotImplementedError()  # temporarily disable
-        # Build the model from save_name
-        model = Model(train_dir)
-        hparams = model.hparams
 
-    else:
-        # Random number generator used
-        default_hparams = get_default_hparams(ruleset)
-        if hparams is not None:
-            default_hparams.update(hparams)
-        hparams = default_hparams
-        hparams['seed'] = seed
-        tools.save_hparams(hparams, train_dir)
-        # rng can not be serialized
-        hparams['rng'] = np.random.RandomState(seed)
-
-        # Build the model
-        model = Model(train_dir, hparams=hparams)
+    default_hparams = get_default_hparams(ruleset)
+    if hparams is not None:
+        default_hparams.update(hparams)
+    hparams = default_hparams
+    hparams['seed'] = seed
 
     # Rules to train and test. Rules in a set are trained together
     if rule_trains is None:
@@ -444,6 +433,13 @@ def train(train_dir,
                 [rule_prob_map.get(r, 1.) for r in hparams['rule_trains']])
         hparams['rule_probs'] = list(rule_prob/np.sum(rule_prob))
 
+    tools.save_hparams(hparams, train_dir)
+    # rng can not be serialized
+    hparams['rng'] = np.random.RandomState(seed)
+
+    # Build the model
+    model = Model(train_dir, hparams=hparams)
+
     # Display hparamsuration
     for key, val in hparams.iteritems():
         print('{:20s} = '.format(key) + str(val))
@@ -456,10 +452,7 @@ def train(train_dir,
 
     # Use customized session that launches the graph as well
     with tf.Session() as sess:
-        if reuse:
-            model.restore(sess)
-        else:
-            sess.run(tf.global_variables_initializer())
+        sess.run(tf.global_variables_initializer())
 
         step = 0
         while step * hparams['batch_size_train'] <= max_steps:
