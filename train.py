@@ -139,32 +139,6 @@ def update_intsyn2():
         ]
 
 
-def gen_feed_dict(model, trial, hparams):
-    if hparams['in_type'] == 'normal':
-        feed_dict = {model.x: trial.x,
-                     model.y: trial.y,
-                     model.c_mask: trial.c_mask}
-    elif hparams['in_type'] == 'multi':
-        n_time, batch_size = trial.x.shape[:2]
-        new_shape = [n_time,
-                     batch_size,
-                     hparams['rule_start']*hparams['n_rule']]
-
-        x = np.zeros(new_shape, dtype=np.float32)
-        for i in range(batch_size):
-            ind_rule = np.argmax(trial.x[0, i, hparams['rule_start']:])
-            i_start = ind_rule*hparams['rule_start']
-            x[:, i, i_start:i_start+hparams['rule_start']] = \
-                trial.x[:, i, :hparams['rule_start']]
-
-        feed_dict = {model.x: x,
-                     model.y: trial.y,
-                     model.c_mask: trial.c_mask}
-
-    return feed_dict
-
-
-
 def do_eval(sess, model, log, rule_train):
     """Do evaluation.
 
@@ -193,7 +167,7 @@ def do_eval(sess, model, log, rule_train):
         for i_rep in range(n_rep):
             trial = generate_trials(
                 rule_test, hparams, 'random', batch_size=batch_size_test_rep)
-            feed_dict = gen_feed_dict(model, trial, hparams)
+            feed_dict = tools.gen_feed_dict(model, trial, hparams)
             c_lsq, c_reg, y_hat_test = sess.run(
                 [model.cost_lsq, model.cost_reg, model.y_hat],
                 feed_dict=feed_dict)
@@ -357,7 +331,7 @@ def train_old(train_dir,
                             batch_size=hparams['batch_size_train'])
 
                     # Generating feed_dict.
-                    feed_dict = gen_feed_dict(model, trial, hparams)
+                    feed_dict = tools.gen_feed_dict(model, trial, hparams)
 
                     if hparams['param_intsyn']:
                         update_intsyn2()
@@ -381,7 +355,6 @@ def train(train_dir,
           ruleset='mante',
           rule_trains=None,
           rule_prob_map=None,
-          reuse=False,
           seed=0,
           ):
     '''Train the network
@@ -394,7 +367,6 @@ def train(train_dir,
         ruleset: the set of rules to train
         rule_trains: list of rules to train, if None then all rules possible
         rule_prob_map: None or dictionary of relative rule probability
-        reuse: boolean. If True, reload previous checkpoints
         seed: int, random seed to be used
 
     Returns:
@@ -405,8 +377,6 @@ def train(train_dir,
     tools.mkdir_p(train_dir)
 
     # Network parameters
-    # Number of units each ring has
-
     default_hparams = get_default_hparams(ruleset)
     if hparams is not None:
         default_hparams.update(hparams)
@@ -477,7 +447,7 @@ def train(train_dir,
                         batch_size=hparams['batch_size_train'])
 
                 # Generating feed_dict.
-                feed_dict = gen_feed_dict(model, trial, hparams)
+                feed_dict = tools.gen_feed_dict(model, trial, hparams)
                 sess.run(model.train_step, feed_dict=feed_dict)
 
                 step += 1

@@ -5,6 +5,33 @@ import errno
 import fnmatch
 import pickle
 import json
+import numpy as np
+
+
+def gen_feed_dict(model, trial, hparams):
+    """Generate feed_dict for session run."""
+    if hparams['in_type'] == 'normal':
+        feed_dict = {model.x: trial.x,
+                     model.y: trial.y,
+                     model.c_mask: trial.c_mask}
+    elif hparams['in_type'] == 'multi':
+        n_time, batch_size = trial.x.shape[:2]
+        new_shape = [n_time,
+                     batch_size,
+                     hparams['rule_start']*hparams['n_rule']]
+
+        x = np.zeros(new_shape, dtype=np.float32)
+        for i in range(batch_size):
+            ind_rule = np.argmax(trial.x[0, i, hparams['rule_start']:])
+            i_start = ind_rule*hparams['rule_start']
+            x[:, i, i_start:i_start+hparams['rule_start']] = \
+                trial.x[:, i, :hparams['rule_start']]
+
+        feed_dict = {model.x: x,
+                     model.y: trial.y,
+                     model.c_mask: trial.c_mask}
+
+    return feed_dict
 
 
 def valid_save_names(save_pattern):
@@ -39,6 +66,10 @@ def load_hparams(save_dir):
 
     with open(fname, 'rb') as f:
         hparams = json.load(f)
+
+    # Use a different seed aftering loading,
+    # since loading is typically for analysis
+    hparams['rng'] = np.random.RandomState(hparams['seed']+1000)
     return hparams
 
 
