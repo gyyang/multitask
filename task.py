@@ -175,10 +175,10 @@ class Trial(object):
 
     def add_rule(self, rule, on=None, off=None, strength=1.):
         if isinstance(rule, int):
-            self.x[on:off,:,self.config['rule_start']+rule] = strength # Have rule input
+            self.x[on:off, :, self.config['rule_start']+rule] = strength
         else:
             ind_rule = get_rule_index(rule, self.config)
-            self.x[on:off,:,ind_rule] = strength # Have rule input
+            self.x[on:off, :, ind_rule] = strength
 
     def add_x_loc(self, x_loc):
         dist = get_dist(x_loc-self.pref) # periodic boundary
@@ -1597,8 +1597,6 @@ def generate_trials(rule, config, mode, noise_on=True, **kwargs):
     :return: dictionary of list of data.
     '''
     trial = rule_mapping[rule](config, mode, **kwargs)
-    if noise_on:
-        trial.add_x_noise()
 
     # Add rule input to every task
     if 'rule_on' in kwargs:
@@ -1635,6 +1633,9 @@ def generate_trials(rule, config, mode, noise_on=True, **kwargs):
 
     for r, s in zip(rule, rule_strength):
         trial.add_rule(r, on=rule_on, off=rule_off, strength=s)
+
+    if noise_on:
+        trial.add_x_noise()
 
     return trial
 

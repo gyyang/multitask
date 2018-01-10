@@ -5,7 +5,6 @@ from __future__ import division
 import os
 import sys
 import time
-import pickle
 from collections import defaultdict
 import numpy as np
 import tensorflow as tf
@@ -90,25 +89,6 @@ def get_default_hparams(ruleset):
             'param_intsyn': None
             }
 
-    # Rules to train and test. Rules in a set are trained together
-    hparams['rule_trains'] = [task.rules_dict[ruleset]]
-    hparams['rules'] = task.rules_dict[ruleset]
-
-    # Assign probabilities for rule_trains.
-    rule_prob_map = dict()
-
-    # Turn into rule_trains format
-    rule_probs = list()
-    for rule_train in hparams['rule_trains']:
-        if not hasattr(rule_train, '__iter__'):
-            rule_probs.append(None)
-        else:
-            # Set default as 1.
-            rule_prob = np.array(
-                    [rule_prob_map.get(r, 1.) for r in rule_train])
-            rule_probs.append(list(rule_prob/np.sum(rule_prob)))
-    hparams['rule_probs'] = rule_probs
-
     return hparams
 
 
@@ -185,7 +165,7 @@ def gen_feed_dict(model, trial, hparams):
 
 
 
-def do_eval(sess, model, log, rule_train, train_dir):
+def do_eval(sess, model, log, rule_train):
     """Do evaluation.
 
     Args:
@@ -193,7 +173,6 @@ def do_eval(sess, model, log, rule_train, train_dir):
         model: Model class instance
         log: dictionary that stores the log
         rule_train: string or list of strings, the rules being trained
-        train_dir: string, training directory
     """
     hparams = model.hparams
     if not hasattr(rule_train, '__iter__'):
@@ -214,10 +193,10 @@ def do_eval(sess, model, log, rule_train, train_dir):
         for i_rep in range(n_rep):
             trial = generate_trials(
                 rule_test, hparams, 'random', batch_size=batch_size_test_rep)
-            # y_hat_test = model.get_y(trial.x)
             feed_dict = gen_feed_dict(model, trial, hparams)
-            c_lsq, c_reg, y_hat_test = sess.run([model.cost_lsq, model.cost_reg, model.y_hat],
-                                    feed_dict=feed_dict)
+            c_lsq, c_reg, y_hat_test = sess.run(
+                [model.cost_lsq, model.cost_reg, model.y_hat],
+                feed_dict=feed_dict)
 
             # Cost is first summed over time,
             # and averaged across batch and units
@@ -245,13 +224,12 @@ def do_eval(sess, model, log, rule_train, train_dir):
 
     # Saving the model
     model.save()
-
     tools.save_log(log, hparams['save_name'])
 
     return log
 
 
-def train(train_dir,
+def train_old(train_dir,
           hparams=None,
           max_steps=1000000,
           display_step=500,
@@ -271,10 +249,8 @@ def train(train_dir,
         seed: int, random seed to be used
 
     Returns:
-        model is stored at save_name.ckpt
-        training configuration is stored at 'hparams_'+'save_name.ckpt'
-        training progress is stored at 'log_'+'save_name.ckpt'
-
+        model is stored at train_dir/model.ckpt
+        training configuration is stored at train_dir/hparams.json
     '''
 
     tools.mkdir_p(train_dir)
@@ -294,9 +270,9 @@ def train(train_dir,
             default_hparams.update(hparams)
         hparams = default_hparams
         hparams['seed'] = seed
-        rng = np.random.RandomState(seed)
-
         tools.save_hparams(hparams, train_dir)
+        # rng can not be serialized
+        hparams['rng'] = np.random.RandomState(seed)
 
         # Build the model
         model = Model(train_dir, hparams=hparams)
@@ -330,7 +306,7 @@ def train(train_dir,
         if reuse:
             model.restore(sess)
         else:
-            model.initialize()
+            sess.run(tf.global_variables_initializer())
 
         # penalty on deviation from initial weight
         if hparams['l2_weight_init'] > 0:
@@ -358,11 +334,11 @@ def train(train_dir,
                 try:
                     # Validation
                     if step % display_step == 0:
-                        trial = step_total*hparams['batch_size_train']
+                        trial = step_total * hparams['batch_size_train']
                         log['trials'].append(trial)
                         log['times'].append(time.time()-t_start)
                         log['rule_now'].append(rule_train)
-                        log = do_eval(sess, model, log, rule_train, train_dir)
+                        log = do_eval(sess, model, log, rule_train)
                         if log['perf_avg'][-1] > model.hparams['target_perf']:
                             print('Perf reached the target: {:0.2f}'.format(
                                 hparams['target_perf']))
@@ -373,7 +349,7 @@ def train(train_dir,
                         rule_train_now = rule_train
                     else:
                         p = hparams['rule_probs'][i_rule_train]
-                        rule_train_now = rng.choice(rule_train, p=p)
+                        rule_train_now = hparams['rng'].choice(rule_train, p=p)
                     # Generate a random batch of trials.
                     # Each batch has the same trial length
                     trial = generate_trials(
@@ -386,7 +362,7 @@ def train(train_dir,
                     if hparams['param_intsyn']:
                         update_intsyn2()
                     else:
-                        sess.run(model.optimizer, feed_dict=feed_dict)             
+                        sess.run(model.train_step, feed_dict=feed_dict)
 
                     step += 1
                     step_total += 1
@@ -397,6 +373,127 @@ def train(train_dir,
 
         print("Optimization Finished!")
 
+
+def train(train_dir,
+          hparams=None,
+          max_steps=1000000,
+          display_step=500,
+          ruleset='mante',
+          rule_trains=None,
+          rule_prob_map=None,
+          reuse=False,
+          seed=0,
+          ):
+    '''Train the network
+
+    Args:
+        train_dir: str, training directory
+        hparams: dictionary of hyperparameters
+        max_steps: int, maximum number of training steps
+        display_step: int, display steps
+        ruleset: the set of rules to train
+        reuse: boolean. If True, reload previous checkpoints
+        seed: int, random seed to be used
+
+    Returns:
+        model is stored at train_dir/model.ckpt
+        training configuration is stored at train_dir/hparams.json
+    '''
+
+    tools.mkdir_p(train_dir)
+
+    # Network parameters
+    # Number of units each ring has
+    if reuse:
+        raise NotImplementedError()  # temporarily disable
+        # Build the model from save_name
+        model = Model(train_dir)
+        hparams = model.hparams
+
+    else:
+        # Random number generator used
+        default_hparams = get_default_hparams(ruleset)
+        if hparams is not None:
+            default_hparams.update(hparams)
+        hparams = default_hparams
+        hparams['seed'] = seed
+        tools.save_hparams(hparams, train_dir)
+        # rng can not be serialized
+        hparams['rng'] = np.random.RandomState(seed)
+
+        # Build the model
+        model = Model(train_dir, hparams=hparams)
+
+    # Rules to train and test. Rules in a set are trained together
+    if rule_trains is None:
+        # By default, training all rules available to this ruleset
+        hparams['rule_trains'] = task.rules_dict[ruleset]
+    else:
+        hparams['rule_trains'] = rule_trains
+    hparams['rules'] = hparams['rule_trains']
+
+    # Assign probabilities for rule_trains.
+    if rule_prob_map is None:
+        rule_prob_map = dict()
+
+    # Turn into rule_trains format
+    hparams['rule_probs'] = None
+    if hasattr(hparams['rule_trains'], '__iter__'):
+        # Set default as 1.
+        rule_prob = np.array(
+                [rule_prob_map.get(r, 1.) for r in hparams['rule_trains']])
+        hparams['rule_probs'] = list(rule_prob/np.sum(rule_prob))
+
+    # Display hparamsuration
+    for key, val in hparams.iteritems():
+        print('{:20s} = '.format(key) + str(val))
+
+    # Store results
+    log = defaultdict(list)
+
+    # Record time
+    t_start = time.time()
+
+    # Use customized session that launches the graph as well
+    with tf.Session() as sess:
+        if reuse:
+            model.restore(sess)
+        else:
+            sess.run(tf.global_variables_initializer())
+
+        step = 0
+        while step * hparams['batch_size_train'] <= max_steps:
+            try:
+                # Validation
+                if step % display_step == 0:
+                    log['trials'].append(step * hparams['batch_size_train'])
+                    log['times'].append(time.time()-t_start)
+                    log = do_eval(sess, model, log, hparams['rule_trains'])
+                    if log['perf_avg'][-1] > model.hparams['target_perf']:
+                        print('Perf reached the target: {:0.2f}'.format(
+                            hparams['target_perf']))
+                        break
+
+                # Training
+                rule_train_now = hparams['rng'].choice(hparams['rule_trains'],
+                                                       p=hparams['rule_probs'])
+                # Generate a random batch of trials.
+                # Each batch has the same trial length
+                trial = generate_trials(
+                        rule_train_now, hparams, 'random',
+                        batch_size=hparams['batch_size_train'])
+
+                # Generating feed_dict.
+                feed_dict = gen_feed_dict(model, trial, hparams)
+                sess.run(model.train_step, feed_dict=feed_dict)
+
+                step += 1
+
+            except KeyboardInterrupt:
+                print("Optimization interrupted by user")
+                break
+
+        print("Optimization Finished!")
 
 # function to create save_name TODO(gryang): move to tools?
 def to_savename(
@@ -449,8 +546,8 @@ def to_savename(
 if __name__ == '__main__':
     pass
     run_analysis = []
-    # TODO: Why is contextdm2 worse than contextdm1?
-    train('debug', seed=4, display_step=500)
+    train('debug', seed=1, hparams={'learning_rate': 0.001}, ruleset='mante',
+          display_step=500)
 
 #==============================================================================
 #     #maddy added - start
@@ -477,4 +574,3 @@ if __name__ == '__main__':
 #           l1_h = l1_h, l2_h = l2_h, l1_weight = l1_weight, l2_weight = l2_weight)
 #     #maddy added - end
 #==============================================================================
-    

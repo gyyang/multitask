@@ -42,9 +42,15 @@ def gen_ortho_matrix(dim, rng=None):
 
 
 def popvec(y):
-    """
-    Population vector read out
+    """Population vector read out.
+
     Assuming the last dimension is the dimension to be collapsed
+
+    Args:
+        y: population output on a ring network. Numpy array (Batch, Units)
+
+    Returns:
+        Readout locations: Numpy array (Batch,)
     """
     pref = np.arange(0, 2*np.pi, 2*np.pi/y.shape[-1])  # preferences
     temp_sum = y.sum(axis=-1)
@@ -55,12 +61,18 @@ def popvec(y):
 
 
 def get_perf(y_hat, y_loc):
+    """Get performance.
+
+    Args:
+      y_hat: Actual output. Numpy array (Time, Batch, Unit)
+      y_loc: Target output location (-1 for fixation).
+        Numpy array (Time, Batch)
+
+    Returns:
+      perf: Numpy array (Batch,)
     """
-    Get performance
-    :param y_hat: Actual output. Time, Batch, Unit
-    :param y_loc: Target output location (-1 for fixation). Time, Batch
-    :return:
-    """
+    if len(y_hat.shape) != 3:
+        raise ValueError('y_hat must have shape (Time, Batch, Unit)')
     # Only look at last time points
     y_loc = y_loc[-1]
     y_hat = y_hat[-1]
@@ -451,7 +463,9 @@ class Model(object):
         elif hparams['rnn_type'] == 'GRU':
             cell = tf.contrib.rnn.GRUCell(hparams['n_rnn'], activation=f_act)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError("""rnn_type must be one of LeakyRNN,
+            LeakyGRU, EILeakyGRU, LSTM, GRU
+            """)
 
         # Dynamic rnn with time major
         self.h, states = rnn.dynamic_rnn(
@@ -461,27 +475,35 @@ class Model(object):
         with tf.variable_scope("output"):
             # Using default initialization `glorot_uniform_initializer`
             w_out = tf.get_variable(
-                'weights', [hparams['n_rnn'], hparams['n_output']], dtype=tf.float32)
+                'weights',
+                [hparams['n_rnn'], hparams['n_output']],
+                dtype=tf.float32
+            )
             b_out = tf.get_variable(
-                    'biases', [hparams['n_output']], dtype=tf.float32,
-                    initializer=tf.constant_initializer(0.0, dtype=tf.float32))
+                'biases',
+                [hparams['n_output']],
+                dtype=tf.float32,
+                initializer=tf.constant_initializer(0.0, dtype=tf.float32)
+            )
 
+        h_shaped = tf.reshape(self.h, (-1, hparams['n_rnn']))
         y_shaped = tf.reshape(self.y, (-1, hparams['n_output']))
+        # y_hat_ shape (n_time*n_batch, n_unit)
+        y_hat_ = tf.matmul(h_shaped, w_out) + b_out
         if hparams['loss_type'] == 'lsq':
-            self.y_hat = tf.sigmoid(tf.matmul(
-                    tf.reshape(self.h, (-1, hparams['n_rnn'])), w_out) + b_out)
-            # Loss
+            # Least-square loss
+            y_hat = tf.sigmoid(y_hat_)
             self.cost_lsq = tf.reduce_mean(
-                    tf.square((y_shaped-self.y_hat)*self.c_mask))
+                    tf.square((y_shaped-y_hat)*self.c_mask))
         else:
-            # y_hat_ shape (n_time*n_batch, n_unit)
-            y_hat_ = tf.matmul(
-                    tf.reshape(self.h, (-1, hparams['n_rnn'])), w_out) + b_out
-            self.y_hat = tf.nn.softmax(y_hat_)
-            # Actually the cross-entropy cost
+            y_hat = tf.nn.softmax(y_hat_)
+            # Cross-entropy loss
             self.cost_lsq = tf.reduce_mean(
                     self.c_mask * tf.nn.softmax_cross_entropy_with_logits(
                             labels=y_shaped, logits=y_hat_))
+
+        self.y_hat = tf.reshape(y_hat,
+                                (-1, tf.shape(self.h)[1], hparams['n_output']))
 
         self.var_list = tf.trainable_variables()
 
@@ -566,7 +588,7 @@ class Model(object):
         self.grads_and_vars = self.opt.compute_gradients(cost, self.var_list)
         # gradient clipping
         capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in self.grads_and_vars]
-        self.optimizer = self.opt.apply_gradients(capped_gvs)
+        self.train_step = self.opt.apply_gradients(capped_gvs)
 
     def lesion_units(self, sess, units, verbose=False):
         """Lesion units given by units
