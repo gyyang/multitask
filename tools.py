@@ -75,8 +75,10 @@ def load_hparams(save_dir):
 
 def save_hparams(hparams, save_dir):
     """Save the hyper-parameter file of model save_name"""
+    hparams_copy = hparams.copy()
+    hparams_copy.pop('rng')  # rng can not be serialized
     with open(os.path.join(save_dir, 'hparams.json'), 'wb') as f:
-        json.dump(hparams, f)
+        json.dump(hparams_copy, f)
 
 
 def mkdir_p(path):

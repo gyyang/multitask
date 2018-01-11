@@ -382,6 +382,7 @@ def train(train_dir,
         default_hparams.update(hparams)
     hparams = default_hparams
     hparams['seed'] = seed
+    hparams['rng'] = np.random.RandomState(seed)
 
     # Rules to train and test. Rules in a set are trained together
     if rule_trains is None:
@@ -404,8 +405,6 @@ def train(train_dir,
         hparams['rule_probs'] = list(rule_prob/np.sum(rule_prob))
 
     tools.save_hparams(hparams, train_dir)
-    # rng can not be serialized
-    hparams['rng'] = np.random.RandomState(seed)
 
     # Build the model
     model = Model(train_dir, hparams=hparams)

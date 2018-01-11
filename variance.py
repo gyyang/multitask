@@ -45,7 +45,8 @@ def compute_variance(model_dir, rules=None, random_rotation=False):
 
         for rule in rules:
             trial = generate_trials(rule, hparams, 'test', noise_on=False)
-            h = model.get_h(trial.x)
+            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            h = sess.run(model.h, feed_dict=feed_dict)
             if random_rotation:
                 h = np.dot(h, random_ortho_matrix) # randomly rotate
 
