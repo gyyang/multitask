@@ -24,6 +24,8 @@ def compute_variance(model_dir, rules=None, random_rotation=False):
 
     Args:
         model_dir: str, the path of the model directory
+        rules: list of rules to compute variance, list of strings
+        random_rotation: boolean. If True, rotate the neural activity.
     """
     h_all_byrule  = OrderedDict()
     h_all_byepoch = OrderedDict()
@@ -62,7 +64,8 @@ def compute_variance(model_dir, rules=None, random_rotation=False):
     # ind_key_sort = np.lexsort(zip(*keys))
     # Using mergesort because it is stable
     ind_key_sort = np.argsort(zip(*keys)[1], kind='mergesort')
-    h_all_byepoch = OrderedDict([(keys[i], h_all_byepoch[keys[i]]) for i in ind_key_sort])
+    h_all_byepoch = OrderedDict(
+        [(keys[i], h_all_byepoch[keys[i]]) for i in ind_key_sort])
 
 
     for data_type in ['rule', 'epoch']:
@@ -82,10 +85,11 @@ def compute_variance(model_dir, rules=None, random_rotation=False):
             h_var_all[:, i] = val.var(axis=1).mean(axis=0)
 
         result = {'h_var_all' : h_var_all, 'keys' : h_all.keys()}
+        save_name = 'variance_'+data_type
         if random_rotation:
             save_name += '_rr'
 
-        fname = os.path.join('data','variance_'+data_type+save_name+'.pkl')
+        fname = os.path.join(model_dir, save_name+'.pkl')
         print('Variance saved at {:s}'.format(fname))
         with open(fname,'wb') as f:
             pickle.dump(result, f)
