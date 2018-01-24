@@ -53,11 +53,11 @@ save = True
 # data_type = 'epoch'
 
 class Analysis(object):
-    def __init__(self, save_name, data_type, normalization_method='max'):
-        config = tools.load_config(save_name)
+    def __init__(self, model_dir, data_type, normalization_method='max'):
+        hparams = tools.load_hparams(model_dir)
 
         # If not computed, use variance.py
-        fname = os.path.join('data','variance_'+data_type+save_name)
+        fname = os.path.join(model_dir, 'variance_'+data_type)
         with open(fname+'.pkl','rb') as f:
             res = pickle.load(f)
         h_var_all_ = res['h_var_all']
@@ -101,15 +101,10 @@ class Analysis(object):
             scores.append(score)
             labels_list.append(labels)
 
-        plt.figure()
-        plt.plot(n_clusters, scores, 'o-')
-        plt.xlabel('number of clusters')
-        plt.ylabel('silhouette score')
+        scores = np.array(scores)
 
         # Heuristic elbow method
         # Choose the number of cluster when Silhouette score first falls
-        scores = np.array(scores)
-
         if data_type == 'rule':
             i = np.where((scores[1:]-scores[:-1])<0)[0][0]
         else:
@@ -117,8 +112,8 @@ class Analysis(object):
             i = n_clusters.index(10)
 
         labels = labels_list[i]
-        print('Choosing {:d} clusters'.format(n_clusters[i]))
-
+        n_cluster = n_clusters[i]
+        print('Choosing {:d} clusters'.format(n_cluster))
 
         # Sort clusters by its task preference (important for consistency across nets)
         if data_type == 'rule':
@@ -137,7 +132,7 @@ class Analysis(object):
 
         # # Sort data by labels and by input connectivity
         # model = Model(save_name)
-        # config = model.config
+        # hparams = model.hparams
         # with tf.Session() as sess:
         #     model.restore(sess)
         #     var_list = sess.run(model.var_list)
@@ -149,8 +144,8 @@ class Analysis(object):
         # w_rec = var_list[2][n_input:, :].T
         # b_rec = var_list[3]
         #
-        # # nx, nh, ny = config['shape']
-        # nr = config['n_eachring']
+        # # nx, nh, ny = hparams['shape']
+        # nr = hparams['n_eachring']
         #
         # sort_by = 'w_in'
         # if sort_by == 'w_in':
@@ -169,15 +164,27 @@ class Analysis(object):
         self.h_normvar_all   = h_normvar_all[ind_sort, :]
         self.ind_active      = ind_active[ind_sort]
 
+        self.n_clusters = n_clusters
+        self.scores = scores
+        self.n_cluster = n_cluster
+
         self.h_var_all = h_var_all
         self.normalization_method = normalization_method
         self.labels = labels
         self.unique_labels = np.unique(labels)
 
-        self.save_name = save_name
-        self.config = config
+        self.model_dir = model_dir
+        self.hparams = hparams
         self.data_type = data_type
-        self.rules = config['rules']
+        self.rules = hparams['rules']
+
+    def plot_cluster_score(self):
+        """Plot the score by the number of clusters."""
+        plt.figure()
+        plt.plot(self.n_clusters, self.scores, 'o-')
+        plt.xlabel('Number of clusters')
+        plt.ylabel('Silhouette score')
+        plt.title('Chosen number of clusters: {:d}'.format(self.n_cluster))
 
     def plot_variance(self):
         labels = self.labels
@@ -336,12 +343,12 @@ class Analysis(object):
 
     def plot_connectivity_byclusters(self):
         """Plot connectivity of the model"""
-        nx, _, ny = self.config['shape']
+        nx, _, ny = self.hparams['shape']
         ind_active = self.ind_active
 
         # Sort data by labels and by input connectivity
         model = Model(self.save_name)
-        config = model.config
+        hparams = model.hparams
         with tf.Session() as sess:
             model.restore(sess)
             var_list = sess.run(model.var_list)
@@ -353,8 +360,8 @@ class Analysis(object):
         w_rec = var_list[2][nx:, :].T
         b_rec = var_list[3]
 
-        # nx, nh, ny = config['shape']
-        nr = config['n_eachring']
+        # nx, nh, ny = hparams['shape']
+        nr = hparams['n_eachring']
 
         sort_by = 'w_in'
         if sort_by == 'w_in':
@@ -370,10 +377,10 @@ class Analysis(object):
 
 
         ######################### Plotting Connectivity ###############################
-        nx, _, ny = self.config['shape']
+        nx, _, ny = self.hparams['shape']
         nh = len(self.ind_active)
-        nr = self.config['n_eachring']
-        nrule = len(self.config['rules'])
+        nr = self.hparams['n_eachring']
+        nrule = len(self.hparams['rules'])
 
 
         # Plot active units
@@ -425,7 +432,7 @@ class Analysis(object):
 
     def plot_lesions(self):
         labels = self.labels
-        n_output = self.config['shape'][2]
+        n_output = self.hparams['shape'][2]
         ######################### Causal Manipulation of Clusters #####################
         from network import get_perf
         from task import generate_trials
@@ -444,7 +451,7 @@ class Analysis(object):
 
         for i, lesion_units in enumerate(lesion_units_list):
             model = Model(self.save_name)
-            config = model.config
+            hparams = model.hparams
             with tf.Session() as sess:
                 model.restore(sess)
                 model.lesion_units(sess, lesion_units)
@@ -452,8 +459,8 @@ class Analysis(object):
                 perfs_store = list()
                 cost_store = list()
                 for rule in self.rules:
-                    # trial = generate_trials(rule=rule, config=config, mode='test')
-                    # trial = generate_trials(rule=rule, config=config, mode='random', batch_size=100)
+                    # trial = generate_trials(rule=rule, hparams=hparams, mode='test')
+                    # trial = generate_trials(rule=rule, hparams=hparams, mode='random', batch_size=100)
                     # y_hat_test = model.get_y(trial.x)
                     # feed_dict = {model.x: trial.x,
                     #              model.y: trial.y.reshape((-1,n_output)),
@@ -470,7 +477,7 @@ class Analysis(object):
                     clsq_tmp = list()
                     perf_tmp = list()
                     for i_rep in range(n_rep):
-                        trial = generate_trials(rule, config, 'random', batch_size=batch_size_test_rep)
+                        trial = generate_trials(rule, hparams, 'random', batch_size=batch_size_test_rep)
                         y_hat_test = model.get_y(trial.x)
                         feed_dict = {model.x: trial.x,
                                      model.y: trial.y.reshape((-1,n_output)),

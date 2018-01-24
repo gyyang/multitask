@@ -4,7 +4,9 @@ from __future__ import division
 
 import os
 import numpy as np
+
 import train
+import variance
 
 # TODO: make this flexible
 DATAPATH = os.path.join(os.getcwd(), 'data')
@@ -45,18 +47,21 @@ DATAPATH = os.path.join(os.getcwd(), 'data')
 #             compute_replacerule_performance(save_name, setup, restore=False)
 
 
-def train_mante_local():
-    """Local training of only the Mante task."""
-    hparams = {'learning_rate': 0.001, 'in_type': 'multi'}
-    train_dir = os.path.join(DATAPATH, 'debug')
-    train.train(train_dir, hparams=hparams, ruleset='mante', seed=0)
+def train_mante(seed=0, train_dir='train_mante'):
+    """Training of only the Mante task."""
+    hparams = {'target_perf': 0.9}
+    train_dir = os.path.join(DATAPATH, train_dir, str(seed))
+    train.train(train_dir, hparams=hparams, ruleset='mante', seed=seed)
 
 
-def train_all_local():
-    """Local training of all tasks."""
-    train_dir = os.path.join(DATAPATH, 'debug')
+def train_all(seed=0, train_dir='train_all'):
+    """Training of all tasks."""
+    train_dir = os.path.join(DATAPATH, train_dir, str(seed))
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir, ruleset='all', rule_prob_map=rule_prob_map, seed=0)
+    train.train(train_dir,
+                ruleset='all',
+                rule_prob_map=rule_prob_map,
+                seed=seed)
 
 
 def train_vary_hparams(i):
@@ -83,16 +88,19 @@ def train_vary_hparams(i):
 
     # Set up new hyperparameter
     hparams = dict()
+    hparams['target_perf'] = 0.8
     for key, index in zip(keys, indices):
         hparams[key] = hp_ranges[key][index]
 
     train_dir = os.path.join(DATAPATH, 'debug', str(i))
-    train.train(train_dir, hparams, ruleset='mante', max_steps=2000)
+    train.train(train_dir, hparams, ruleset='mante', max_steps=1e7)
+
+    variance.compute_variance(train_dir)
 
 
 if __name__ == '__main__':
-    # train_mante_local()
-    # train_all_local()
-    for i in range(10):
-        train_vary_hparams(i)
+    train_mante()
+    # train_all()
+    # for i in range(10):
+    #     train_vary_hparams(i)
 

@@ -1,30 +1,47 @@
 #! /usr/bin/env python
 """
-Sample script for performing common tasks.
-
-If you use this script to run jobs on a cluster don't forget to change the `queue`
-argument in `write_jobfile`. Of course, you may have to modify the function
-itself depending on your setup.
-
+Launching jobs on the NYU cluster
 """
 from __future__ import absolute_import
 
 import os
+import argparse
 import subprocess
 import numpy as np
+
 import tools
 
-
-#=========================================================================================
-# Submit a job
-#=========================================================================================
+parser = argparse.ArgumentParser()
+parser.add_argument('run')
+args = parser.parse_args()
 
 sbatchpath = './sbatch/'
 scratchpath = '/scratch/gy441/multitask/'
 
+if args.run == 'all':
+    for seed in range(0, 20):
+        jobname = 'train_all_{:d}'.format(seed)
+        train_arg = 'seed={:d}'.format(seed)
+        cmd = r'''python -c "import experiment as e;e.train_all('''+\
+              train_arg+''')"'''
+
+        jobfile = tools.write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
+if args.run == 'mante':
+    for seed in range(0, 20):
+        jobname = 'train_mante_{:d}'.format(seed)
+        train_arg = 'seed={:d}'.format(seed)
+        cmd = r'''python -c "import experiment as e;e.train_mante('''+\
+              train_arg+''')"'''
+
+        jobfile = tools.write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
 
 # Current continual learning version
-if True:
+if args.run == 'cont':
     s = 1
     n_unit = 256
     for seed in range(0,20):
@@ -48,26 +65,9 @@ if True:
             jobfile = tools.write_jobfile(cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
             subprocess.call(['sbatch', jobfile])
 
-
-if True:
-    # nunits = [128, 256, 512]
-    nunits = [256]
-    s_list = [0]
-    for seed in range(0,20):
-        for nunit in nunits:
-            jobname = 'job_{:d}_{:d}'.format(seed, nunit)
-            train_arg = 'nunit={:d}'.format(nunit)
-            train_arg += ',seed={:d}'.format(seed)
-            # train_arg += ',incomplete_set=True'
-
-            cmd     = r'''python -c "import paper as p;p.main_train('''+train_arg+''')"'''
-
-            jobfile = tools.write_jobfile(cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
-            subprocess.call(['sbatch', jobfile])
-
-
 # Grid search
-if False:
+if args.run == 'grid':
+    raise NotImplementedError()
     s = 1
     n_unit = 256
     for seed in range(5):

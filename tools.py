@@ -100,45 +100,20 @@ def write_jobfile(cmd, jobname, sbatchpath, scratchpath,
     """
     Create a job file.
 
-    Parameters
-    ----------
+    Args:
+        cmd : str, Command to execute.
+        jobname : str, Name of the job.
+        sbatchpath : str, Directory to store SBATCH file in.
+        scratchpath : str, Directory to store output files in.
+        nodes : int, optional, Number of compute nodes.
+        ppn : int, optional, Number of cores per node.
+        gpus : int, optional, Number of GPU cores.
+        mem : int, optional, Amount, in GB, of memory.
+        ndays : int, optional, Running time, in days.
+        queue : str, optional, Queue name.
 
-    cmd : str
-          Command to execute.
-
-    jobname : str
-              Name of the job.
-
-    sbatchpath : str
-              Directory to store SBATCH file in.
-
-    scratchpath : str
-                  Directory to store output files in.
-
-    nodes : int, optional
-            Number of compute nodes.
-
-    ppn : int, optional
-          Number of cores per node.
-
-    gpus : int, optional
-           Number of GPU cores.
-
-    mem : int, optional
-          Amount, in GB, of memory.
-
-    ndays : int, optional
-            Running time, in days.
-
-    queue : str, optional
-            Queue name.
-
-    Returns
-    -------
-
-    jobfile : str
-              Path to the job file.
-
+    Returns:
+        jobfile : str, Path to the job file.
     """
 
     mkdir_p(sbatchpath)

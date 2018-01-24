@@ -78,13 +78,13 @@ def get_default_hparams(ruleset):
             # number of output units
             'n_output': n_output,
             # number of recurrent units
-            'n_rnn': 64,
+            'n_rnn': 256,
             # number of input units
             'ruleset': ruleset,
             # name to save
             'save_name': 'test',
             # learning rate
-            'learning_rate': 0.01,
+            'learning_rate': 0.001,
             # intelligent synapses parameters, tuple (c, ksi)
             'param_intsyn': None
             }
@@ -205,7 +205,7 @@ def do_eval(sess, model, log, rule_train):
 
 def train_old(train_dir,
           hparams=None,
-          max_steps=1000000,
+          max_steps=1e7,
           display_step=500,
           ruleset='mante',
           reuse=False,
@@ -350,7 +350,7 @@ def train_old(train_dir,
 
 def train(train_dir,
           hparams=None,
-          max_steps=1000000,
+          max_steps=1e7,
           display_step=500,
           ruleset='mante',
           rule_trains=None,
