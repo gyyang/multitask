@@ -16,13 +16,24 @@ parser.add_argument('run')
 args = parser.parse_args()
 
 sbatchpath = './sbatch/'
-scratchpath = '/scratch/gy441/multitask/'
+scratchpath = '/scratch/mj98-share/multitask-master_testmaddy/'
 
 if args.run == 'all':
     for seed in range(0, 20):
         jobname = 'train_all_{:d}'.format(seed)
         train_arg = 'seed={:d}'.format(seed)
         cmd = r'''python -c "import experiment as e;e.train_all('''+\
+              train_arg+''')"'''
+
+        jobfile = tools.write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
+if args.run == 'all_varyhp': 
+    for seed in range(0, 64):
+        jobname = 'train_varyhp_{:d}'.format(seed)
+        train_arg = '{:d}'.format(seed)
+        cmd = r'''python -c "import experiment as e;e.train_vary_hparams('''+\
               train_arg+''')"'''
 
         jobfile = tools.write_jobfile(
