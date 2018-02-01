@@ -196,6 +196,9 @@ def do_eval(sess, model, log, rule_train):
     perf_tests_mean = np.mean([log['perf_'+r][-1] for r in rule_tmp])
     log['perf_avg'].append(perf_tests_mean)
 
+    perf_tests_min = np.min([log['perf_'+r][-1] for r in rule_tmp])
+    log['perf_min'].append(perf_tests_min)
+
     # Saving the model
     model.save()
     tools.save_log(log)
@@ -433,7 +436,9 @@ def train(train_dir,
                     log['trials'].append(step * hparams['batch_size_train'])
                     log['times'].append(time.time()-t_start)
                     log = do_eval(sess, model, log, hparams['rule_trains'])
-                    if log['perf_avg'][-1] > model.hparams['target_perf']:
+                    #if log['perf_avg'][-1] > model.hparams['target_perf']:
+                    #check if minimum performance is above target    
+                    if log['perf_min'][-1] > model.hparams['target_perf']:
                         print('Perf reached the target: {:0.2f}'.format(
                             hparams['target_perf']))
                         break
