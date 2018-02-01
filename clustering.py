@@ -105,8 +105,10 @@ class Analysis(object):
 
         # Heuristic elbow method
         # Choose the number of cluster when Silhouette score first falls
+        # Choose the number of cluster when Silhouette score is maximum
         if data_type == 'rule':
-            i = np.where((scores[1:]-scores[:-1])<0)[0][0]
+            #i = np.where((scores[1:]-scores[:-1])<0)[0][0]
+            i = np.argmax(scores)
         else:
             # The more rigorous method doesn't work well in this case
             i = n_clusters.index(10)
@@ -340,7 +342,7 @@ class Analysis(object):
             # Plot single example neuron in time
             pretty_singleneuron_plot(self.save_name, ['fdgo'], [self.ind_active[ind]],
                                      epoch=None, save=save, ylabel_firstonly=True)
-
+            
     def plot_connectivity_byclusters(self):
         """Plot connectivity of the model"""
         nx, _, ny = self.hparams['shape']
