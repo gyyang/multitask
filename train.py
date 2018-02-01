@@ -198,7 +198,7 @@ def do_eval(sess, model, log, rule_train):
 
     # Saving the model
     model.save()
-    tools.save_log(log, hparams['save_name'])
+    tools.save_log(log)
 
     return log
 
@@ -415,7 +415,9 @@ def train(train_dir,
 
     # Store results
     log = defaultdict(list)
-
+    
+    log['train_dir'] = train_dir 
+    
     # Record time
     t_start = time.time()
 
