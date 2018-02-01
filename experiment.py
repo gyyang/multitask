@@ -71,7 +71,7 @@ def train_vary_hparams(i):
     """
     # Ranges of hyperparameters to loop over
     hp_ranges = dict()
-    hp_ranges['activation'] = ['relu', 'tanh']
+    hp_ranges['activation'] = ['softplus','relu', 'tanh']
     hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
     hp_ranges['w_rec_init'] = ['diag', 'randortho']
     hp_ranges['l1_h'] = [0, 1e-4]
@@ -85,7 +85,7 @@ def train_vary_hparams(i):
 
     # Set up new hyperparameter
     hparams = dict()
-    hparams['target_perf'] = 0.95#0.8
+    hparams['target_perf'] = 0.9#0.8
     for key, index in zip(keys, indices):
         hparams[key] = hp_ranges[key][index]
 
