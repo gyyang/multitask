@@ -41,8 +41,9 @@ def valid_save_names(save_pattern):
     return [f[:-10] for f in os.listdir('data/') if fnmatch.fnmatch(f, save_pattern+'.ckpt.meta')]
 
 
-def load_log(save_name):
+#def load_log(save_name): 
     """Load the log file of model save_name"""
+"""
     fname = os.path.join('data','log_'+save_name+'.pkl')
     if not os.path.isfile(fname):
         return None
@@ -50,11 +51,29 @@ def load_log(save_name):
     with open(fname, 'rb') as f:
         log = pickle.load(f)
     return log
+"""    
 
+def load_log(train_dir):
+    """Load the log file of model save_name"""
+    fname = os.path.join(train_dir,'log.pkl')
+    if not os.path.isfile(fname):
+        return None
 
-def save_log(log, save_name):
-    """Save the log file of model save_name"""
-    with open(os.path.join('data', 'log_'+save_name+'.pkl'), 'wb') as f:
+    with open(fname, 'rb') as f:
+        log = pickle.load(f)
+    return log
+    
+#def save_log(log, save_name): 
+#save log file also in debug/number/ folder
+#    """Save the log file of model save_name"""
+#    with open(os.path.join('data', 'log_'+save_name+'.pkl'), 'wb') as f:
+#        pickle.dump(log, f)          
+
+def save_log(log): 
+#    """Save the log file of model """
+    model_dir = log['train_dir']
+    fname = os.path.join(model_dir, 'log.pkl')
+    with open(fname,'wb') as f:
         pickle.dump(log, f)
 
 
