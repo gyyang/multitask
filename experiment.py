@@ -58,10 +58,7 @@ def train_all(seed=0, train_dir='train_all'):
     """Training of all tasks."""
     train_dir = os.path.join(DATAPATH, train_dir, str(seed))
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir,
-                ruleset='all',
-                rule_prob_map=rule_prob_map,
-                seed=seed)
+    train.train(train_dir,ruleset='all',rule_prob_map=rule_prob_map,seed=seed)
 
 
 def train_vary_hparams(i):
@@ -88,19 +85,28 @@ def train_vary_hparams(i):
 
     # Set up new hyperparameter
     hparams = dict()
-    hparams['target_perf'] = 0.8
+    hparams['target_perf'] = 0.95#0.8
     for key, index in zip(keys, indices):
         hparams[key] = hp_ranges[key][index]
 
     train_dir = os.path.join(DATAPATH, 'debug', str(i))
-    train.train(train_dir, hparams, ruleset='mante', max_steps=1e7)
+    #train.train(train_dir, hparams, ruleset='mante', max_steps=1e7)
+    rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
+    train.train(train_dir, hparams, ruleset='all',rule_prob_map=rule_prob_map, max_steps=1e8)
 
     variance.compute_variance(train_dir)
 
 
 if __name__ == '__main__':
+    """ 
     train_mante()
     # train_all()
     # for i in range(10):
     #     train_vary_hparams(i)
+    """ 
+
+    #train_all()
+    for i in np.arange(0,3):
+        #train_vary_hparams(i)
+        train_all(i)
 
