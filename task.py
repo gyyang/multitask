@@ -1538,7 +1538,8 @@ def delaymatchcategory_original(config, mode, **kwargs):
 
     return trial
 
-rule_mapping = {'testinit'          : test_init,
+
+rule_mapping = {'testinit': test_init,
                 'fdgo'              : fdgo,
                 'reactgo'           : reactgo,
                 'delaygo'           : delaygo,
