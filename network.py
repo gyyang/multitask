@@ -15,7 +15,7 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.util import nest
 from tensorflow.python.ops import rnn
-from tensorflow.python.ops.rnn_cell_impl import RNNCell, _linear
+from tensorflow.python.ops.rnn_cell_impl import RNNCell
 
 import tools
 
@@ -96,7 +96,7 @@ def get_perf(y_hat, y_loc):
     return perf
 
 
-class LeakyRNNCell(RNNCell):
+class LeakyRNNCell_obsolete(RNNCell):
     """The most basic Leaky RNN cell."""
 
     def __init__(self,
@@ -201,6 +201,144 @@ class LeakyRNNCell(RNNCell):
                 (1-self._alpha)*state + self._alpha*self._activation(
                 _linear([inputs, state], self._num_units, True) +
                 tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma)))
+
+        return output, output
+
+
+class LeakyRNNCell(RNNCell):
+    """The most basic RNN cell.
+
+    Args:
+        num_units: int, The number of units in the RNN cell.
+        activation: Nonlinearity to use.    Default: `tanh`.
+        reuse: (optional) Python boolean describing whether to reuse variables
+         in an existing scope.    If not `True`, and the existing scope already has
+         the given variables, an error is raised.
+        name: String, the name of the layer. Layers with the same name will
+            share weights, but to avoid mistakes we require reuse=True in such
+            cases.
+    """
+
+    def __init__(self,
+                 num_units,
+                 n_input,
+                 alpha,
+                 sigma_rec=0,
+                 activation='softplus',
+                 w_rec_init='diag',
+                 rng=None,
+                 reuse=None,
+                 name=None):
+        super(LeakyRNNCell, self).__init__(_reuse=reuse, name=name)
+
+        # Inputs must be 2-dimensional.
+        # self.input_spec = base_layer.InputSpec(ndim=2)
+
+        self._num_units = num_units
+        self._w_rec_init = w_rec_init
+        self._reuse = reuse
+
+        if activation == 'softplus':
+            self._activation = tf.nn.softplus
+            self._bias_start = 0.
+            self._w_in_start = 1.0
+            if self._w_rec_init == 'diag':
+                self._w_rec_start = 0.54
+            elif self._w_rec_init == 'randortho':
+                self._w_rec_start = 1.0
+            elif self._w_rec_init == 'randgauss':
+                self._w_rec_start = 1.0
+        elif activation == 'tanh':
+            self._activation = tf.tanh
+            self._bias_start = 0.
+            self._w_in_start = 1.0
+            self._w_rec_start = 1.0
+        elif activation == 'relu':
+            self._activation = tf.nn.relu
+            self._bias_start = 0.5
+            self._w_in_start = 1.0
+            if self._w_rec_init == 'diag':
+                self._w_rec_start = 0.54
+            elif self._w_rec_init == 'randortho':
+                self._w_rec_start = 0.5
+            elif self._w_rec_init == 'randgauss':
+                self._w_rec_start = 1.0
+        elif activation == 'suplin':
+            self._activation = lambda x: tf.square(tf.nn.relu(x))
+            self._bias_start = 0.5
+            self._w_in_start = 1.0
+            if self._w_rec_init == 'diag':
+                self._w_rec_start = 0.01  # Only using this now
+            elif self._w_rec_init == 'randortho':
+                self._w_rec_start = 1.0
+            elif self._w_rec_init == 'randgauss':
+                self._w_rec_start = 1.0
+        else:
+            raise ValueError('Unknown activation')
+        self._alpha = alpha
+        self._sigma = np.sqrt(2*alpha) * sigma_rec
+        if rng is None:
+            self.rng = np.random.RandomState()
+        else:
+            self.rng = rng
+
+        # Generate initialization matrix
+        n_hidden = self._num_units
+        w_in0 = (self.rng.randn(n_input, n_hidden) /
+                 np.sqrt(n_input) * self._w_in_start)
+
+        if self._w_rec_init == 'diag':
+            w_rec0 = self._w_rec_start*np.eye(n_hidden)
+        elif self._w_rec_init == 'randortho':
+            w_rec0 = self._w_rec_start*gen_ortho_matrix(n_hidden, rng=self.rng)
+        elif self._w_rec_init == 'randgauss':
+            w_rec0 = (self._w_rec_start *
+                      self.rng.randn(n_hidden, n_hidden)/np.sqrt(n_hidden))
+
+        matrix0 = np.concatenate((w_in0, w_rec0), axis=0)
+
+        self.w_rnn0 = matrix0
+        self._initializer = tf.constant_initializer(matrix0, dtype=tf.float32)
+
+    @property
+    def state_size(self):
+        return self._num_units
+
+    @property
+    def output_size(self):
+        return self._num_units
+
+    def build(self, inputs_shape):
+        if inputs_shape[1].value is None:
+            raise ValueError(
+                "Expected inputs.shape[-1] to be known, saw shape: %s"
+                                             % inputs_shape)
+
+        input_depth = inputs_shape[1].value
+        self._kernel = self.add_variable(
+                'kernel',
+                shape=[input_depth + self._num_units, self._num_units],
+                initializer=self._initializer)
+        self._bias = self.add_variable(
+                'bias',
+                shape=[self._num_units],
+                initializer=init_ops.zeros_initializer(dtype=self.dtype))
+
+        self.built = True
+
+    def call(self, inputs, state):
+        """Most basic RNN: output = new_state = act(W * input + U * state + B)."""
+
+        gate_inputs = math_ops.matmul(
+            array_ops.concat([inputs, state], 1), self._kernel)
+        gate_inputs = nn_ops.bias_add(gate_inputs, self._bias)
+
+        noise = tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma)
+        gate_inputs = gate_inputs + noise
+
+        output = self._activation(gate_inputs)
+
+        output = (1-self._alpha) * state + self._alpha * output
 
         return output, output
 
