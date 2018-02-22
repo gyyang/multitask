@@ -24,16 +24,21 @@ train_dirs = [d for d in train_dirs if 'variance_rule.pkl' in [f for f in listdi
 
 # Compute the number of clusters
 n_clusters = list()
+scores = list()
+
 hparams_list = list()
 for train_dir in train_dirs:
     hparams = tools.load_hparams(train_dir)
     #check if performance exceeds target
     log = tools.load_log(train_dir) 
-    if log['perf_avg'][-1] > hparams['target_perf']: 
+    #if log['perf_avg'][-1] > hparams['target_perf']: 
+    if log['perf_min'][-1] > hparams['target_perf']:         
     
         # variance.compute_variance(train_dir)
         analysis = clustering.Analysis(train_dir, 'rule')
         n_clusters.append(analysis.n_cluster)
+        scores.append(analysis.scores)
+        analysis.plot_cluster_score()
         hparams_list.append(hparams)
     
         #analysis.plot_example_unit()
@@ -43,5 +48,5 @@ for train_dir in train_dirs:
 
 plt.figure()
 plt.plot(n_clusters)
-
+#min score 90% -- softplus ---- pick cluster with max sil score. 
 
