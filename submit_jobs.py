@@ -18,6 +18,81 @@ args = parser.parse_args()
 sbatchpath = './sbatch/'
 scratchpath = '/scratch/mj98-share/multitask-master_testmaddy/'
 
+
+
+def write_jobfile(cmd, jobname, sbatchpath, scratchpath,
+                  nodes=1, ppn=1, gpus=0, mem=16, nhours=12):
+    """
+    Create a job file.
+
+    Args:
+        cmd : str, Command to execute.
+        jobname : str, Name of the job.
+        sbatchpath : str, Directory to store SBATCH file in.
+        scratchpath : str, Directory to store output files in.
+        nodes : int, optional, Number of compute nodes.
+        ppn : int, optional, Number of cores per node.
+        gpus : int, optional, Number of GPU cores.
+        mem : int, optional, Amount, in GB, of memory.
+        ndays : int, optional, Running time, in days.
+        queue : str, optional, Queue name.
+
+    Returns:
+        jobfile : str, Path to the job file.
+    """
+
+    tools.mkdir_p(sbatchpath)
+    jobfile = os.path.join(sbatchpath, jobname + '.s')
+    logname = os.path.join('log', jobname)
+
+    if gpus == 0:
+        with open(jobfile, 'w') as f:
+            f.write(
+                '#! /bin/bash\n'
+                + '\n'
+                + '#SBATCH --nodes={}\n'.format(nodes)
+                #+ '#SBATCH --ntasks=1\n'
+                + '#SBATCH --ntasks-per-node=1\n'
+                + '#SBATCH --cpus-per-task={}\n'.format(ppn)
+                + '#SBATCH --mem={}GB\n'.format(mem)
+                + '#SBATCH --time={}:00:00\n'.format(nhours)
+                + '#SBATCH --job-name={}\n'.format(jobname[0:16])
+                + '#SBATCH --output={}log/{}.o\n'.format(scratchpath, jobname[0:16])
+                + '\n'
+                + 'cd {}\n'.format(scratchpath)
+                + 'pwd > {}.log\n'.format(logname)
+                + 'date >> {}.log\n'.format(logname)
+                + 'which python >> {}.log\n'.format(logname)
+                + '{} >> {}.log 2>&1\n'.format(cmd, logname)
+                + '\n'
+                + 'exit 0;\n'
+                )
+    else:
+        with open(jobfile, 'w') as f:
+            f.write(
+                '#! /bin/bash\n'
+                + '\n'
+                + '#SBATCH --nodes={}\n'.format(nodes)
+                + '#SBATCH --ntasks-per-node=1\n'
+                + '#SBATCH --cpus-per-task={}\n'.format(ppn)
+                + '#SBATCH --mem={}GB\n'.format(mem)
+                + '#SBATCH --partition=xwang_gpu\n'
+                + '#SBATCH --gres=gpu:1\n'
+                + '#SBATCH --time={}:00:00\n'.format(nhours)
+                + '#SBATCH --job-name={}\n'.format(jobname[0:16])
+                + '#SBATCH --output={}log/{}.o\n'.format(scratchpath, jobname[0:16])
+                + '\n'
+                + 'cd {}\n'.format(scratchpath)
+                + 'pwd > {}.log\n'.format(logname)
+                + 'date >> {}.log\n'.format(logname)
+                + 'which python >> {}.log\n'.format(logname)
+                + '{} >> {}.log 2>&1\n'.format(cmd, logname)
+                + '\n'
+                + 'exit 0;\n'
+                )
+    return jobfile
+
+
 if args.run == 'all':
     for seed in range(0, 20):
         jobname = 'train_all_{:d}'.format(seed)
@@ -25,7 +100,7 @@ if args.run == 'all':
         cmd = r'''python -c "import experiment as e;e.train_all('''+\
               train_arg+''')"'''
 
-        jobfile = tools.write_jobfile(
+        jobfile = write_jobfile(
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
@@ -36,7 +111,7 @@ if args.run == 'all_varyhp':
         cmd = r'''python -c "import experiment as e;e.train_vary_hparams('''+\
               train_arg+''')"'''
 
-        jobfile = tools.write_jobfile(
+        jobfile = write_jobfile(
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
@@ -47,7 +122,7 @@ if args.run == 'mante':
         cmd = r'''python -c "import experiment as e;e.train_mante('''+\
               train_arg+''')"'''
 
-        jobfile = tools.write_jobfile(
+        jobfile = write_jobfile(
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
@@ -73,12 +148,12 @@ if args.run == 'cont':
 
             cmd     = r'''python -c "import paper as p;p.cont_train('''+train_arg+''')"'''
 
-            jobfile = tools.write_jobfile(cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+            jobfile = write_jobfile(cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
             subprocess.call(['sbatch', jobfile])
 
 # Grid search
 if args.run == 'grid':
-    raise NotImplementedError()
+    raise NotImplemente55rror()
     s = 1
     n_unit = 256
     for seed in range(5):
@@ -91,5 +166,6 @@ if args.run == 'grid':
 
                 cmd     = r'''python -c "import paper as p;p.cont_train('''+train_arg+''')"'''
 
-                jobfile = tools.write_jobfile(cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+                jobfile = write_jobfile(cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
                 subprocess.call(['sbatch', jobfile])
+
