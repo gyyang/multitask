@@ -60,6 +60,20 @@ def popvec(y):
     return np.mod(loc, 2*np.pi)
 
 
+def tf_popvec(y):
+    """Population vector read-out in tensorflow."""
+
+    num_units = y.get_shape().as_list()[-1]
+    pref = np.arange(0, 2 * np.pi, 2 * np.pi / num_units)  # preferences
+    cos_pref = np.cos(pref)
+    sin_pref = np.sin(pref)
+    temp_sum = tf.reduce_sum(y, axis=-1)
+    temp_cos = tf.reduce_sum(y * cos_pref, axis=-1) / temp_sum
+    temp_sin = tf.reduce_sum(y * sin_pref, axis=-1) / temp_sum
+    loc = tf.atan2(temp_sin, temp_cos)
+    return tf.mod(loc, 2*np.pi)
+
+
 def get_perf(y_hat, y_loc):
     """Get performance.
 
@@ -547,6 +561,9 @@ class Model(object):
 
         if hparams is None:
             hparams = tools.load_hparams(save_dir)
+            if hparams is None:
+                raise ValueError(
+                    'No hparams found for save_dir {:s}'.format(save_dir))
 
         tf.set_random_seed(hparams['seed'])
         rng = np.random.RandomState(hparams['seed'])
@@ -642,6 +659,7 @@ class Model(object):
 
         self.y_hat = tf.reshape(y_hat,
                                 (-1, tf.shape(self.h)[1], hparams['n_output']))
+        self.y_hat_loc = tf_popvec(self.y_hat)
 
         self.var_list = tf.trainable_variables()
 
