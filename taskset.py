@@ -1,6 +1,6 @@
 """
-Task set analysis (temporary name)
-Analyze how state-space of stimulus-averaged activity
+Task set analysis
+Analyze the state-space of stimulus-averaged activity
 """
 
 from __future__ import division
@@ -9,18 +9,19 @@ import os
 import numpy as np
 import pickle
 from collections import OrderedDict
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-import time
-import seaborn.apionly as sns
+import seaborn as sns
 
 import tensorflow as tf
 
-from task import rule_name, generate_trials
+from task import rule_name
+from task import generate_trials
 from network import Model
+from network import get_perf
 import tools
 
 save = True
+
 
 def get_dim(h, zero_mean=False):
     # Get effective dimension
@@ -39,10 +40,17 @@ def get_dim(h, zero_mean=False):
 
     return N_eff
 
-class TaskSetAnalysis(object):
-    def __init__(self, model_dir, rules=None):
-        ########################## Running the network ################################
 
+class TaskSetAnalysis(object):
+    """Analyzing the representation of tasks."""
+
+    def __init__(self, model_dir, rules=None):
+        """Initialization.
+
+        Args:
+            model_dir: str, model directory
+            rules: None or a list of rules
+        """
         # Stimulus-averaged traces
         h_stimavg_byrule  = OrderedDict()
         h_stimavg_byepoch = OrderedDict()
@@ -180,13 +188,13 @@ class TaskSetAnalysis(object):
 
         return h_trans
 
-    def compute_and_plot_taskspace(self,
+    def obsolete_compute_and_plot_taskspace(self,
                rules=None, epochs=None, **kwargs):
 
         h_trans = self.compute_taskspace(rules=rules, epochs=epochs, **kwargs)
         self.plot_taskspace(h_trans, **kwargs)
 
-    def plot_taskspace(self, h_trans, epochs=None, dim_reduction_type='MDS',
+    def obsolete_plot_taskspace(self, h_trans, epochs=None, dim_reduction_type='MDS',
                        plot_text=True, color_by_feature=False, feature=None,
                        figsize=(4,4), markersize=5, plot_label=True,
                        plot_special_point=False, plot_arrow=False, **kwargs):
@@ -348,7 +356,8 @@ class TaskSetAnalysis(object):
                 self.dimpair_lastt_byepoch[(key1, key2)] = dim_pair
                 self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
 
-def plot_dim():
+
+def obsolete_plot_dim():
     model_dir = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(model_dir)
     tsa.compute_dim()
@@ -375,7 +384,8 @@ def plot_dim():
     plt.savefig('figure/temp.pdf', transparent=True)
     plt.show()
 
-def plot_dimpair():
+
+def obsolete_plot_dimpair():
     model_dir = 'allrule_weaknoise_400'
     tsa = TaskSetAnalysis(model_dir)
     tsa.compute_dim()
@@ -426,129 +436,6 @@ def plot_dimpair():
     plt.savefig('figure/temp.pdf',transparent=True)
 
 
-def temp_quantify_composition():
-    model_dir = 'allrule_weaknoise_360'
-    tsa = TaskSetAnalysis(model_dir)
-
-    epochs = ['stim1']
-    rules = None
-
-    h = tsa.filter(tsa.h_stimavg_byepoch, epochs=epochs, rules=rules, get_lasttimepoint=True)
-
-    h_keys = h.keys()
-    n_epochs = len(h_keys)
-
-    def unit_vector(vector):
-        """ Returns the unit vector of the vector.  """
-        return vector / np.linalg.norm(vector)
-
-    def angle_between(v1, v2):
-        """ Returns the angle in radians between vectors 'v1' and 'v2'::"""
-        v1_u = unit_vector(v1)
-        v2_u = unit_vector(v2)
-        return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
-
-    shuffle = False
-    h2 = OrderedDict()
-    for key in h_keys:
-        h2[key] = h[key][-1]
-        if shuffle:
-            # h2[key] = np.random.permutation(h2[key])
-            h2[key] = h2[key] * np.random.uniform(0.5,1.5)
-
-    vec_diffs = list()
-    vec_ids = list()
-    for i in range(n_epochs):
-        for j in range(n_epochs):
-            if i != j:
-                hi = h2[h_keys[i]]
-                hj = h2[h_keys[j]]
-
-                vec_diffs.append(hi-hj)
-                vec_ids.append([i, j])
-
-    n_diff = len(vec_diffs)
-
-
-    from scipy.stats import linregress
-    from numpy.linalg import norm
-
-    #==============================================================================
-    # tmps = list()
-    # tmp_ids = list()
-    # for i in range(n_diff-1):
-    #     for j in range(i+1, n_diff):
-    #         # tmps.append(angle_between(vec_diffs[i], vec_diffs[j]))
-    #
-    #         # slope, intercept, r_value, p_value, std_err = linregress(vec_diffs[i],vec_diffs[j])
-    #         # tmps.append(p_value)
-    #
-    #         # tmps.append(norm(vec_diffs[i]-vec_diffs[j]))
-    #         tmps.append(norm(vec_diffs[i]-vec_diffs[j])/np.sqrt(norm(vec_diffs[i])*norm(vec_diffs[i])))
-    #         tmp_ids.append(vec_ids[i] + vec_ids[j])
-    # tmps = np.array(tmps)
-    # # _ = plt.hist(tmps, bins=200)
-    #
-    #
-    # hist, bins_edge = np.histogram(tmps, bins=200)
-    # plt.plot((bins_edge[:-1]+bins_edge[1:])/2, hist)
-    # # plt.plot((bins_edge0[:-1]+bins_edge0[1:])/2, hist0, 'red')
-    #
-    #
-    # ind_sort = np.argsort(tmps)
-    # for i in ind_sort[:100]:
-    #     print('')
-    #     print('{:0.4f}'.format(tmps[i])),
-    #     for j in tmp_ids[i]:
-    #         print('{:15s}'.format(rule_name[h_keys[j][0]])),
-    #
-    #
-    # aa = h2[('fdgo','stim1')]-h2[('fdanti','stim1')]
-    # bb = h2[('delaygo','stim1')]-h2[('delayanti','stim1')]
-    #
-    # aa = h2[('dmcgo','stim1')]-h2[('dmcnogo','stim1')]
-    # bb = h2[('dmsgo','stim1')]-h2[('dmsnogo','stim1')]
-    #
-    # aa = h2[('multidm','stim1')]-h2[('dm2','stim1')]
-    # bb = h2[('multidm','stim1')]-h2[('contextdm2','stim1')]
-    #==============================================================================
-
-
-    tmps = list()
-    tmp_ids = list()
-    for i in range(n_epochs):
-        ki = h_keys[i]
-        hi = h2[ki]
-        for j in range(i+1, n_epochs):
-            kj = h_keys[j]
-            hj = h2[kj]
-            for k in range(j+1, n_epochs):
-                kk = h_keys[k]
-                hk = h2[kk]
-                for l in range(k+1, n_epochs):
-                    kl = h_keys[l]
-                    hl = h2[kl]
-                    hij = hi - hj
-                    hkl = hk - hl
-                    tmp = norm(hij - hkl)/np.sqrt(norm(hij)*norm(hkl))
-                    tmps.append(tmp)
-                    # tmp_ids.append([h_keys[m][0] for m in [i,j,k,l]])
-                    tmp_ids.append([ki[0],kj[0],kk[0],kl[0]])
-
-    ind_sort = np.argsort(tmps)
-    for i in ind_sort[:10]:
-        print('')
-        print('{:0.4f}'.format(tmps[i])),
-        for j in tmp_ids[i]:
-            print('{:15s}'.format(rule_name[j])),
-
-    for i in ind_sort[:10]:
-        rules = tmp_ids[i]
-        tsa.plot_taskspace(rules=rules, epochs=['stim1'], plot_text=True, figsize=(1.5,1.5),
-                           markersize=3, plot_label=False, dim_reduction_type='PCA', get_lasttimepoint=True)
-
-########################## Plotting task representation #######################
-
 def compute_taskspace(model_dir, setup, restore=False, representation='rate'):
     if setup == 1:
         rules = ['fdgo', 'fdanti', 'delaygo', 'delayanti']
@@ -557,15 +444,17 @@ def compute_taskspace(model_dir, setup, restore=False, representation='rate'):
     elif setup == 3:
         rules = ['dmsgo', 'dmcgo', 'dmsnogo', 'dmcnogo']
     elif setup == 4:
-        rules = ['contextdelaydm1', 'contextdelaydm2', 'multidelaydm', 'contextdm1', 'contextdm2', 'multidm']
+        rules = ['contextdelaydm1', 'contextdelaydm2', 'multidelaydm',
+                 'contextdm1', 'contextdm2', 'multidm']
     elif setup == 5:
-        rules = ['contextdelaydm1', 'contextdelaydm2', 'multidelaydm', 'delaydm1', 'delaydm2',
-             'contextdm1', 'contextdm2', 'multidm', 'dm1', 'dm2',]
+        rules = ['contextdelaydm1', 'contextdelaydm2', 'multidelaydm',
+                 'delaydm1', 'delaydm2', 'contextdm1', 'contextdm2',
+                 'multidm', 'dm1', 'dm2',]
     elif setup == 6:
         rules = ['fdgo', 'delaygo', 'contextdm1', 'contextdelaydm1']
 
     if representation == 'rate':
-        fname = 'taskset{:d}_space_'.format(setup)+'.pkl'
+        fname = 'taskset{:d}_space'.format(setup)+'.pkl'
         fname = os.path.join(model_dir, fname)
 
         if restore and os.path.isfile(fname):
@@ -659,10 +548,13 @@ def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
 
     if kwargs['setup'] == 1:
         arrow_starts = [h_trans[('fdgo','stim1')], h_trans[('fdanti','stim1')]]
-        arrow_ends   = [h_trans[('delaygo','stim1')], h_trans[('delayanti','stim1')]]
+        arrow_ends   = [h_trans[('delaygo','stim1')],
+                        h_trans[('delayanti','stim1')]]
     elif kwargs['setup'] == 2:
-        arrow_starts = [h_trans[('contextdm1','stim1')], h_trans[('contextdelaydm1','stim1')]]
-        arrow_ends   = [h_trans[('contextdm2','stim1')], h_trans[('contextdelaydm2','stim1')]]
+        arrow_starts = [h_trans[('contextdm1','stim1')],
+                        h_trans[('contextdelaydm1','stim1')]]
+        arrow_ends   = [h_trans[('contextdm2','stim1')],
+                        h_trans[('contextdelaydm2','stim1')]]
     else:
         plot_arrow = False
 
@@ -712,9 +604,11 @@ def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
 
     return (lx, ly)
 
+
 def plot_taskspace(model_dir, setup=1, restore=True, representation='rate'):
-    h_trans = compute_taskspace(model_dir, setup, restore=restore, representation=representation)
-    save_name = 'taskset{:d}_space_'.format(setup)
+    h_trans = compute_taskspace(
+        model_dir, setup, restore=restore, representation=representation)
+    save_name = 'taskset{:d}_space'.format(setup)
     _plot_taskspace(h_trans, save_name, setup=setup)
 
 
@@ -723,6 +617,10 @@ def plot_taskspace_group(model_dir, setup=1, restore=True, representation='rate'
 
     Args:
         model_dir : the root directory for all models to analyse
+        setup: int, the combination of rules to use
+        restore: bool, whether to restore results
+        representation: 'rate' or 'weight'
+        flip_sign: bool, whether to flip signs for consistency
     '''
 
     model_dirs = tools.valid_model_dirs(model_dir)
@@ -732,7 +630,8 @@ def plot_taskspace_group(model_dir, setup=1, restore=True, representation='rate'
     h_trans_all = OrderedDict()
     i = 0
     for model_dir in model_dirs:
-        h_trans = compute_taskspace(model_dir, setup, restore=restore, representation=representation)
+        h_trans = compute_taskspace(
+            model_dir, setup, restore=restore, representation=representation)
 
         if flip_sign:
             if setup != 1:
@@ -768,22 +667,19 @@ def plot_taskspace_group(model_dir, setup=1, restore=True, representation='rate'
 
     lxy = _plot_taskspace(h_trans_all, fig_name, setup=setup)
     fig_name = fig_name + '_example'
-    lxy = _plot_taskspace(h_trans_all, fig_name, setup=setup, plot_example=True, lxy=lxy)
+    lxy = _plot_taskspace(h_trans_all, fig_name, setup=setup,
+                          plot_example=True, lxy=lxy)
 
-#################### Replacing rule ##########################################
+
 def run_network_replacerule(model_dir, rule, replace_rule, rule_strength):
-    '''
-    Run the network but with replaced rule input weight
-    :param rule: the rule to run
-    :param rule_X: A numpy array of rules, whose values will be used to replace
-    :param beta: the weights for each rule_X vector used.
-    If beta='fit', use the best linear fit
+    """Run the network but with replaced rule input weights.
 
-    The rule input connection will be replaced by
-    sum_i rule_connection(rule_X_i) * beta_i
-    '''
-    from network import get_perf
-
+    Args:
+        model_dir: model directory
+        rule: the rule to test on
+        replace_rule: a list of rule input units to use
+        rule_strength: the relative strength of each replace rule unit
+    """
     model = Model(model_dir)
     hparams = model.hparams
     with tf.Session() as sess:
@@ -804,15 +700,9 @@ def run_network_replacerule(model_dir, rule, replace_rule, rule_strength):
 
     return np.mean(perf_rep), rule_strength
 
-    #     # Get performance
-    #     trial = generate_trials(rule, hparams, 'test',
-    #                              replace_rule=replace_rule, rule_strength=rule_strength)
-    #
-    #     y_hat_test = model.get_y(trial.x)
-    #
-    # return np.mean(get_perf(y_hat_test, trial.y_loc)), rule_strength
 
 def replace_rule_name(replace_rule, rule_strength):
+    """Helper function to replace rule name"""
     # little helper function
     name = ''
     counter = 0
@@ -834,8 +724,9 @@ def replace_rule_name(replace_rule, rule_strength):
     name = name[:-1]
     return name
 
+
 def compute_replacerule_performance(model_dir, setup, restore=False):
-    #Compute the performance of one task given a replaced rule input
+    """Compute the performance of one task given a replaced rule input."""
 
     if setup == 1:
         rule = 'delayanti'
@@ -871,7 +762,7 @@ def compute_replacerule_performance(model_dir, setup, restore=False):
     else:
         raise ValueError('Unknown setup value')
 
-    fname = 'taskset{:d}_perf_'.format(setup)+'.pkl'
+    fname = 'taskset{:d}_perf'.format(setup)+'.pkl'
     fname = os.path.join(model_dir, fname)
 
     if restore and os.path.isfile(fname):
@@ -897,6 +788,7 @@ def compute_replacerule_performance(model_dir, setup, restore=False):
         print('Results stored at : '+fname)
 
     return perfs, rule, names
+
 
 def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, fig_name=None):
     save = True
@@ -930,7 +822,7 @@ def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, fig
     ax.set_xlim([0,1.05])
     ax.set_ylim([-0.5,len(perfs)-0.5])
     if fig_name is None:
-        fig_name = 'taskset{:d}_perf_'.format(setup)
+        fig_name = 'taskset{:d}_perf'.format(setup)
     if save:
         plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
     plt.show()
@@ -961,29 +853,4 @@ def plot_replacerule_performance_group(model_dir, setup=1, restore=True):
 
 
 if __name__ == '__main__':
-    from network import get_perf
-    model_dir = 'data/train_all/0'
-    model = Model(model_dir)
-    hparams = model.hparams
-
-    rule = 'contextdelaydm1'
-    replace_rule = ['contextdelaydm1', 'contextdelaydm2', 'contextdm1', 'contextdm2']
-    rule_strength = [0, 1, 1, -1]
-    with tf.Session() as sess:
-        model.restore()
-
-        # Get performance
-        batch_size_test = 1000
-        n_rep = 20
-        batch_size_test_rep = int(batch_size_test / n_rep)
-        perf_rep = list()
-        for i_rep in range(n_rep):
-            trial = generate_trials(rule, hparams, 'random',
-                                    batch_size=batch_size_test_rep,
-                                    replace_rule=replace_rule,
-                                    rule_strength=rule_strength)
-            feed_dict = tools.gen_feed_dict(model, trial, hparams)
-            y_hat_test = sess.run(model.y_hat, feed_dict=feed_dict)
-
-            perf_rep.append(np.mean(get_perf(y_hat_test, trial.y_loc)))
-    print(perf_rep)
+    pass
