@@ -94,22 +94,19 @@ def compute_variance(model_dir, rules=None, random_rotation=False):
         with open(fname,'wb') as f:
             pickle.dump(result, f)
 
-def _compute_hist_varprop(save_name, rule_pair, random_rotation=False):
+def _compute_hist_varprop(model_dir, rule_pair, random_rotation=False):
     data_type = 'rule'
     assert len(rule_pair) == 2
     assert data_type == 'rule'
 
-    fname = os.path.join('data','variance_'+data_type+save_name)
+    fname = os.path.join(model_dir, 'variance_'+data_type)
     if random_rotation:
         fname += '_rr'
     fname += '.pkl'
     if not os.path.isfile(fname):
         # If not computed, compute now
-        compute_variance(save_name, random_rotation=random_rotation)
+        compute_variance(model_dir, random_rotation=random_rotation)
 
-    # If not computed, use variance.py
-    # fname = 'data/variance'+data_type+save_name+'_rr'
-    # fname = 'data/variance'+data_type+save_name
     with open(fname,'rb') as f:
         res = pickle.load(f)
     h_var_all = res['h_var_all']
@@ -141,16 +138,16 @@ def _compute_hist_varprop(save_name, rule_pair, random_rotation=False):
     return hist, bins_edge
 
 
-def compute_hist_varprop(save_pattern, rule_pair, random_rotation=False):
+def compute_hist_varprop(model_dir, rule_pair, random_rotation=False):
     data_type = 'rule'
     assert len(rule_pair) == 2
     assert data_type == 'rule'
 
-    save_names = tools.valid_save_names(save_pattern)
+    model_dirs = tools.valid_model_dirs(model_dir)
 
     hists = list()
-    for save_name in save_names:
-        hist, bins_edge_ = _compute_hist_varprop(save_name, rule_pair, random_rotation)
+    for model_dir in model_dirs:
+        hist, bins_edge_ = _compute_hist_varprop(model_dir, rule_pair, random_rotation)
         if hist is None:
             continue
         else:
@@ -209,7 +206,7 @@ def _plot_hist_varprop(hist_plot, bins_edge, rule_pair, hist_example=None,
             figname = 'plot_hist_varprop_tmp.pdf'
         plt.savefig(os.path.join('figure', figname), transparent=True)
 
-def plot_hist_varprop(save_pattern, rule_pair, plot_example=False, **kwargs):
+def plot_hist_varprop(model_dir, rule_pair, plot_example=False, **kwargs):
     '''
     Plot histogram of proportion of variance for some tasks across units
     :param save_name:
@@ -218,7 +215,7 @@ def plot_hist_varprop(save_pattern, rule_pair, plot_example=False, **kwargs):
     :return:
     '''
 
-    hists, bins_edge = compute_hist_varprop(save_pattern, rule_pair)
+    hists, bins_edge = compute_hist_varprop(model_dir, rule_pair)
 
     hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
 
@@ -231,11 +228,11 @@ def plot_hist_varprop(save_pattern, rule_pair, plot_example=False, **kwargs):
         hist_example = None
 
     hist_plot = hist_med
-    figname = ('plot_hist_varprop'+rule_pair[0]+rule_pair[1]+save_pattern+'.pdf').replace('*','')
+    figname = ('plot_hist_varprop'+rule_pair[0]+rule_pair[1]+'.pdf').replace('*','')
     _plot_hist_varprop(hist_plot, bins_edge, rule_pair=rule_pair,
                        hist_example=hist_example, figname=figname, **kwargs)
 
-def plot_hist_varprop_selection(save_pattern):
+def plot_hist_varprop_selection(model_dir):
     rule_pair_list = [('dm1', 'dm2'),
                   ('contextdm1', 'contextdm2'),
                   ('dm1', 'fdanti'),
@@ -246,14 +243,14 @@ def plot_hist_varprop_selection(save_pattern):
                   ('contextdm1', 'contextdelaydm1')]
     for rule_pair in rule_pair_list:
         try:
-            plot_hist_varprop(save_pattern=save_pattern,
+            plot_hist_varprop(model_dir=model_dir,
                               rule_pair=rule_pair,
                               plot_legend=(rule_pair==('dm1', 'fdanti')),
                               plot_example=True)
         except ValueError:
             pass
 
-def plot_hist_varprop_all(save_pattern, plot_control=True):
+def plot_hist_varprop_all(model_dir, plot_control=True):
     '''
     Plot histogram of proportion of variance for some tasks across units
     :param save_name:
@@ -262,11 +259,9 @@ def plot_hist_varprop_all(save_pattern, plot_control=True):
     :return:
     '''
 
-    save_names = tools.valid_save_names(save_pattern)
+    model_dirs = tools.valid_model_dirs(model_dir)
 
-    hparams_path = os.path.join('data','hparams_'+save_names[0]+'.pkl')
-    with open(hparams_path,'rb') as f:
-        hparams = pickle.load(f)
+    hparams = tools.load_hparams(model_dirs[0])
     rules = hparams['rules']
 
     figsize = (7, 7)
@@ -288,12 +283,12 @@ def plot_hist_varprop_all(save_pattern, plot_control=True):
             if j == 0:
                 ax.set_ylabel(rule_name[rules[i]], fontsize=fs, rotation=45, ha='right')
 
-            hists, bins_edge = compute_hist_varprop(save_pattern, (rules[i], rules[j]))
+            hists, bins_edge = compute_hist_varprop(model_dir, (rules[i], rules[j]))
             hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
 
             # Control case
             if plot_control:
-                hists_ctrl, _ = compute_hist_varprop(save_pattern, (rules[i], rules[j]), random_rotation=True)
+                hists_ctrl, _ = compute_hist_varprop(model_dir, (rules[i], rules[j]), random_rotation=True)
                 _, hist_med_ctrl, _ = np.percentile(hists_ctrl, [10, 50, 90], axis=0)
                 ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med_ctrl, color='gray', lw=0.75)
 
@@ -313,7 +308,7 @@ def plot_hist_varprop_all(save_pattern, plot_control=True):
 
     # plt.tight_layout()
     if save:
-        figname = ('figure/plot_hist_varprop_all'+save_pattern+'.pdf').replace('*','')
+        figname = ('figure/plot_hist_varprop_all.pdf').replace('*','')
         plt.savefig(figname, transparent=True)
 
 def plot_hist_varprop_selection_cont():
