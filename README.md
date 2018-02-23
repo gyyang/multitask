@@ -1,5 +1,13 @@
 # MultiTask Network
 
+## Dependencies
+The training code is only tested in Tensorflow 1.5.0 and Python 2.7.
+
+Scikit-learn (http://scikit-learn.org/stable/) is necessary for many analyses.
+
+The seaborn package (https://seaborn.pydata.org/) is needed to correctly
+plot some analysis results.
+
 ## Reproducing results from the paper
 All analysis results from the paper can be reproduced from paper.py
 
