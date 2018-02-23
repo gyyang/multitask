@@ -34,24 +34,18 @@ def gen_feed_dict(model, trial, hparams):
     return feed_dict
 
 
-def valid_save_names(save_pattern):
-    """Get valid save_names given a save pattern"""
+def _contain_model_file(model_dir):
+    """Check if the directory contains model files."""
+    for f in os.listdir(model_dir):
+        if 'model.ckpt' in f:
+            return True
+    return False
 
-    # Get all model names that match patterns (strip off .ckpt.meta at the end)
-    return [f[:-10] for f in os.listdir('data/') if fnmatch.fnmatch(f, save_pattern+'.ckpt.meta')]
 
+def valid_model_dirs(model_dir):
+    """Get valid model directories given a root directory."""
+    return [x[0] for x in os.walk(model_dir) if _contain_model_file(x[0])]
 
-#def load_log(save_name): 
-    """Load the log file of model save_name"""
-"""
-    fname = os.path.join('data','log_'+save_name+'.pkl')
-    if not os.path.isfile(fname):
-        return None
-
-    with open(fname, 'rb') as f:
-        log = pickle.load(f)
-    return log
-"""    
 
 def load_log(train_dir):
     """Load the log file of model save_name"""
@@ -62,15 +56,10 @@ def load_log(train_dir):
     with open(fname, 'rb') as f:
         log = pickle.load(f)
     return log
-    
-#def save_log(log, save_name): 
-#save log file also in debug/number/ folder
-#    """Save the log file of model save_name"""
-#    with open(os.path.join('data', 'log_'+save_name+'.pkl'), 'wb') as f:
-#        pickle.dump(log, f)          
+
 
 def save_log(log): 
-#    """Save the log file of model """
+    """Save the log file of model."""
     model_dir = log['train_dir']
     fname = os.path.join(model_dir, 'log.pkl')
     with open(fname,'wb') as f:
