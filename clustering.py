@@ -47,10 +47,6 @@ kelly_colors = \
 
 save = True
 
-########################## Running the network ################################
-# save_name = '1_256migrate'
-# data_type = 'rule'
-# data_type = 'epoch'
 
 class Analysis(object):
     def __init__(self, model_dir, data_type, normalization_method='max'):
@@ -77,7 +73,6 @@ class Analysis(object):
             h_normvar_all = h_var_all
         else:
             raise NotImplementedError()
-
 
         ################################## Clustering ################################
         from sklearn import metrics
@@ -340,27 +335,24 @@ class Analysis(object):
 
             from standard_analysis import pretty_singleneuron_plot
             # Plot single example neuron in time
-            pretty_singleneuron_plot(self.save_name, ['fdgo'], [self.ind_active[ind]],
+            pretty_singleneuron_plot(self.model_dir, ['fdgo'], [self.ind_active[ind]],
                                      epoch=None, save=save, ylabel_firstonly=True)
             
     def plot_connectivity_byclusters(self):
         """Plot connectivity of the model"""
-        nx, _, ny = self.hparams['shape']
+
         ind_active = self.ind_active
 
         # Sort data by labels and by input connectivity
-        model = Model(self.save_name)
+        model = Model(self.model_dir)
         hparams = model.hparams
         with tf.Session() as sess:
-            model.restore(sess)
-            var_list = sess.run(model.var_list)
-
-        # Get connectivity
-        w_out = var_list[0].T
-        b_out = var_list[1]
-        w_in  = var_list[2][:nx, :].T
-        w_rec = var_list[2][nx:, :].T
-        b_rec = var_list[3]
+            model.restore()
+            w_in = sess.run(model.w_in).T
+            w_rec = sess.run(model.w_rec).T
+            w_out = sess.run(model.w_out).T
+            b_rec = sess.run(model.b_rec)
+            b_out = sess.run(model.b_out)
 
         # nx, nh, ny = hparams['shape']
         nr = hparams['n_eachring']
@@ -376,14 +368,12 @@ class Analysis(object):
 
         ind_sort        = np.lexsort((w_prefs, self.labels)) # sort by labels then by prefs
 
-
-
         ######################### Plotting Connectivity ###############################
-        nx, _, ny = self.hparams['shape']
+        nx = self.hparams['n_input']
+        ny = self.hparams['n_output']
         nh = len(self.ind_active)
         nr = self.hparams['n_eachring']
         nrule = len(self.hparams['rules'])
-
 
         # Plot active units
         _w_rec  = w_rec[ind_sort,:][:,ind_sort]
@@ -433,9 +423,9 @@ class Analysis(object):
 
 
     def plot_lesions(self):
+        """Lesion individual cluster and show performance."""
         labels = self.labels
-        n_output = self.hparams['shape'][2]
-        ######################### Causal Manipulation of Clusters #####################
+
         from network import get_perf
         from task import generate_trials
 
@@ -452,10 +442,10 @@ class Analysis(object):
         cost_changes = list()
 
         for i, lesion_units in enumerate(lesion_units_list):
-            model = Model(self.save_name)
+            model = Model(self.model_dir)
             hparams = model.hparams
             with tf.Session() as sess:
-                model.restore(sess)
+                model.restore()
                 model.lesion_units(sess, lesion_units)
 
                 perfs_store = list()
@@ -479,12 +469,11 @@ class Analysis(object):
                     clsq_tmp = list()
                     perf_tmp = list()
                     for i_rep in range(n_rep):
-                        trial = generate_trials(rule, hparams, 'random', batch_size=batch_size_test_rep)
-                        y_hat_test = model.get_y(trial.x)
-                        feed_dict = {model.x: trial.x,
-                                     model.y: trial.y.reshape((-1,n_output)),
-                                     model.c_mask: trial.c_mask}
-                        c_lsq = sess.run(model.cost_lsq, feed_dict=feed_dict)
+                        trial = generate_trials(rule, hparams, 'random',
+                                                batch_size=batch_size_test_rep)
+                        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                        y_hat_test, c_lsq = sess.run(
+                            [model.y_hat, model.cost_lsq], feed_dict=feed_dict)
 
                         # Cost is first summed over time, and averaged across batch and units
                         # We did the averaging over time through c_mask
@@ -497,8 +486,6 @@ class Analysis(object):
                     perfs_store.append(np.mean(perf_tmp))
                     cost_store.append(np.mean(clsq_tmp))
 
-
-
             perfs_store = np.array(perfs_store)
             cost_store = np.array(cost_store)
 
@@ -509,14 +496,12 @@ class Analysis(object):
                 perfs_changes.append(perfs_store-perfs_store_list[0])
                 cost_changes.append(cost_store-cost_store_list[0])
 
-        perfs_store_list = np.array(perfs_store_list)
-        cost_store_list = np.array(cost_store_list)
-
         perfs_changes = np.array(perfs_changes)
         cost_changes = np.array(cost_changes)
 
 
-        cb_labels = ['Performance change after lesioning', 'Cost change after lesioning']
+        cb_labels = ['Performance change after lesioning',
+                     'Cost change after lesioning']
         vmins = [-0.5, -0.5]
         vmaxs = [+0.5, +0.5]
         ticks = [[-0.5,0.5], [-0.5, 0.5]]
@@ -530,8 +515,8 @@ class Analysis(object):
         for i in range(2):
             fig = plt.figure(figsize=figsize)
             ax = fig.add_axes(rect)
-            im = ax.imshow(changes_plot[i].T, cmap='coolwarm',
-                           aspect='auto', interpolation='nearest', vmin=vmins[i], vmax=vmaxs[i])
+            im = ax.imshow(changes_plot[i].T, cmap='coolwarm', aspect='auto',
+                           interpolation='nearest', vmin=vmins[i], vmax=vmaxs[i])
 
             tick_names = [rule_name[r] for r in self.rules]
             _ = plt.yticks(range(len(tick_names)), tick_names,
