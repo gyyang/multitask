@@ -1,5 +1,15 @@
 # MultiTask Network
 
+## Reproducing results from the paper
+All analysis results from the paper can be reproduced from paper.py
+
+Simply go to paper.py, set the model_dir to be the directory of your 
+model files, uncomment the analyses you want to run, and run the file.
+
+## Pretrained models
+We provide 20 pretrained models and their auxillary data files for
+analyses.
+
 ## Get started with training
 Train a default network with:
 
