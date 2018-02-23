@@ -659,7 +659,9 @@ class Model(object):
 
         self.y_hat = tf.reshape(y_hat,
                                 (-1, tf.shape(self.h)[1], hparams['n_output']))
-        self.y_hat_loc = tf_popvec(self.y_hat)
+        y_hat_fix, y_hat_ring = tf.split(
+            self.y_hat, [1, hparams['n_output']-1], axis=-1)
+        self.y_hat_loc = tf_popvec(y_hat_ring)
 
         self.var_list = tf.trainable_variables()
 

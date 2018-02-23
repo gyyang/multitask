@@ -8,7 +8,7 @@ from __future__ import absolute_import
 import tools
 
 
-def main_train(nunit, seed, incomplete_set=False):
+def main_train_obsolete(nunit, seed, incomplete_set=False):
     """Training setup for paper.
 
     Args:
@@ -111,56 +111,59 @@ if __name__ == '__main__':
 
     # Performance Analysis-----------------------------------------------------
     # Name of the model
-    save_name = '0_256paper'
+    model_dir = 'data/train_all/1'
 
     import performance
     import standard_analysis
+    import antitask
+    import clustering
+    import variance
+    import taskset
 
-    # standard_analysis.schematic_plot(save_name) # Generate schematic
-    # performance.plot_performanceprogress(save_name) # Plot performance during training
-    # performance.psychometric_choice(save_name) # Psychometric for dm
-    # performance.psychometric_choiceattend(save_name, no_ylabel=True)
-    # performance.psychometric_choiceint(save_name, no_ylabel=True)
+    # standard_analysis.schematic_plot(model_dir=model_dir) # Generate schematic
+    # performance.plot_performanceprogress(model_dir) # Plot performance during training
+    # performance.psychometric_choice(model_dir) # Psychometric for dm
+    # performance.psychometric_choiceattend(model_dir, no_ylabel=True)
+    # performance.psychometric_choiceint(model_dir, no_ylabel=True)
 
-    save_names = tools.valid_save_names('*256paper')
-    # for save_name in save_names[3:4]:
+    # model_dirs = t
+    # tools.valid_model_dirs('*256paper')
+    # for model_dir in model_dirs[3:4]:
     #     for rule in ['dm1', 'contextdm1', 'multidm']:
-    #         # performance.compute_choicefamily_varytime(save_name, rule)
-    #         performance.plot_choicefamily_varytime(save_name, rule)
-    # performance.psychometric_delaychoice_varytime(save_name, 'delaydm1')
+    #         # performance.compute_choicefamily_varytime(model_dir, rule)
+    #         performance.plot_choicefamily_varytime(model_dir, rule)
+    # performance.psychometric_delaychoice_varytime(model_dir, 'delaydm1')
 
     # Analysis of Anti tasks---------------------------------------------------
-    import antitask
-    # ATA = antitask.Analysis(save_name)
+
+    ATA = antitask.Analysis(model_dir)
     # ATA.plot_example_unit()
-    # ATA.plot_lesions()
+    ATA.plot_lesions()
     # ATA.plot_inout_connections()
     # ATA.plot_rec_connections()
     # ATA.plot_rule_connections()
 
     # Clustering Analysis------------------------------------------------------
-    import clustering
-    CA = clustering.Analysis(save_name, data_type='rule')
+
+    # CA = clustering.Analysis(model_dir, data_type='rule')
     # CA.plot_example_unit()
     # CA.plot_variance()
-    CA.plot_2Dvisualization()
+    # CA.plot_2Dvisualization()
     # CA.plot_lesions()
 
-    # import variance
-    # variance.compute_variance(save_name)
-    # CA = clustering.Analysis(save_name, data_type='epoch')
+
+    # variance.compute_variance(model_dir)
+    # CA = clustering.Analysis(model_dir, data_type='epoch')
     # CA.plot_variance()
     # CA.plot_2Dvisualization()
 
     # FTV Analysis-------------------------------------------------------------
     save_pattern='*256paper'
-    import variance
     # variance.plot_hist_varprop_selection(save_pattern)
     # variance.plot_hist_varprop_all(save_pattern)
 
     # Task Representation------------------------------------------------------
-    import taskset
-    # tsa = taskset.TaskSetAnalysis(save_name)
+    # tsa = taskset.TaskSetAnalysis(model_dir)
     # tsa.compute_and_plot_taskspace(
     #         epochs=['stim1'], dim_reduction_type='PCA')
 
@@ -183,4 +186,4 @@ if __name__ == '__main__':
     # performance.plot_finalperformance_cont('*2cont', '*0cont')
     # for save_pattern in ['*3cont']:
     #     variance.plot_hist_varprop_selection(save_pattern)
-    # performance.plot_performanceprogress(save_name='0_3seqlowlr') # Plot performance during training
+    # performance.plot_performanceprogress(model_dir='0_3seqlowlr') # Plot performance during training

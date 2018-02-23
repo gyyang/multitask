@@ -515,8 +515,11 @@ def to_savename(
 if __name__ == '__main__':
     pass
     run_analysis = []
-    train('debug', seed=1, hparams={'learning_rate': 0.001}, ruleset='mante',
-          display_step=500)
+    # train('debug', seed=1, hparams={'learning_rate': 0.001}, ruleset='mante',
+    #       display_step=500)
+    
+    rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
+    train('debug',ruleset='all',rule_prob_map=rule_prob_map,seed=1)
 
 #==============================================================================
 #     #maddy added - start

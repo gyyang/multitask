@@ -25,34 +25,34 @@ save = True
 
 class Analysis(object):
     """Analyze the Anti tasks"""
-    def __init__(self, save_name):
-        self.save_name = save_name
+    def __init__(self, model_dir):
+        self.model_dir = model_dir
         ############################### Run Model and Load Data #######################
-        model = Model(save_name)
-        self.config = model.config
-        n_input, n_hidden, n_output = self.config['shape']
+        model = Model(model_dir)
+        self.hparams = model.hparams
+        n_input = self.hparams['n_input']
         with tf.Session() as sess:
-            model.restore(sess)
+            model.restore()
             var_list = sess.run(model.var_list)
 
         # Get connectivity
+        # TODO(gryang): This is a really dumb way to get variables
         self.w_out = var_list[0].T
         self.b_out = var_list[1]
-        self.w_in  = var_list[2][:n_input, :].T
+        self.w_in = var_list[2][:n_input, :].T
         self.w_rec = var_list[2][n_input:, :].T
         self.b_rec = var_list[3]
 
-
         data_type  = 'rule'
-        with open('data/variance_'+data_type+save_name+'.pkl','rb') as f:
+        with open(model_dir + '/variance_'+data_type+'.pkl', 'rb') as f:
             res = pickle.load(f)
         h_var_all = res['h_var_all']
-        self.rules     = res['keys']
+        self.rules = res['keys']
 
         # First only get active units. Total variance across tasks larger than 1e-3
         ind_active = np.where(h_var_all.sum(axis=1) > 1e-3)[0]
         # ind_active = np.where(h_var_all.sum(axis=1) > 0.)[0]
-        h_var_all  = h_var_all[ind_active, :]
+        h_var_all = h_var_all[ind_active, :]
 
         # Normalize by the total variance across tasks
         h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
@@ -60,15 +60,15 @@ class Analysis(object):
         ########################## Get Anti Units ####################################
         # Directly search
         # This will be a stricter subset of the anti modules found in clustering results
-        self.rules_anti         = np.array(['fdanti', 'reactanti', 'delayanti'])
-        self.rules_nonanti      = np.array([r for r in self.rules if r not in self.rules_anti])
+        self.rules_anti = np.array(['fdanti', 'reactanti', 'delayanti'])
+        self.rules_nonanti = np.array([r for r in self.rules if r not in self.rules_anti])
 
         # Rule index used only for the rules
-        self.ind_rules_anti     = [self.rules.index(r) for r in self.rules_anti]
-        self.ind_rules_nonanti  = [self.rules.index(r) for r in self.rules_nonanti]
+        self.ind_rules_anti = [self.rules.index(r) for r in self.rules_anti]
+        self.ind_rules_nonanti = [self.rules.index(r) for r in self.rules_nonanti]
 
-        self.h_normvar_all_anti     = h_normvar_all[:, self.ind_rules_anti].sum(axis=1)
-        self.h_normvar_all_nonanti  = h_normvar_all[:, self.ind_rules_nonanti].sum(axis=1)
+        self.h_normvar_all_anti = h_normvar_all[:, self.ind_rules_anti].sum(axis=1)
+        self.h_normvar_all_nonanti = h_normvar_all[:, self.ind_rules_nonanti].sum(axis=1)
 
         # plt.figure()
         # _ = plt.hist(h_normvar_all_anti, bins=50)
@@ -88,12 +88,12 @@ class Analysis(object):
     def plot_example_unit(self):
         """Plot activity of an example unit"""
         from standard_analysis import pretty_singleneuron_plot
-        pretty_singleneuron_plot(self.save_name, ['fdanti', 'fdgo'], self.ind_anti_orig[2],
+        pretty_singleneuron_plot(self.model_dir, ['fdanti', 'fdgo'], self.ind_anti_orig[2],
                                  save=save, ylabel_firstonly = True)
 
     def plot_inout_connections(self):
         """Plot the input connections from stimulus units and the output connections to response units """
-        n_eachring = self.config['n_eachring']
+        n_eachring = self.hparams['n_eachring']
         w_in, w_out = self.w_in, self.w_out
 
         w_in_ = (w_in[:, 1:n_eachring+1]+w_in[:, 1+n_eachring:2*n_eachring+1])/2.
@@ -154,8 +154,8 @@ class Analysis(object):
 
         # Rule index for the connectivity
         from task import get_rule_index
-        indconn_rules_anti     = [get_rule_index(r, self.config) for r in self.rules_anti]
-        indconn_rules_nonanti  = [get_rule_index(r, self.config) for r in self.rules_nonanti]
+        indconn_rules_anti     = [get_rule_index(r, self.hparams) for r in self.rules_anti]
+        indconn_rules_nonanti  = [get_rule_index(r, self.hparams) for r in self.rules_nonanti]
 
         for ind, unit_type in zip([self.ind_anti_orig, self.ind_nonanti_orig],
                                   ['Anti units', 'Non-Anti units']):
@@ -183,7 +183,7 @@ class Analysis(object):
     def plot_rec_connections(self):
         """Plot connectivity between recurrent units"""
 
-        n_eachring = self.config['n_eachring']
+        n_eachring = self.hparams['n_eachring']
         w_in, w_rec, w_out = self.w_in, self.w_rec, self.w_out
 
         w_in_ = (w_in[:, 1:n_eachring+1]+w_in[:, 1+n_eachring:2*n_eachring+1])/2.
@@ -285,12 +285,10 @@ class Analysis(object):
             #     plt.savefig('figure/conn_'+unit_type+'_'+save_addon+'.pdf', transparent=True)
 
 
-# ########### Plot Causal Manipulation Results  #############################
-
     def plot_lesions(self):
-        """Plot results of lesioning"""
+        """Plot results of lesioning."""
 
-        n_hidden = self.config['shape'][1]
+        n_hidden = self.hparams['n_rnn']
         # Randomly select a group to lesion. The group has the same size as the anti group
         ind_randomselect = np.arange(n_hidden)
         np.random.shuffle(ind_randomselect)
@@ -305,15 +303,15 @@ class Analysis(object):
         names = ['Control', 'Anti units all lesioned', 'Random group lesioned']
 
         for lesion_units in lesion_units_list:
-            model = Model(self.save_name)
-            config = model.config
+            model = Model(self.model_dir)
+            hparams = model.hparams
             with tf.Session() as sess:
-                model.restore(sess)
+                model.restore()
                 model.lesion_units(sess, lesion_units)
 
                 perfs_store = list()
                 for rule in self.rules:
-                    trial = generate_trials(rule=rule, config=config, mode='test')
+                    trial = generate_trials(rule=rule, hparams=hparams, mode='test')
                     y_hat_test = model.get_y(trial.x)
                     perf = np.mean(get_perf(y_hat_test, trial.y_loc))
                     perfs_store.append(perf)
