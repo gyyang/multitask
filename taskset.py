@@ -40,7 +40,7 @@ def get_dim(h, zero_mean=False):
     return N_eff
 
 class TaskSetAnalysis(object):
-    def __init__(self, save_name, rules=None):
+    def __init__(self, model_dir, rules=None):
         ########################## Running the network ################################
 
         # Stimulus-averaged traces
@@ -49,30 +49,29 @@ class TaskSetAnalysis(object):
         # Last time points of epochs
         h_lastt_byepoch   = OrderedDict()
 
-        model = Model(save_name)
-        config = model.config
+        model = Model(model_dir)
+        hparams = model.hparams
 
         if rules is None:
             # Default value
-            rules = config['rules']
+            rules = hparams['rules']
         n_rules = len(rules)
 
         with tf.Session() as sess:
-            model.restore(sess)
-            nx, nh, ny = config['shape']
+            model.restore()
 
             for rule in rules:
-                trial = generate_trials(rule=rule, config=config, mode='test')
-
-                h = model.get_h(trial.x)
+                trial = generate_trials(rule=rule, hparams=hparams, mode='test')
+                feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                h = sess.run(model.h, feed_dict=feed_dict)
 
                 # Average across stimulus conditions
                 h_stimavg = h.mean(axis=1)
 
                 # dt_new = 50
-                # every_t = int(dt_new/config['dt'])
+                # every_t = int(dt_new/hparams['dt'])
 
-                t_start = int(500/config['dt']) # Important: Ignore the initial transition
+                t_start = int(500/hparams['dt']) # Important: Ignore the initial transition
                 # Average across stimulus conditions
                 h_stimavg_byrule[rule] = h_stimavg[t_start:, :]
 
@@ -92,7 +91,7 @@ class TaskSetAnalysis(object):
         self.h_stimavg_byrule  = h_stimavg_byrule
         self.h_stimavg_byepoch = h_stimavg_byepoch
         self.h_lastt_byepoch   = h_lastt_byepoch
-        self.save_name = save_name
+        self.model_dir = model_dir
 
     @staticmethod
     def filter(h, rules=None, epochs=None, non_rules=None, non_epochs=None,
@@ -350,8 +349,8 @@ class TaskSetAnalysis(object):
                 self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
 
 def plot_dim():
-    save_name = 'allrule_weaknoise_400'
-    tsa = TaskSetAnalysis(save_name)
+    model_dir = 'allrule_weaknoise_400'
+    tsa = TaskSetAnalysis(model_dir)
     tsa.compute_dim()
     
     epoch_names = tsa.dim_lastt_byepoch.keys()
@@ -377,8 +376,8 @@ def plot_dim():
     plt.show()
 
 def plot_dimpair():
-    save_name = 'allrule_weaknoise_400'
-    tsa = TaskSetAnalysis(save_name)
+    model_dir = 'allrule_weaknoise_400'
+    tsa = TaskSetAnalysis(model_dir)
     tsa.compute_dim()
     tsa.compute_dim_pair()
 
@@ -426,9 +425,10 @@ def plot_dimpair():
     plt.tick_params(axis='both', which='major', labelsize=7)
     plt.savefig('figure/temp.pdf',transparent=True)
 
+
 def temp_quantify_composition():
-    save_name = 'allrule_weaknoise_360'
-    tsa = TaskSetAnalysis(save_name)
+    model_dir = 'allrule_weaknoise_360'
+    tsa = TaskSetAnalysis(model_dir)
 
     epochs = ['stim1']
     rules = None
@@ -549,7 +549,7 @@ def temp_quantify_composition():
 
 ########################## Plotting task representation #######################
 
-def compute_taskspace(save_name, setup, restore=False, representation='rate'):
+def compute_taskspace(model_dir, setup, restore=False, representation='rate'):
     if setup == 1:
         rules = ['fdgo', 'fdanti', 'delaygo', 'delayanti']
     elif setup == 2:
@@ -565,8 +565,8 @@ def compute_taskspace(save_name, setup, restore=False, representation='rate'):
         rules = ['fdgo', 'delaygo', 'contextdm1', 'contextdelaydm1']
 
     if representation == 'rate':
-        fname = 'taskset{:d}_space_'.format(setup)+save_name+'.pkl'
-        fname = os.path.join('data', fname)
+        fname = 'taskset{:d}_space_'.format(setup)+'.pkl'
+        fname = os.path.join(model_dir, fname)
 
         if restore and os.path.isfile(fname):
             print('Reloading results from '+fname)
@@ -574,7 +574,7 @@ def compute_taskspace(save_name, setup, restore=False, representation='rate'):
                 h_trans = pickle.load(f)
 
         else:
-            tsa = TaskSetAnalysis(save_name, rules=rules)
+            tsa = TaskSetAnalysis(model_dir, rules=rules)
             h_trans = tsa.compute_taskspace(rules=rules, epochs=['stim1'],
                                             dim_reduction_type='PCA', setup=setup)
             with open(fname, 'wb') as f:
@@ -584,17 +584,15 @@ def compute_taskspace(save_name, setup, restore=False, representation='rate'):
     elif representation == 'weight':
         from task import get_rule_index
 
-        model = Model(save_name)
-        config = model.config
-        n_input, n_hidden, n_output = config['shape']
+        model = Model(model_dir)
+        hparams = model.hparams
+        n_hidden = hparams['n_rnn']
+        n_output = hparams['n_output']
         with tf.Session() as sess:
-            model.restore(sess)
-            var_list = sess.run(model.var_list)
+            model.restore()
+            w_in = sess.run(model.w_in).T
 
-        # Get connectivity
-        w_in  = var_list[2][:n_input, :].T
-
-        rule_indices = [get_rule_index(r, config) for r in rules]
+        rule_indices = [get_rule_index(r, hparams) for r in rules]
         w_rules = w_in[:, rule_indices]
 
         from sklearn.decomposition import PCA
@@ -714,26 +712,27 @@ def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
 
     return (lx, ly)
 
-def plot_taskspace(save_name, setup=1, restore=True, representation='rate'):
-    h_trans = compute_taskspace(save_name, setup, restore=restore, representation=representation)
-    save_name = 'taskset{:d}_space_'.format(setup)+save_name
+def plot_taskspace(model_dir, setup=1, restore=True, representation='rate'):
+    h_trans = compute_taskspace(model_dir, setup, restore=restore, representation=representation)
+    save_name = 'taskset{:d}_space_'.format(setup)
     _plot_taskspace(h_trans, save_name, setup=setup)
 
-def plot_taskspace_group(save_pattern, setup=1, restore=True, representation='rate', flip_sign=True):
-    '''Plot task space for a group of networks
+
+def plot_taskspace_group(model_dir, setup=1, restore=True, representation='rate', flip_sign=True):
+    '''Plot task space for a group of networks.
 
     Args:
-        save_pattern : should be a pattern for the networks, support Unix shell-style wildcard
+        model_dir : the root directory for all models to analyse
     '''
 
-    save_names = tools.valid_save_names(save_pattern)
+    model_dirs = tools.valid_model_dirs(model_dir)
     print('Analyzing models : ')
-    print(save_names)
+    print(model_dirs)
 
     h_trans_all = OrderedDict()
     i = 0
-    for save_name in save_names:
-        h_trans = compute_taskspace(save_name, setup, restore=restore, representation=representation)
+    for model_dir in model_dirs:
+        h_trans = compute_taskspace(model_dir, setup, restore=restore, representation=representation)
 
         if flip_sign:
             if setup != 1:
@@ -772,7 +771,7 @@ def plot_taskspace_group(save_pattern, setup=1, restore=True, representation='ra
     lxy = _plot_taskspace(h_trans_all, fig_name, setup=setup, plot_example=True, lxy=lxy)
 
 #################### Replacing rule ##########################################
-def run_network_replacerule(save_name, rule, replace_rule, rule_strength):
+def run_network_replacerule(model_dir, rule, replace_rule, rule_strength):
     '''
     Run the network but with replaced rule input weight
     :param rule: the rule to run
@@ -785,10 +784,10 @@ def run_network_replacerule(save_name, rule, replace_rule, rule_strength):
     '''
     from network import get_perf
 
-    model = Model(save_name)
-    config = model.config
+    model = Model(model_dir)
+    hparams = model.hparams
     with tf.Session() as sess:
-        model.restore(sess)
+        model.restore()
 
         # Get performance
         batch_size_test = 1000
@@ -796,16 +795,17 @@ def run_network_replacerule(save_name, rule, replace_rule, rule_strength):
         batch_size_test_rep = int(batch_size_test/n_rep)
         perf_rep = list()
         for i_rep in range(n_rep):
-            trial = generate_trials(rule, config, 'random', batch_size=batch_size_test_rep,
+            trial = generate_trials(rule, hparams, 'random', batch_size=batch_size_test_rep,
                                      replace_rule=replace_rule, rule_strength=rule_strength)
+            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            y_hat_test = sess.run(model.y_hat, feed_dict=feed_dict)
 
-            y_hat_test = model.get_y(trial.x)
             perf_rep.append(np.mean(get_perf(y_hat_test, trial.y_loc)))
 
     return np.mean(perf_rep), rule_strength
 
     #     # Get performance
-    #     trial = generate_trials(rule, config, 'test',
+    #     trial = generate_trials(rule, hparams, 'test',
     #                              replace_rule=replace_rule, rule_strength=rule_strength)
     #
     #     y_hat_test = model.get_y(trial.x)
@@ -834,7 +834,7 @@ def replace_rule_name(replace_rule, rule_strength):
     name = name[:-1]
     return name
 
-def compute_replacerule_performance(save_name, setup, restore=False):
+def compute_replacerule_performance(model_dir, setup, restore=False):
     #Compute the performance of one task given a replaced rule input
 
     if setup == 1:
@@ -871,8 +871,8 @@ def compute_replacerule_performance(save_name, setup, restore=False):
     else:
         raise ValueError('Unknown setup value')
 
-    fname = 'taskset{:d}_perf_'.format(setup)+save_name+'.pkl'
-    fname = os.path.join('data', fname)
+    fname = 'taskset{:d}_perf_'.format(setup)+'.pkl'
+    fname = os.path.join(model_dir, fname)
 
     if restore and os.path.isfile(fname):
         print('Reloading results from '+fname)
@@ -884,7 +884,7 @@ def compute_replacerule_performance(save_name, setup, restore=False):
         perfs = list()
         names = list()
         for rule_strength in rule_strengths:
-            perf, _ = run_network_replacerule(save_name, rule, replace_rule, rule_strength)
+            perf, _ = run_network_replacerule(model_dir, rule, replace_rule, rule_strength)
             perfs.append(perf)
             names.append(replace_rule_name(replace_rule, rule_strength))
 
@@ -935,18 +935,20 @@ def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, fig
         plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
     plt.show()
 
-def plot_replacerule_performance(save_name, setup, perfs_all=None, fig_name=None, restore=True):
-    perfs, rule, names = compute_replacerule_performance(save_name, setup, restore)
+
+def plot_replacerule_performance(model_dir, setup, perfs_all=None, fig_name=None, restore=True):
+    perfs, rule, names = compute_replacerule_performance(model_dir, setup, restore)
     _plot_replacerule_performance(perfs, rule, names, setup, perfs_all, fig_name)
 
-def plot_replacerule_performance_group(save_pattern, setup=1, restore=True):
-    save_names = tools.valid_save_names(save_pattern)
+
+def plot_replacerule_performance_group(model_dir, setup=1, restore=True):
+    model_dirs = tools.valid_model_dirs(model_dir)
     print('Analyzing models : ')
-    print(save_names)
+    print(model_dirs)
 
     perfs_plot = list()
-    for save_name in save_names:
-        perfs, rule, names = compute_replacerule_performance(save_name, setup, restore)
+    for model_dir in model_dirs:
+        perfs, rule, names = compute_replacerule_performance(model_dir, setup, restore)
         perfs_plot.append(perfs)
 
     perfs_plot = np.array(perfs_plot)
@@ -959,87 +961,29 @@ def plot_replacerule_performance_group(save_pattern, setup=1, restore=True):
 
 
 if __name__ == '__main__':
-    # save_type = 'allrule_softplus'
-    # save_type_end = 'largeinput'
-    # setup = 1
-    # compute_and_plot_replacerule_performance_type(save_type, setup, save_type_end=None)
+    from network import get_perf
+    model_dir = 'data/train_all/0'
+    model = Model(model_dir)
+    hparams = model.hparams
 
-    save_name = '2_256migrate'
-    # plot_taskspace(save_name)
-    # plot_weight_rule_PCA(save_name)
-    # for setup in range(7):
+    rule = 'contextdelaydm1'
+    replace_rule = ['contextdelaydm1', 'contextdelaydm2', 'contextdm1', 'contextdm2']
+    rule_strength = [0, 1, 1, -1]
+    with tf.Session() as sess:
+        model.restore()
 
-    # plot_dim()
-    # plot_dimpair()
+        # Get performance
+        batch_size_test = 1000
+        n_rep = 20
+        batch_size_test_rep = int(batch_size_test / n_rep)
+        perf_rep = list()
+        for i_rep in range(n_rep):
+            trial = generate_trials(rule, hparams, 'random',
+                                    batch_size=batch_size_test_rep,
+                                    replace_rule=replace_rule,
+                                    rule_strength=rule_strength)
+            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            y_hat_test = sess.run(model.y_hat, feed_dict=feed_dict)
 
-    # save_name = 'choicefamily_softplus_340'
-    # rules = ['contextdm1', 'contextdm2', 'dm1', 'dm2']
-    # rules = ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']
-    # rules = ['delaydm1', 'delaydm2', 'contextdm1', 'contextdm2']
-
-    save_name = '0_256migrate'
-    # rules = ['multidm', 'multidelaydm', 'contextdm1', 'contextdelaydm1']
-    # tsa = TaskSetAnalysis(save_name, rules=rules)
-    # tsa.plot_taskspace(rules=rules,
-    #                    epochs=['stim1'], plot_text=True,
-    #                            save_append='type'+str(4), figsize=(1.5,1.5),
-    #                            markersize=3, plot_label=False, dim_reduction_type='PCA',
-    #                            plot_special_point=False, plot_arrow=False, get_lasttimepoint=True)
-    # plot_weight_rule_PCA(save_name)
-
-
-    ######################### Plotting task space for all tasks ##################
-    save_name = '0_256migrate'
-    tsa = TaskSetAnalysis(save_name)
-    tsa.compute_and_plot_taskspace(epochs=['stim1'], dim_reduction_type='PCA')
-    # tsa.compute_and_plot_taskspace(epochs=['stim1', 'delay1', 'go1'], dim_reduction_type='MDS')
-
-    
-    # for feature in features:
-    #     tsa.compute_and_plot_taskspace(epochs=['stim1'], plot_text=False, color_by_feature=True,
-    #                        feature=feature, figsize=(1.0,1.0), markersize=2, plot_label=False)
-
-    ##################### Plotting task space with selected tasks #################
-    ################# & Plotting performance with replaced rule #################
-
-    save_pattern = '*256migrate'
-    # setups = [1] # Go, Anti family
-    # setups = [2] # Ctx DM family
-    setups = [1, 2]
-    # setups = [3]
-    for setup in setups:
-        pass
-        # plot_taskspace_group(save_pattern, setup=setup, restore=True, representation='rate')
-        # plot_taskspace_group(save_pattern, setup=setup, restore=True, representation='weight')
-        # plot_replacerule_performance_group(save_pattern, setup=setup, restore=True)
-
-    #################### Plotting trajectories in task space #####################
-    save_name = 'allrule_softplus_0_300mainfri'
-#==============================================================================
-#     rules = []
-#     rules+= ['reactgo', 'fdgo', 'delaygo']
-#     rules+= ['reactanti', 'fdanti', 'delayanti']
-#     # rules += ['contextdm1', 'contextdm2', 'contextdelaydm1', 'contextdelaydm2']
-#     # rules+= ['dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm']
-#     # rules+= ['delaydm1', 'delaydm2', 'contextdelaydm1', 'contextdelaydm2', 'multidelaydm']
-#     tsa = TaskSetAnalysis(save_name, rules=rules)
-#     h_trans = tsa.compute_taskspace(rules=rules, epochs=None,
-#                                     dim_reduction_type='PCA', get_lasttimepoint=False)
-# 
-#     from performance import rule_color
-#     dim0, dim1 = (0, 1) # plot dimensions
-# 
-#     plt.figure()
-#     for key, val in h_trans.iteritems():
-#         rule, epoch = key
-#         if epoch in ['stim1', 'stim2']:
-#             lw = 1
-#         elif epoch in ['delay1', 'delay2']:
-#             lw = 0.5
-#         elif epoch == 'go1':
-#             lw = 2
-#         else:
-#             raise NotImplementedError()
-#         color = np.array(rule_color[rule])
-#         plt.plot(val[:, dim0], val[:, dim1], color=color, lw=lw)
-#==============================================================================
+            perf_rep.append(np.mean(get_perf(y_hat_test, trial.y_loc)))
+    print(perf_rep)
