@@ -5,56 +5,15 @@ in a neural network trained to perform many cognitive tasks
 Yang GR et al. 2017 BioRxiv
 """
 from __future__ import absolute_import
-import tools
 
+import performance
+import standard_analysis
+import antitask
+import clustering
+import variance
+import taskset
 
-def main_train_obsolete(nunit, seed, incomplete_set=False):
-    """Training setup for paper.
-
-    Args:
-        nunit: int, number of units.
-        seed: int, seed.
-        incomplete_set : if True,
-            do not train 'delayanti' and 'contextdelaydm1'
-    """
-    from train import train
-    save_name = '{:d}_{:d}paper'.format(seed, nunit)
-
-    if incomplete_set:
-        save_name = '{:d}_{:d}incom'.format(seed, nunit)
-
-    ruleset = 'all'
-
-    rule_prob_map = dict()
-    # increase probability for contextdm1 & 2
-    rule_prob_map['contextdm1'] = 5.
-    rule_prob_map['contextdm2'] = 5.
-
-    from task import rules_dict
-    rule_trains = [rules_dict[ruleset]]
-
-    if incomplete_set:
-        # overwrite rule_trains
-        rule_excludes = ['delayanti', 'contextdelaydm1']
-        rule_trains = [
-                [r for r in rules_dict[ruleset] if r not in rule_excludes]]
-
-    train(save_name,
-          ruleset=ruleset,
-          n_hidden=nunit,
-          learning_rate=0.001,
-          target_perf=None,
-          seed=seed,
-          activation='softplus',
-          rnn_type='LeakyRNN',
-          l1_h=0.0001,
-          training_iters=150000,
-          rule_trains=rule_trains,
-          rule_prob_map=rule_prob_map,
-          run_analysis=['var', 'taskset', 'psy'])
-
-
-def cont_train(c, ksi, seed, save_name, seq=True):
+def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
     """Sequantial training setup for paper
 
     Args:
@@ -107,83 +66,75 @@ def cont_train(c, ksi, seed, save_name, seq=True):
           run_analysis=['var'],
           easy_task=easy_task)
 
-if __name__ == '__main__':
 
-    # Performance Analysis-----------------------------------------------------
-    # Name of the model
-    model_dir = 'data/train_all/1'
+# Directories of the models and the sample model
+# Change these to your directories
+root_dir = './data/train_all'
+model_dir = root_dir + '/0'
 
-    import performance
-    import standard_analysis
-    import antitask
-    import clustering
-    import variance
-    import taskset
+# Performance Analysis-----------------------------------------------------
+# standard_analysis.schematic_plot(model_dir=model_dir) # Generate schematic
+# performance.plot_performanceprogress(model_dir) # Plot performance during training
+# performance.psychometric_choice(model_dir) # Psychometric for dm
+# performance.psychometric_choiceattend(model_dir, no_ylabel=True)
+# performance.psychometric_choiceint(model_dir, no_ylabel=True)
 
-    # standard_analysis.schematic_plot(model_dir=model_dir) # Generate schematic
-    # performance.plot_performanceprogress(model_dir) # Plot performance during training
-    # performance.psychometric_choice(model_dir) # Psychometric for dm
-    # performance.psychometric_choiceattend(model_dir, no_ylabel=True)
-    # performance.psychometric_choiceint(model_dir, no_ylabel=True)
+# model_dirs = t
+# tools.valid_model_dirs('*256paper')
+# for model_dir in model_dirs[3:4]:
+#     for rule in ['dm1', 'contextdm1', 'multidm']:
+#         # performance.compute_choicefamily_varytime(model_dir, rule)
+#         performance.plot_choicefamily_varytime(model_dir, rule)
+# performance.psychometric_delaychoice_varytime(model_dir, 'delaydm1')
 
-    # model_dirs = t
-    # tools.valid_model_dirs('*256paper')
-    # for model_dir in model_dirs[3:4]:
-    #     for rule in ['dm1', 'contextdm1', 'multidm']:
-    #         # performance.compute_choicefamily_varytime(model_dir, rule)
-    #         performance.plot_choicefamily_varytime(model_dir, rule)
-    # performance.psychometric_delaychoice_varytime(model_dir, 'delaydm1')
+# Analysis of Anti tasks---------------------------------------------------
+# ATA = antitask.Analysis(model_dir)
+# ATA.plot_example_unit()
+# ATA.plot_lesions()
+# ATA.plot_inout_connections()
+# ATA.plot_rec_connections()
+# ATA.plot_rule_connections()
 
-    # Analysis of Anti tasks---------------------------------------------------
+# Clustering Analysis------------------------------------------------------
 
-    ATA = antitask.Analysis(model_dir)
-    # ATA.plot_example_unit()
-    ATA.plot_lesions()
-    # ATA.plot_inout_connections()
-    # ATA.plot_rec_connections()
-    # ATA.plot_rule_connections()
+# CA = clustering.Analysis(model_dir, data_type='rule')
+# CA.plot_example_unit()
+# CA.plot_variance()
+# CA.plot_2Dvisualization()
+# CA.plot_lesions()
 
-    # Clustering Analysis------------------------------------------------------
+# variance.compute_variance(model_dir)
+# CA = clustering.Analysis(model_dir, data_type='epoch')
+# CA.plot_variance()
+# CA.plot_2Dvisualization()
 
-    # CA = clustering.Analysis(model_dir, data_type='rule')
-    # CA.plot_example_unit()
-    # CA.plot_variance()
-    # CA.plot_2Dvisualization()
-    # CA.plot_lesions()
+# FTV Analysis-------------------------------------------------------------
+# variance.plot_hist_varprop_selection(root_dir)
+# variance.plot_hist_varprop_all(root_dir)
 
+# Task Representation------------------------------------------------------
+# tsa = taskset.TaskSetAnalysis(model_dir)
+# tsa.compute_and_plot_taskspace(
+#         epochs=['stim1'], dim_reduction_type='PCA')
 
-    # variance.compute_variance(model_dir)
-    # CA = clustering.Analysis(model_dir, data_type='epoch')
-    # CA.plot_variance()
-    # CA.plot_2Dvisualization()
+# Compositional Representation---------------------------------------------
+# setups = [1] # Go, Anti family
+# setups = [2] # Ctx DM family
+setups = [1, 2]
+for setup in setups:
+    pass
+    # taskset.plot_taskspace_group(root_dir, setup=setup,
+    #                              restore=True, representation='rate')
+    # taskset.plot_taskspace_group(root_dir, setup=setup,
+    #                              restore=True, representation='weight')
+    # taskset.plot_replacerule_performance_group(
+    #         root_dir, setup=setup, restore=True)
 
-    # FTV Analysis-------------------------------------------------------------
-    save_pattern='*256paper'
-    # variance.plot_hist_varprop_selection(save_pattern)
-    # variance.plot_hist_varprop_all(save_pattern)
-
-    # Task Representation------------------------------------------------------
-    # tsa = taskset.TaskSetAnalysis(model_dir)
-    # tsa.compute_and_plot_taskspace(
-    #         epochs=['stim1'], dim_reduction_type='PCA')
-
-    # Compositional Representation---------------------------------------------
-    # setups = [1] # Go, Anti family
-    # setups = [2] # Ctx DM family
-    setups = [1, 2]
-    for setup in setups:
-        pass 
-        # taskset.plot_taskspace_group(save_pattern, setup=setup,
-        #                              restore=True, representation='rate')
-        # taskset.plot_taskspace_group(save_pattern, setup=setup,
-        #                              restore=True, representation='weight')
-        # taskset.plot_replacerule_performance_group(
-        #         save_pattern, setup=setup, restore=True)
-
-    # Continual Learning Analysis----------------------------------------------
-    # performance.get_allperformance('*cont')
-    # performance.plot_performanceprogress_cont(('0_2cont', '0_0cont'))
-    # performance.plot_finalperformance_cont('*2cont', '*0cont')
-    # for save_pattern in ['*3cont']:
-    #     variance.plot_hist_varprop_selection(save_pattern)
-    # performance.plot_performanceprogress(model_dir='0_3seqlowlr') # Plot performance during training
+# Continual Learning Analysis----------------------------------------------
+# TODO(gryang): Remains to be fixed
+# performance.get_allperformance('*cont')
+# performance.plot_performanceprogress_cont(('0_2cont', '0_0cont'))
+# performance.plot_finalperformance_cont('*2cont', '*0cont')
+# for save_pattern in ['*3cont']:
+#     variance.plot_hist_varprop_selection(save_pattern)
+# performance.plot_performanceprogress(model_dir='0_3seqlowlr') # Plot performance during training
