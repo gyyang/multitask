@@ -74,7 +74,7 @@ class UnitAnalysis(object):
         ind_lesions['12'] = np.where(np.logical_and(h_normvar_all[:,0]>0.2, h_normvar_all[:,0]<0.8))[0]
         ind_lesions['2']  = np.where(h_normvar_all[:,0]<0.1)[0]
 
-        ind_lesions_orig = {key: ind_active[val] for key, val in ind_lesions.iteritems()}
+        ind_lesions_orig = {key: ind_active[val] for key, val in ind_lesions.items()}
 
         self.save_addon         = save_addon
         self.ind_lesions        = ind_lesions

@@ -23,7 +23,7 @@ rules_dict = \
 
 # Store indices of rules
 rule_index_map = dict()
-for ruleset, rules in rules_dict.iteritems():
+for ruleset, rules in rules_dict.items():
     rule_index_map[ruleset] = dict()
     for ind, rule in enumerate(rules):
         rule_index_map[ruleset][rule] = ind

@@ -83,7 +83,7 @@ class TaskSetAnalysis(object):
                 # Average across stimulus conditions
                 h_stimavg_byrule[rule] = h_stimavg[t_start:, :]
 
-                for e_name, e_time in trial.epochs.iteritems():
+                for e_name, e_time in trial.epochs.items():
                     if 'fix' in e_name:
                         continue
 
@@ -107,7 +107,7 @@ class TaskSetAnalysis(object):
         # h should be a dictionary
         # get a new dictionary containing keys from the list of rules and epochs
         # And avoid epochs from non_rules and non_epochs
-        # h_new = OrderedDict([(key, val) for key, val in h.iteritems() if key[1] in epochs])
+        # h_new = OrderedDict([(key, val) for key, val in h.items() if key[1] in epochs])
 
         if get_lasttimepoint:
             print('Analyzing last time points of epochs')
@@ -181,7 +181,7 @@ class TaskSetAnalysis(object):
         # Package back to dictionary
         h_trans = OrderedDict()
         i_start = 0
-        for key, val in h.iteritems():
+        for key, val in h.items():
             i_end = i_start + val.shape[0]
             h_trans[key] = data_trans[i_start:i_end, :]
             i_start = i_end
@@ -241,7 +241,7 @@ class TaskSetAnalysis(object):
         #             arrowprops=dict(arrowstyle="<-", ec='gray'))
 
 
-        for key, val in h_trans.iteritems():
+        for key, val in h_trans.items():
             rule, epoch = key
 
             if color_by_feature:
@@ -330,7 +330,7 @@ class TaskSetAnalysis(object):
         # compute dimensions of each epoch
         print('Computing dimensions of rule/epochs')
         self.dim_lastt_byepoch = OrderedDict()
-        for key, val in self.h_lastt_byepoch.iteritems():
+        for key, val in self.h_lastt_byepoch.items():
             self.dim_lastt_byepoch[key] = get_dim(val, **kwargs)
 
     def compute_dim_pair(self, **kwargs):
@@ -341,8 +341,8 @@ class TaskSetAnalysis(object):
         self.dimpair_lastt_byepoch = OrderedDict()
         self.dimpairratio_lastt_byepoch = OrderedDict()
 
-        for key1, val1 in self.h_lastt_byepoch.iteritems():
-            for key2, val2 in self.h_lastt_byepoch.iteritems():
+        for key1, val1 in self.h_lastt_byepoch.items():
+            for key2, val2 in self.h_lastt_byepoch.items():
 
                 #TODO: TEMP
                 val1 = val1 - val1.mean(axis=0)
@@ -517,7 +517,7 @@ def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
     fig = plt.figure(figsize=figsize)
     ax = fig.add_axes([0.2, 0.2, 0.65, 0.65])
 
-    for key, val in h_trans.iteritems():
+    for key, val in h_trans.items():
         rule, epoch = key
         # Default coloring by rule_color
         color = np.array(rule_color[rule])
@@ -637,7 +637,7 @@ def plot_taskspace_group(model_dir, setup=1, restore=True, representation='rate'
             if setup != 1:
                 # # The first data point should have all positive coordinate values
                 signs = ((h_trans.values()[0]>0)*2.-1)
-                for key, val in h_trans.iteritems():
+                for key, val in h_trans.items():
                     h_trans[key] = val*signs
             else:
                 # When PC1 and PC2 capture similar variances, allow for a rotation
@@ -648,18 +648,18 @@ def plot_taskspace_group(model_dir, setup=1, restore=True, representation='rate'
                 rot_mat = np.array([[np.cos(theta), -np.sin(theta)],
                                     [np.sin(theta),  np.cos(theta)]])
 
-                for key, val in h_trans.iteritems():
+                for key, val in h_trans.items():
                     h_trans[key] = np.dot(val, rot_mat)
 
                 if get_angle(h_trans.values()[1][0]) < 0:
-                    for key, val in h_trans.iteritems():
+                    for key, val in h_trans.items():
                         h_trans[key] = val*np.array([1, -1])
 
         if i == 0:
-            for key, val in h_trans.iteritems():
+            for key, val in h_trans.items():
                 h_trans_all[key] = val
         else:
-            for key, val in h_trans.iteritems():
+            for key, val in h_trans.items():
                 h_trans_all[key] = np.concatenate((h_trans_all[key], val), axis=0)
         i += 1
 

@@ -416,7 +416,7 @@ def get_allperformance(save_pattern, param_list=None):
             final_perfs[key] = [final_perf]
             filenames[key] = model_dir
 
-    for key, val in final_perfs.iteritems():
+    for key, val in final_perfs.items():
         final_perfs[key] = np.mean(val)
         print(key),
         print('{:0.3f}'.format(final_perfs[key])),

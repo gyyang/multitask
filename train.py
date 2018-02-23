@@ -255,7 +255,7 @@ def train_old(train_dir,
         model = Model(train_dir, hparams=hparams)
 
     # Display hparamsuration
-    for key, val in hparams.iteritems():
+    for key, val in hparams.items():
         print('{:20s} = '.format(key) + str(val))
 
     # Number of training iterations for each rule
@@ -413,7 +413,7 @@ def train(train_dir,
     model = Model(train_dir, hparams=hparams)
 
     # Display hparamsuration
-    for key, val in hparams.iteritems():
+    for key, val in hparams.items():
         print('{:20s} = '.format(key) + str(val))
 
     # Store results

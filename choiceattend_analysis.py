@@ -80,7 +80,7 @@ class UnitAnalysis(object):
         ind_lesions['12'] = np.where(np.logical_and(h_normvar_all[:,0]>0.4, h_normvar_all[:,0]<0.6))[0]
         ind_lesions['2']  = np.where(h_normvar_all[:,0]<0.1)[0]
 
-        ind_lesions_orig = {key: ind_active[val] for key, val in ind_lesions.iteritems()}
+        ind_lesions_orig = {key: ind_active[val] for key, val in ind_lesions.items()}
 
         self.save_addon         = save_addon
         self.ind_lesions        = ind_lesions
@@ -479,11 +479,11 @@ class StateSpaceAnalysis(object):
 
         # Update settings with kwargs
         setting = default_setting
-        for key, val in kwargs.iteritems():
+        for key, val in kwargs.items():
             setting[key] = val
 
         print('Current analysis setting:')
-        for key, val in default_setting.iteritems():
+        for key, val in default_setting.items():
             print('{:20s} : {:s}'.format(key, str(val)))
 
 

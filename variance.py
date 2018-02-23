@@ -52,7 +52,7 @@ def compute_variance(model_dir, rules=None, random_rotation=False):
             if random_rotation:
                 h = np.dot(h, random_ortho_matrix) # randomly rotate
 
-            for e_name, e_time in trial.epochs.iteritems():
+            for e_name, e_time in trial.epochs.items():
                 if 'fix' not in e_name: # Ignore fixation period
                     h_all_byepoch[(rule, e_name)] = h[e_time[0]:e_time[1],:,:]
 
