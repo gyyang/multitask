@@ -584,10 +584,13 @@ class Model(object):
             n_input = hparams['n_input']
         elif hparams['in_type'] == 'multi':
             n_input = hparams['rule_start'] * hparams['n_rule']
+        n_rnn = hparams['n_rnn']
+        n_output = hparams['n_output']
+
         self.x = tf.placeholder("float", [None, None, n_input])
-        self.y = tf.placeholder("float", [None, None, hparams['n_output']])
+        self.y = tf.placeholder("float", [None, None, n_output])
         if hparams['loss_type'] == 'lsq':
-            self.c_mask = tf.placeholder("float", [None, hparams['n_output']])
+            self.c_mask = tf.placeholder("float", [None, n_output])
         else:
             # Mask on time
             self.c_mask = tf.placeholder("float", [None])
@@ -598,7 +601,7 @@ class Model(object):
         # Recurrent activity
         if hparams['rnn_type'] == 'LeakyRNN':
             n_in_rnn = self.x.get_shape().as_list()[-1]
-            cell = LeakyRNNCell(hparams['n_rnn'], n_in_rnn,
+            cell = LeakyRNNCell(n_rnn, n_in_rnn,
                                 hparams['alpha'],
                                 sigma_rec=hparams['sigma_rec'],
                                 activation=hparams['activation'],
@@ -606,17 +609,17 @@ class Model(object):
                                 rng=rng)
         elif hparams['rnn_type'] == 'LeakyGRU':
             cell = LeakyGRUCell(
-                    hparams['n_rnn'], hparams['alpha'],
+                    n_rnn, hparams['alpha'],
                     sigma_rec=hparams['sigma_rec'], activation=f_act)
         elif hparams['rnn_type'] == 'EILeakyGRU':
             cell = EILeakyGRUCell(
-                    hparams['n_rnn'], hparams['alpha'],
+                    n_rnn, hparams['alpha'],
                     sigma_rec=hparams['sigma_rec'], activation=f_act)
         elif hparams['rnn_type'] == 'LSTM':
-            cell = tf.contrib.rnn.LSTMCell(hparams['n_rnn'], activation=f_act)
+            cell = tf.contrib.rnn.LSTMCell(n_rnn, activation=f_act)
 
         elif hparams['rnn_type'] == 'GRU':
-            cell = tf.contrib.rnn.GRUCell(hparams['n_rnn'], activation=f_act)
+            cell = tf.contrib.rnn.GRUCell(n_rnn, activation=f_act)
         else:
             raise NotImplementedError("""rnn_type must be one of LeakyRNN,
             LeakyGRU, EILeakyGRU, LSTM, GRU
@@ -631,18 +634,18 @@ class Model(object):
             # Using default initialization `glorot_uniform_initializer`
             w_out = tf.get_variable(
                 'weights',
-                [hparams['n_rnn'], hparams['n_output']],
+                [n_rnn, n_output],
                 dtype=tf.float32
             )
             b_out = tf.get_variable(
                 'biases',
-                [hparams['n_output']],
+                [n_output],
                 dtype=tf.float32,
                 initializer=tf.constant_initializer(0.0, dtype=tf.float32)
             )
 
-        h_shaped = tf.reshape(self.h, (-1, hparams['n_rnn']))
-        y_shaped = tf.reshape(self.y, (-1, hparams['n_output']))
+        h_shaped = tf.reshape(self.h, (-1, n_rnn))
+        y_shaped = tf.reshape(self.y, (-1, n_output))
         # y_hat_ shape (n_time*n_batch, n_unit)
         y_hat_ = tf.matmul(h_shaped, w_out) + b_out
         if hparams['loss_type'] == 'lsq':
@@ -658,9 +661,9 @@ class Model(object):
                             labels=y_shaped, logits=y_hat_))
 
         self.y_hat = tf.reshape(y_hat,
-                                (-1, tf.shape(self.h)[1], hparams['n_output']))
+                                (-1, tf.shape(self.h)[1], n_output))
         y_hat_fix, y_hat_ring = tf.split(
-            self.y_hat, [1, hparams['n_output']-1], axis=-1)
+            self.y_hat, [1, n_output-1], axis=-1)
         self.y_hat_loc = tf_popvec(y_hat_ring)
 
         self.var_list = tf.trainable_variables()
@@ -683,7 +686,7 @@ class Model(object):
 
         # Create an optimizer.
         self.opt = tf.train.AdamOptimizer(
-                learning_rate=hparams['learning_rate'])
+            learning_rate=hparams['learning_rate'])
         # Set cost
         self.set_optimizer()
 
@@ -692,6 +695,33 @@ class Model(object):
 
         self.save_dir = save_dir
         self.hparams = hparams
+        for v in self.var_list:
+            if 'rnn' in v.name:
+                if 'kernel' in v.name or 'weight' in v.name:
+                    self.w_rec = v[n_input:, :]
+                    self.w_in = v[:n_input, :]
+                else:
+                    self.b_rec = v
+            else:
+                assert 'output' in v.name
+                if 'kernel' in v.name or 'weight' in v.name:
+                    self.w_out = v
+                else:
+                    self.b_out = v
+
+        # check if the recurrent and output connection has the correct shape
+        if self.w_out.shape != (n_rnn, n_output):
+            raise ValueError('Shape of w_out should be ' +
+                             str((n_rnn, n_output)) + ', but found ' +
+                             str(w_out.shape))
+        if self.w_rec.shape != (n_rnn, n_rnn):
+            raise ValueError('Shape of w_rec should be ' +
+                             str((n_rnn, n_rnn)) + ', but found ' +
+                             str(self.w_rec.shape))
+        if self.w_in.shape != (n_input, n_rnn):
+            raise ValueError('Shape of w_in should be ' +
+                             str((n_input, n_rnn)) + ', but found ' +
+                             str(self.w_in.shape))
 
     def initialize(self):
         """Initialize the model for training."""
@@ -712,21 +742,21 @@ class Model(object):
         self.saver.save(sess, save_path)
         print("Model saved in file: %s" % save_path)
 
-    def get_h(self, x):
+    def get_h_obsolete(self, x):
         """get the recurrent unit activities"""
         return self.sess.run(self.h, feed_dict={self.x: x})
 
-    def get_y_from_h(self, h):
+    def get_y_from_h_obsolete(self, h):
         """get the output from recurrent activities"""
         return self.sess.run(
                 self.y_hat,
                 feed_dict={self.h: h}).reshape((h.shape[0], h.shape[1], -1))
 
-    def get_y(self, x):
+    def get_y_obsolete(self, x):
         """get the output from input"""
         return self.get_y_from_h(self.get_h(x))
 
-    def get_y_loc(self, y):
+    def get_y_loc_obsolete(self, y):
         """get the response location from the output"""
         return popvec(y[..., 1:])
 
@@ -764,22 +794,16 @@ class Model(object):
         else:
             units = np.array(units)
 
-        n_input, n_rnn, n_output = self.hparams['shape']
-
-        w_out = sess.run(self.var_list[0])
-        w_rec = sess.run(self.var_list[2])
-
-        # check if the recurrent and output connection has the correct shape
-        assert w_out.shape == (n_rnn, n_output)
-        assert w_rec.shape == (n_input+n_rnn, n_rnn)
+        w_out = sess.run(self.w_out)
+        w_rec = sess.run(self.w_rec)
 
         # Set output projections from these units to zero
         w_out[units, :] = 0
-        w_rec[n_input+units, :] = 0
+        w_rec[units, :] = 0
 
         # Apply the lesioning
-        sess.run(self.var_list[0].assign(w_out))
-        sess.run(self.var_list[2].assign(w_rec))
+        sess.run(self.w_out.assign(w_out))
+        sess.run(self.w_rec.assign(w_rec))
 
         if verbose:
             print('Lesioned units:')
