@@ -4,44 +4,33 @@ Analysis of anti units
 
 from __future__ import division
 
-import os
 import numpy as np
 import pickle
-import time
-import copy
-from collections import OrderedDict
-import scipy.stats as stats
-from scipy.optimize import curve_fit, minimize
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
+import seaborn as sns # If you don't have this, then some colormaps won't work
 
 import tensorflow as tf
 from network import Model, get_perf
 from task import get_dist, generate_trials
+import tools
 
 save = True
 
+
 class Analysis(object):
-    """Analyze the Anti tasks"""
+    """Analyze the Anti tasks."""
     def __init__(self, model_dir):
         self.model_dir = model_dir
-        ############################### Run Model and Load Data #######################
+
+        # Run model
         model = Model(model_dir)
         self.hparams = model.hparams
-        n_input = self.hparams['n_input']
         with tf.Session() as sess:
             model.restore()
-            var_list = sess.run(model.var_list)
-
-        # Get connectivity
-        # TODO(gryang): This is a really dumb way to get variables
-        self.w_out = var_list[0].T
-        self.b_out = var_list[1]
-        self.w_in = var_list[2][:n_input, :].T
-        self.w_rec = var_list[2][n_input:, :].T
-        self.b_rec = var_list[3]
+            for name in ['w_in', 'w_rec', 'w_out', 'b_rec', 'b_out']:
+                setattr(self, name, sess.run(getattr(model, name)))
+                if 'w_' in name:
+                    setattr(self, name, getattr(self, name).T)
 
         data_type  = 'rule'
         with open(model_dir + '/variance_'+data_type+'.pkl', 'rb') as f:
@@ -86,13 +75,14 @@ class Analysis(object):
         # ind_anti_orig = ind_orig[ind_anti] # Indices of anti units in the original matrix
 
     def plot_example_unit(self):
-        """Plot activity of an example unit"""
+        """Plot activity of an example unit."""
         from standard_analysis import pretty_singleneuron_plot
-        pretty_singleneuron_plot(self.model_dir, ['fdanti', 'fdgo'], self.ind_anti_orig[2],
-                                 save=save, ylabel_firstonly = True)
+        pretty_singleneuron_plot(
+            self.model_dir, ['fdanti', 'fdgo'], self.ind_anti_orig[2],
+            save=save, ylabel_firstonly = True)
 
     def plot_inout_connections(self):
-        """Plot the input connections from stimulus units and the output connections to response units """
+        """Plot the input and output connections."""
         n_eachring = self.hparams['n_eachring']
         w_in, w_out = self.w_in, self.w_out
 
@@ -311,8 +301,9 @@ class Analysis(object):
 
                 perfs_store = list()
                 for rule in self.rules:
-                    trial = generate_trials(rule=rule, hparams=hparams, mode='test')
-                    y_hat_test = model.get_y(trial.x)
+                    trial = generate_trials(rule, hparams, mode='test')
+                    feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                    y_hat_test = sess.run(model.y_hat, feed_dict=feed_dict)
                     perf = np.mean(get_perf(y_hat_test, trial.y_loc))
                     perfs_store.append(perf)
 
