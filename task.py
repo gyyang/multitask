@@ -1618,7 +1618,7 @@ def generate_trials(rule, hparams, mode, noise_on=True, **kwargs):
         # Add no rule
         return trial
 
-    if isinstance(rule, str):
+    if isinstance(rule, basestring):
         # rule is not iterable
         # Expand to list
         if 'rule_strength' in kwargs:
