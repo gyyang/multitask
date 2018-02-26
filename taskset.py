@@ -188,13 +188,13 @@ class TaskSetAnalysis(object):
 
         return h_trans
 
-    def obsolete_compute_and_plot_taskspace(self,
+    def compute_and_plot_taskspace(self,
                rules=None, epochs=None, **kwargs):
 
         h_trans = self.compute_taskspace(rules=rules, epochs=epochs, **kwargs)
         self.plot_taskspace(h_trans, **kwargs)
 
-    def obsolete_plot_taskspace(self, h_trans, epochs=None, dim_reduction_type='MDS',
+    def plot_taskspace(self, h_trans, epochs=None, dim_reduction_type='MDS',
                        plot_text=True, color_by_feature=False, feature=None,
                        figsize=(4,4), markersize=5, plot_label=True,
                        plot_special_point=False, plot_arrow=False, **kwargs):

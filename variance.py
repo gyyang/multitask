@@ -19,7 +19,7 @@ import tools
 
 save = True
 
-def compute_variance(model_dir, rules=None, random_rotation=False):
+def _compute_variance(model_dir, rules=None, random_rotation=False):
     """Compute variance for all tasks.
 
     Args:
@@ -34,7 +34,7 @@ def compute_variance(model_dir, rules=None, random_rotation=False):
 
     if rules is None:
         rules = hparams['rules']
-
+    print(rules)
     with tf.Session() as sess:
         model.restore()
 
@@ -93,6 +93,20 @@ def compute_variance(model_dir, rules=None, random_rotation=False):
         print('Variance saved at {:s}'.format(fname))
         with open(fname,'wb') as f:
             pickle.dump(result, f)
+
+
+def compute_variance(model_dir, rules=None, random_rotation=False):
+    """Compute variance for all tasks.
+
+    Args:
+        model_dir: str, the path of the model directory
+        rules: list of rules to compute variance, list of strings
+        random_rotation: boolean. If True, rotate the neural activity.
+    """
+    dirs = tools.valid_model_dirs(model_dir)
+    for d in dirs:
+        _compute_variance(d, rules, random_rotation)
+
 
 def _compute_hist_varprop(model_dir, rule_pair, random_rotation=False):
     data_type = 'rule'
