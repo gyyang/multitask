@@ -72,13 +72,16 @@ def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
 root_dir = './data/train_all'
 model_dir = root_dir + '/0'
 
-# Performance Analysis-----------------------------------------------------
-# standard_analysis.schematic_plot(model_dir=model_dir) # Generate schematic
-# performance.plot_performanceprogress(model_dir) # Plot performance during training
-# performance.psychometric_choice(model_dir) # Psychometric for dm
-# performance.psychometric_choiceattend(model_dir, no_ylabel=True)
-# performance.psychometric_choiceint(model_dir, no_ylabel=True)
+variance.compute_variance(root_dir)
 
+# Performance Analysis-----------------------------------------------------
+standard_analysis.schematic_plot(model_dir=model_dir) # Generate schematic
+performance.plot_performanceprogress(model_dir) # Plot performance during training
+performance.psychometric_choice(model_dir) # Psychometric for dm
+performance.psychometric_choiceattend(model_dir, no_ylabel=True)
+performance.psychometric_choiceint(model_dir, no_ylabel=True)
+
+# TODO(gryang): the following remains to be fixed
 # model_dirs = t
 # tools.valid_model_dirs('*256paper')
 # for model_dir in model_dirs[3:4]:
@@ -88,34 +91,34 @@ model_dir = root_dir + '/0'
 # performance.psychometric_delaychoice_varytime(model_dir, 'delaydm1')
 
 # Analysis of Anti tasks---------------------------------------------------
-# ATA = antitask.Analysis(model_dir)
-# ATA.plot_example_unit()
-# ATA.plot_lesions()
-# ATA.plot_inout_connections()
-# ATA.plot_rec_connections()
-# ATA.plot_rule_connections()
+ATA = antitask.Analysis(model_dir)
+ATA.plot_example_unit()
+ATA.plot_lesions()
+ATA.plot_inout_connections()
+ATA.plot_rec_connections()
+ATA.plot_rule_connections()
 
 # Clustering Analysis------------------------------------------------------
 
-# CA = clustering.Analysis(model_dir, data_type='rule')
-# CA.plot_example_unit()
-# CA.plot_variance()
-# CA.plot_2Dvisualization()
-# CA.plot_lesions()
+CA = clustering.Analysis(model_dir, data_type='rule')
+CA.plot_example_unit()
+CA.plot_variance()
+CA.plot_2Dvisualization()
+CA.plot_lesions()
 
-# variance.compute_variance(model_dir)
-# CA = clustering.Analysis(model_dir, data_type='epoch')
-# CA.plot_variance()
-# CA.plot_2Dvisualization()
+
+CA = clustering.Analysis(model_dir, data_type='epoch')
+CA.plot_variance()
+CA.plot_2Dvisualization()
 
 # FTV Analysis-------------------------------------------------------------
-# variance.plot_hist_varprop_selection(root_dir)
-# variance.plot_hist_varprop_all(root_dir)
+variance.plot_hist_varprop_selection(root_dir)
+variance.plot_hist_varprop_all(root_dir)
 
 # Task Representation------------------------------------------------------
-# tsa = taskset.TaskSetAnalysis(model_dir)
-# tsa.compute_and_plot_taskspace(
-#         epochs=['stim1'], dim_reduction_type='PCA')
+tsa = taskset.TaskSetAnalysis(model_dir)
+tsa.compute_and_plot_taskspace(
+        epochs=['stim1'], dim_reduction_type='PCA')
 
 # Compositional Representation---------------------------------------------
 # setups = [1] # Go, Anti family
@@ -123,12 +126,12 @@ model_dir = root_dir + '/0'
 setups = [1, 2]
 for setup in setups:
     pass
-    # taskset.plot_taskspace_group(root_dir, setup=setup,
-    #                              restore=True, representation='rate')
-    # taskset.plot_taskspace_group(root_dir, setup=setup,
-    #                              restore=True, representation='weight')
-    # taskset.plot_replacerule_performance_group(
-    #         root_dir, setup=setup, restore=True)
+    taskset.plot_taskspace_group(root_dir, setup=setup,
+                                 restore=True, representation='rate')
+    taskset.plot_taskspace_group(root_dir, setup=setup,
+                                 restore=True, representation='weight')
+    taskset.plot_replacerule_performance_group(
+            root_dir, setup=setup, restore=True)
 
 # Continual Learning Analysis----------------------------------------------
 # TODO(gryang): Remains to be fixed

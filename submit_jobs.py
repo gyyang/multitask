@@ -16,8 +16,7 @@ parser.add_argument('run')
 args = parser.parse_args()
 
 sbatchpath = './sbatch/'
-scratchpath = '/scratch/mj98-share/multitask-master_testmaddy/'
-
+scratchpath = '/scratch/gy441/multitask/'
 
 
 def write_jobfile(cmd, jobname, sbatchpath, scratchpath,
@@ -101,7 +100,7 @@ if args.run == 'all':
               train_arg+''')"'''
 
         jobfile = write_jobfile(
-            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=1)
         subprocess.call(['sbatch', jobfile])
 
 if args.run == 'all_varyhp': 
@@ -153,7 +152,7 @@ if args.run == 'cont':
 
 # Grid search
 if args.run == 'grid':
-    raise NotImplemente55rror()
+    raise NotImplementedError()
     s = 1
     n_unit = 256
     for seed in range(5):

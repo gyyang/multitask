@@ -11,40 +11,39 @@ import variance
 # TODO: make this flexible
 DATAPATH = os.path.join(os.getcwd(), 'data')
 
-# def analysis(run_analysis):
-#     # Run a set of standard analysis
-#     if run_analysis is None:
-#         run_analysis = list()
-#
-#     if 'var' in run_analysis:
-#         # Compute variance
-#         from variance import compute_variance
-#         compute_variance(save_name)
-#         compute_variance(save_name, random_rotation=True)
-#         print('Computed variance')
-#
-#     if 'psy' in run_analysis:
-#         # Psychometric analysis
-#         import performance
-#         for rule in ['dm1', 'contextdm1', 'multidm']:
-#             if rule in rule_tests:
-#                 performance.compute_choicefamily_varytime(save_name, rule)
-#
-#     if 'compare' in run_analysis:
-#         # Compute similarity with data and store results
-#         from contextdm_analysis import run_score
-#         log['score_train'], log['score_test'] = run_score(save_name)
-#         print('Data matching score : {:0.3f}'.format(log['score_test'].mean()))
-#
-#         with open(os.path.join('data', 'log_'+save_name+'.pkl'), 'wb') as f:
-#             pickle.dump(log, f)
-#
-#     if 'taskset' in run_analysis:
-#         # Run analysis for task representation
-#         from taskset import compute_taskspace, compute_replacerule_performance
-#         for setup in [1, 2]:
-#             compute_taskspace(save_name, setup, restore=False)
-#             compute_replacerule_performance(save_name, setup, restore=False)
+def analysis(run_analysis, model_dir):
+    # Run a set of standard analysis
+    if run_analysis is None:
+        run_analysis = list()
+
+    if 'var' in run_analysis:
+        # Compute variance
+        from variance import compute_variance
+        compute_variance(model_dir)
+        compute_variance(model_dir, random_rotation=True)
+        print('Computed variance')
+
+    if 'psy' in run_analysis:
+        # Psychometric analysis
+        import performance
+        for rule in ['dm1', 'contextdm1', 'multidm']:
+            performance.compute_choicefamily_varytime(model_dir, rule)
+
+    # if 'compare' in run_analysis:
+    #     # Compute similarity with data and store results
+    #     from contextdm_analysis import run_score
+    #     log['score_train'], log['score_test'] = run_score(model_dir)
+    #     print('Data matching score : {:0.3f}'.format(log['score_test'].mean()))
+    #
+    #     with open(os.path.join('data', 'log_'+model_dir+'.pkl'), 'wb') as f:
+    #         pickle.dump(log, f)
+
+    if 'taskset' in run_analysis:
+        # Run analysis for task representation
+        from taskset import compute_taskspace, compute_replacerule_performance
+        for setup in [1, 2]:
+            compute_taskspace(model_dir, setup, restore=False)
+            compute_replacerule_performance(model_dir, setup, restore=False)
 
 
 def train_mante(seed=0, train_dir='train_mante'):
@@ -57,8 +56,10 @@ def train_mante(seed=0, train_dir='train_mante'):
 def train_all(seed=0, train_dir='train_all'):
     """Training of all tasks."""
     train_dir = os.path.join(DATAPATH, train_dir, str(seed))
+    hparams = {'activation': 'softplus'}
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir,ruleset='all',rule_prob_map=rule_prob_map,seed=seed)
+    train.train(train_dir, hparams=hparams, ruleset='all',
+                rule_prob_map=rule_prob_map, seed=seed)
 
 
 def train_vary_hparams(i):
@@ -92,7 +93,7 @@ def train_vary_hparams(i):
     train_dir = os.path.join(DATAPATH, 'debug', str(i))
     #train.train(train_dir, hparams, ruleset='mante', max_steps=1e7)
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir, hparams, ruleset='all',rule_prob_map=rule_prob_map, max_steps=1e8)
+    train.train(train_dir, hparams, ruleset='all', rule_prob_map=rule_prob_map, max_steps=1e8)
 
     variance.compute_variance(train_dir)
 
