@@ -235,10 +235,13 @@ class Analysis(object):
             ax = fig.add_axes(rect_color)
             for il, l in enumerate(self.unique_labels):
                 ind_l = np.where(labels==l)[0][[0, -1]]+np.array([0,1])
-                ax.plot(ind_l, [0,0], linewidth=4, solid_capstyle='butt',
-                        color=kelly_colors[il+1])
+                #ax.plot(ind_l, [0,0], linewidth=4, solid_capstyle='butt',
+                #        color=kelly_colors[il+1]) #maddy changed
+                #ax.text(np.mean(ind_l), -0.5, str(il+1), fontsize=6,
+                #        ha='center', va='top', color=kelly_colors[il+1])
+                ax.plot(ind_l, [0,0], linewidth=4, solid_capstyle='butt') 
                 ax.text(np.mean(ind_l), -0.5, str(il+1), fontsize=6,
-                        ha='center', va='top', color=kelly_colors[il+1])
+                        ha='center', va='top')
             ax.set_xlim([0, len(labels)])
             ax.set_ylim([-1, 1])
             ax.axis('off')
@@ -298,7 +301,8 @@ class Analysis(object):
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
         for il, l in enumerate(self.unique_labels):
             ind_l = np.where(labels==l)[0]
-            ax.scatter(Y[ind_l,0], Y[ind_l,1], color=kelly_colors[il+1], s=10)
+            #ax.scatter(Y[ind_l,0], Y[ind_l,1], color=kelly_colors[il+1], s=10)#maddy changed
+            ax.scatter(Y[ind_l,0], Y[ind_l,1], s=10)
         ax.axis('off')
         if save:
             plt.savefig('figure/taskvar_visual_by'+self.data_type+'.pdf', transparent=True)
