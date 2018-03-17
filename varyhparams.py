@@ -3,8 +3,10 @@
 from __future__ import division
 
 from collections import defaultdict
+from collections import OrderedDict
 import os
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 
 import tools
@@ -12,7 +14,10 @@ import variance #maddy added
 import clustering
 import standard_analysis #maddy added. 
 
+matplotlib.rcParams.update({'font.size': 7})
+
 DATAPATH = os.path.join(os.getcwd(), 'data', 'train_varyhparams')
+FIGPATH = os.path.join(os.getcwd(), 'figure')
 
 # Get all the subdirectories
 train_dirs = [os.path.join(DATAPATH, d) for d in os.listdir(DATAPATH)]
@@ -85,57 +90,45 @@ for train_dir in train_dirs:
             print "done"
 """
 
-#maddy added -- check no of clusters under various conditions. 
-hparams_list = list()
-#initdict = {'diag':[], 'randortho':[],'softplus':[], 'relu':[], 'tanh':[],'LeakyRNN':[], 'LeakyGRU':[]}
-# initdict = {'diag':[], 'randortho':[],'softplus':[], 'relu':[], 'tanh':[],'LeakyRNN':[],
-#             'LeakyGRU':[],'l1_h_0':[], 'l1_weight_0':[],'l1_h_1emin5':[], 'l1_weight_1emin5':[],
-#             'l1_h_1emin4':[], 'l1_weight_1emin4':[],'l1_h_1emin3':[], 'l1_weight_1emin3':[] }
-#
-# initdictother = {'LeakyRNNsoftplus':[], 'LeakyRNNrelu':[],'LeakyGRUsoftplus':[], 'LeakyGRUrelu':[]}
-# initdictotherother = {'LeakyRNNsoftplusdiag':[], 'LeakyRNNreludiag':[],'LeakyGRUsoftplusdiag':[],
-#                       'LeakyGRUreludiag':[],'LeakyRNNsoftplusrandortho':[], 'LeakyRNNrelurandortho':[],
-#                       'LeakyGRUsoftplusrandortho':[], 'LeakyGRUrelurandortho':[]}
-initdict = defaultdict(list)
-initdictother = defaultdict(list)
-initdictotherother = defaultdict(list)
-
-#actdict = {'softplus':[], 'relu':[], 'tanh':[]}
-#rnndict = {'LeakyRNN':[], 'LeakyGRU':[]}
-
-for train_dir in train_dirs:
-    hparams = tools.load_hparams(train_dir)
-    #check if performance exceeds target
-    log = tools.load_log(train_dir) 
-    #if log['perf_avg'][-1] > hparams['target_perf']: 
-    if log['perf_min'][-1] > hparams['target_perf']:         
-        print('no. of clusters', log['n_cluster'])
-        n_clusters.append(log['n_cluster'])
-        
-        initdict[hparams['w_rec_init']].append(log['n_cluster'])
-        initdict[hparams['activation']].append(log['n_cluster'])
-
-        #initdict[hparams['rnn_type']].append(log['n_cluster']) 
-        if hparams['activation'] != 'tanh':
-            initdict[hparams['rnn_type']].append(log['n_cluster']) 
-            initdictother[hparams['rnn_type']+hparams['activation']].append(log['n_cluster']) 
-            initdictotherother[hparams['rnn_type']+hparams['activation']+hparams['w_rec_init']].append(log['n_cluster']) 
-
-        if hparams['l1_h'] == 0:
-            initdict['l1_h_0'].append(log['n_cluster'])   
-        else: #hparams['l1_h'] == 1e-3 or 1e-4 or 1e-5:  
-            keyvalstr = 'l1_h_1emin'+str(int(abs(np.log10(hparams['l1_h']))))
-            initdict[keyvalstr].append(log['n_cluster'])   
-            
-        if hparams['l1_weight'] == 0:            
-            initdict['l1_weight_0'].append(log['n_cluster'])  
-        else: #hparams['l1_h'] == 1e-3 or 1e-4 or 1e-5:    
-            keyvalstr = 'l1_weight_1emin'+str(int(abs(np.log10(hparams['l1_weight']))))
-            initdict[keyvalstr].append(log['n_cluster'])   
-            
-        #initdict[hparams['l1_weight']].append(log['n_cluster'])      
         
 def plot_histogram():
+    initdict = defaultdict(list)
+    initdictother = defaultdict(list)
+    initdictotherother = defaultdict(list)
+
+    for train_dir in train_dirs:
+        hparams = tools.load_hparams(train_dir)
+        #check if performance exceeds target
+        log = tools.load_log(train_dir) 
+        #if log['perf_avg'][-1] > hparams['target_perf']: 
+        if log['perf_min'][-1] > hparams['target_perf']:         
+            print('no. of clusters', log['n_cluster'])
+            n_clusters.append(log['n_cluster'])
+            hparams_list.append(hparams)
+            
+            initdict[hparams['w_rec_init']].append(log['n_cluster'])
+            initdict[hparams['activation']].append(log['n_cluster'])
+    
+            #initdict[hparams['rnn_type']].append(log['n_cluster']) 
+            if hparams['activation'] != 'tanh':
+                initdict[hparams['rnn_type']].append(log['n_cluster']) 
+                initdictother[hparams['rnn_type']+hparams['activation']].append(log['n_cluster']) 
+                initdictotherother[hparams['rnn_type']+hparams['activation']+hparams['w_rec_init']].append(log['n_cluster']) 
+    
+            if hparams['l1_h'] == 0:
+                initdict['l1_h_0'].append(log['n_cluster'])   
+            else: #hparams['l1_h'] == 1e-3 or 1e-4 or 1e-5:  
+                keyvalstr = 'l1_h_1emin'+str(int(abs(np.log10(hparams['l1_h']))))
+                initdict[keyvalstr].append(log['n_cluster'])   
+                
+            if hparams['l1_weight'] == 0:            
+                initdict['l1_weight_0'].append(log['n_cluster'])  
+            else: #hparams['l1_h'] == 1e-3 or 1e-4 or 1e-5:    
+                keyvalstr = 'l1_weight_1emin'+str(int(abs(np.log10(hparams['l1_weight']))))
+                initdict[keyvalstr].append(log['n_cluster'])   
+                
+            #initdict[hparams['l1_weight']].append(log['n_cluster'])      
+            
     # Check no of clusters under various conditions.
     f, axarr = plt.subplots(7, 1, figsize=(3,12), sharex=True)
     u = 0
@@ -207,11 +200,67 @@ def plot_histogram():
 
 def plot_n_clusters():
     """Plot the number of clusters."""
-    plt.figure()
-    plt.plot(n_clusters,'.-')
-    plt.xlabel('networks')
-    plt.ylabel('no. of clusters')
-    plt.title('target perf-min 0.9, total:'+str(len(n_clusters))) #
-    #plt.savefig('./figure/noofclusters_pt9_192nets.pdf')
+    hparams_list = list()
+    for i, train_dir in enumerate(train_dirs):
+        print('Analyzing model {:d}/{:d}'.format(i, len(train_dirs)))
+        hparams = tools.load_hparams(train_dir)
+        log = tools.load_log(train_dir)
+        # check if performance exceeds target
+        if log['perf_min'][-1] > hparams['target_perf']:
+            n_clusters.append(log['n_cluster'])
+            hparams_list.append(hparams)
 
-plot_n_clusters()
+    hp_ranges = OrderedDict()
+    hp_ranges['activation'] = ['softplus', 'relu', 'tanh']
+    hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
+    hp_ranges['w_rec_init'] = ['diag', 'randortho']
+    hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]
+    # hp_ranges['l2_h'] = [0, 1e-4]
+    hp_ranges['l1_weight'] = [0, 1e-5, 1e-4, 1e-3]
+
+    # The hparams to show
+    hp_plots = hp_ranges.keys()
+
+    # Sort by number of clusters
+    ind_sort = np.argsort(n_clusters)[::-1]
+    n_clusters_sorted = [n_clusters[i] for i in ind_sort]
+    hparams_list_sorted = [hparams_list[i] for i in ind_sort]
+
+    # Fill a matrix with the index of hparams
+    hparams_visualize = np.zeros([len(hp_plots), len(n_clusters)])
+    for i, hparams in enumerate(hparams_list_sorted):
+        for j, hp in enumerate(hp_plots):
+            ind = hp_ranges[hp].index(hparams[hp])/1.0/len(hp_ranges[hp])
+            hparams_visualize[j, i] = ind
+
+    # Plot results
+    fig = plt.figure(figsize=(3, 2))
+    ax = fig.add_axes([0.3, 0.6, 0.65, 0.3])
+    ax.plot(n_clusters_sorted, '-')
+    ax.set_xlim([0, len(n_clusters) - 1])
+    ax.set_xticks([0, len(n_clusters) - 1])
+    ax.set_xticklabels([])
+    ax.set_yticks([0, 10, 20, 30])
+    ax.set_ylabel('Number of clusters', fontsize=7)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+
+    ax = fig.add_axes([0.3, 0.15, 0.65, 0.35])
+    ax.imshow(hparams_visualize, aspect='auto')
+    ax.set_xticks([0, len(n_clusters) - 1])
+    ax.set_xticklabels([1, len(n_clusters)])
+    ax.set_yticks(range(len(hp_plots)))
+    hp_name = {'activation': 'Activation Fun.',
+               'rnn_type': 'Network type',
+               'w_rec_init': 'Initialization',
+               'l1_h': 'L1 rate',
+               'l1_weight': 'L1 weight'}
+    hp_plot_names = [hp_name[hp] for hp in hp_plots]
+    ax.set_yticklabels(hp_plot_names, fontsize=7)
+    ax.tick_params(length=0)
+    [i.set_linewidth(0.1) for i in ax.spines.itervalues()]
+    ax.set_xlabel('Networks', labelpad=-5)
+    # plt.title('target perf-min 0.9, total:'+str(len(n_clusters))) #
+    plt.savefig(os.path.join(FIGPATH, 'NumClusters.eps'), transparent=True)
+
+# plot_n_clusters()

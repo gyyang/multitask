@@ -12,6 +12,7 @@ import antitask
 import clustering
 import variance
 import taskset
+import varyhparams
 
 def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
     """Sequantial training setup for paper
@@ -110,6 +111,9 @@ CA.plot_lesions()
 CA = clustering.Analysis(model_dir, data_type='epoch')
 CA.plot_variance()
 CA.plot_2Dvisualization()
+
+# Varying hyperparameter analysis
+varyhparams.plot_n_clusters()
 
 # FTV Analysis-------------------------------------------------------------
 variance.plot_hist_varprop_selection(root_dir)
