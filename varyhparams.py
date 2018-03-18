@@ -29,13 +29,6 @@ from os.path import isfile, join
 train_dirs = [d for d in train_dirs if 'variance_rule.pkl' in [f for f in listdir(d) if isfile(join(d, f))]]#maddy added
 
 
-# Compute the number of clusters
-n_clusters = list()
-scores = list()
-
-LeakyGRU_perfmin = list() #maddy added. check how many perform. 
-countval = 0
-
 #maddy added check tanh fig 4
 #root_dir = './data/debug/8' #0, 33 './data/train_all'
 """
@@ -198,18 +191,23 @@ def plot_histogram():
     #plt.savefig('./figure/noofclusters_pt9_l1_weight_192nets.pdf')
 
 
-def plot_n_clusters():
-    """Plot the number of clusters."""
+def get_n_clusters():
     hparams_list = list()
     for i, train_dir in enumerate(train_dirs):
-        print('Analyzing model {:d}/{:d}'.format(i, len(train_dirs)))
+        if i % 10 == 0:
+            print('Analyzing model {:d}/{:d}'.format(i, len(train_dirs)))
         hparams = tools.load_hparams(train_dir)
         log = tools.load_log(train_dir)
         # check if performance exceeds target
         if log['perf_min'][-1] > hparams['target_perf']:
             n_clusters.append(log['n_cluster'])
             hparams_list.append(hparams)
+    return n_clusters, hparams_list
 
+
+def plot_n_clusters():
+    """Plot the number of clusters."""
+    n_clusters, hparams_list = get_n_clusters()
     hp_ranges = OrderedDict()
     hp_ranges['activation'] = ['softplus', 'relu', 'tanh']
     hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
@@ -263,4 +261,33 @@ def plot_n_clusters():
     # plt.title('target perf-min 0.9, total:'+str(len(n_clusters))) #
     plt.savefig(os.path.join(FIGPATH, 'NumClusters.eps'), transparent=True)
 
-# plot_n_clusters()
+
+n_clusters, hparams_list = get_n_clusters()
+
+# Compare activation, ignore tanh that can not be trained with LeakyRNN
+n_cluster_dict = defaultdict(list)
+for hp, n_cluster in zip(hparams_list, n_clusters):
+    n_cluster_dict[hp['activation']].append(n_cluster)
+plt.figure()
+for key, val in n_cluster_dict.items():
+    hist, bin_edges = np.histogram(val, density=True, range=(0, 30), bins=30)
+    plt.hist(val, label=key)
+plt.legend()
+
+def plot_hist_varprop_tanh():
+    """Plot FTV distribution for tanh network."""
+    hp_target = {'activation': 'tanh',
+                 'rnn_type': 'LeakyGRU',
+                 'w_rec_init': 'diag',
+                 'l1_h': 0,
+                 'l1_weight': 0}
+
+    for i, train_dir in enumerate(train_dirs):
+        hp = tools.load_hparams(train_dir)
+        if all(hp[key]==val for key, val in hp_target.items()):
+            break
+    log = tools.load_log(train_dir)
+    # check if performance exceeds target
+    assert log['perf_min'][-1] > hp['target_perf']
+    variance.plot_hist_varprop_selection(train_dir, figname_extra='_tanh')
+

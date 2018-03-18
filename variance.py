@@ -220,14 +220,21 @@ def _plot_hist_varprop(hist_plot, bins_edge, rule_pair, hist_example=None,
             figname = 'plot_hist_varprop_tmp.pdf'
         plt.savefig(os.path.join('figure', figname), transparent=True)
 
-def plot_hist_varprop(model_dir, rule_pair, plot_example=False, **kwargs):
-    '''
+
+def plot_hist_varprop(model_dir,
+                      rule_pair,
+                      plot_example=False,
+                      figname_extra=None,
+                      **kwargs):
+    """
     Plot histogram of proportion of variance for some tasks across units
-    :param save_name:
-    :param data_type:
-    :param rule_pair: list of rules. Show proportion of variance for the first rule
-    :return:
-    '''
+
+    Args:
+        model_dir: model directory
+        rule_pair: tuple of strings, pair of rules
+        plot_example: bool
+        figname_extra: string or None
+    """
 
     hists, bins_edge = compute_hist_varprop(model_dir, rule_pair)
 
@@ -242,11 +249,16 @@ def plot_hist_varprop(model_dir, rule_pair, plot_example=False, **kwargs):
         hist_example = None
 
     hist_plot = hist_med
-    figname = ('plot_hist_varprop'+rule_pair[0]+rule_pair[1]+'.pdf').replace('*','')
+    figname = 'plot_hist_varprop' + rule_pair[0] + rule_pair[1]
+    figname = figname.replace('*','')
+    if figname_extra:
+        figname += figname_extra
     _plot_hist_varprop(hist_plot, bins_edge, rule_pair=rule_pair,
-                       hist_example=hist_example, figname=figname, **kwargs)
+                       hist_example=hist_example, figname=figname+'.pdf',
+                       **kwargs)
 
-def plot_hist_varprop_selection(model_dir):
+
+def plot_hist_varprop_selection(model_dir, figname_extra=None):
     rule_pair_list = [('dm1', 'dm2'),
                   ('contextdm1', 'contextdm2'),
                   ('dm1', 'fdanti'),
@@ -260,7 +272,8 @@ def plot_hist_varprop_selection(model_dir):
             plot_hist_varprop(model_dir=model_dir,
                               rule_pair=rule_pair,
                               plot_legend=(rule_pair==('dm1', 'fdanti')),
-                              plot_example=True)
+                              plot_example=True,
+                              figname_extra=figname_extra)
         except ValueError:
             pass
 
