@@ -112,12 +112,13 @@ CA = clustering.Analysis(model_dir, data_type='epoch')
 CA.plot_variance()
 CA.plot_2Dvisualization()
 
-# Varying hyperparameter analysis
-varyhparams.plot_n_clusters()
-
 # FTV Analysis-------------------------------------------------------------
 variance.plot_hist_varprop_selection(root_dir)
 variance.plot_hist_varprop_all(root_dir)
+
+# Varying hyperparameter analysis------------------------------------------
+varyhparams.plot_n_clusters()
+varyhparams.plot_hist_varprop_tanh()
 
 # Task Representation------------------------------------------------------
 tsa = taskset.TaskSetAnalysis(model_dir)

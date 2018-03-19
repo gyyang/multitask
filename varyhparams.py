@@ -29,6 +29,12 @@ from os.path import isfile, join
 train_dirs = [d for d in train_dirs if 'variance_rule.pkl' in [f for f in listdir(d) if isfile(join(d, f))]]#maddy added
 
 
+hp_name = {'activation': 'Activation Fun.',
+           'rnn_type': 'Network type',
+           'w_rec_init': 'Initialization',
+           'l1_h': 'L1 rate',
+           'l1_weight': 'L1 weight'}
+
 #maddy added check tanh fig 4
 #root_dir = './data/debug/8' #0, 33 './data/train_all'
 """
@@ -248,11 +254,7 @@ def plot_n_clusters():
     ax.set_xticks([0, len(n_clusters) - 1])
     ax.set_xticklabels([1, len(n_clusters)])
     ax.set_yticks(range(len(hp_plots)))
-    hp_name = {'activation': 'Activation Fun.',
-               'rnn_type': 'Network type',
-               'w_rec_init': 'Initialization',
-               'l1_h': 'L1 rate',
-               'l1_weight': 'L1 weight'}
+
     hp_plot_names = [hp_name[hp] for hp in hp_plots]
     ax.set_yticklabels(hp_plot_names, fontsize=7)
     ax.tick_params(length=0)
@@ -262,17 +264,53 @@ def plot_n_clusters():
     plt.savefig(os.path.join(FIGPATH, 'NumClusters.eps'), transparent=True)
 
 
-n_clusters, hparams_list = get_n_clusters()
+def plot_n_cluster_hist():
+    n_clusters, hparams_list = get_n_clusters()
+    hp_plots = ['activation', 'rnn_type', 'w_rec_init', 'l1_h', 'l1_weight']
+    for hp_plot in hp_plots:
+        _plot_n_cluster_hist(hp_plot, n_clusters, hparams_list)
 
-# Compare activation, ignore tanh that can not be trained with LeakyRNN
-n_cluster_dict = defaultdict(list)
-for hp, n_cluster in zip(hparams_list, n_clusters):
-    n_cluster_dict[hp['activation']].append(n_cluster)
-plt.figure()
-for key, val in n_cluster_dict.items():
-    hist, bin_edges = np.histogram(val, density=True, range=(0, 30), bins=30)
-    plt.hist(val, label=key)
-plt.legend()
+
+def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
+    """Plot histogram for number of clusters."""
+    if hparams_list is None:
+        n_clusters, hparams_list = get_n_clusters()
+
+    # Compare activation, ignore tanh that can not be trained with LeakyRNN
+    # hp_plot = 'activation'
+    # hp_plot = 'rnn_type'
+    # hp_plot = 'w_rec_init'
+
+    n_cluster_dict = defaultdict(list)
+    for hp, n_cluster in zip(hparams_list, n_clusters):
+        if hp_plot == 'activation' and hp['rnn_type'] != 'LeakyGRU':
+            continue
+        if hp_plot == 'rnn_type' and hp['activation'] == 'tanh':
+            continue
+        n_cluster_dict[hp[hp_plot]].append(n_cluster)
+
+    import seaborn as sns
+    colors = sns.color_palette("hls", 4)
+    label_map = {'softplus': 'softplus',
+                 'relu': 'ReLU',
+                 'tanh': 'tanh',
+                 'LeakyGRU': 'GRU',
+                 'LeakyRNN': 'RNN'}
+    fig = plt.figure(figsize=(1.5, 1.2))
+    ax = fig.add_axes([0.2, 0.2, 0.7, 0.7])
+    for i, (key, val) in enumerate(n_cluster_dict.items()):
+        hist, bin_edges = np.histogram(val, density=True, range=(0, 30), bins=30)
+        # plt.bar(bin_edges[:-1], hist, label=key)
+        ax.hist(val, label=label_map.get(key, str(key)), range=(0, 30),
+                density=True, bins=16, ec=colors[i], facecolor='None', lw=1.5)
+    ax.legend(loc=3, bbox_to_anchor=(1, 0), title=hp_name[hp_plot], frameon=False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.set_yticks([])
+    ax.set_xticks([0, 15, 30])
+    ax.set_xlabel('Number of clusters')
+
 
 def plot_hist_varprop_tanh():
     """Plot FTV distribution for tanh network."""
@@ -291,3 +329,6 @@ def plot_hist_varprop_tanh():
     assert log['perf_min'][-1] > hp['target_perf']
     variance.plot_hist_varprop_selection(train_dir, figname_extra='_tanh')
 
+
+if __name__ == '__main__':
+    plot_n_cluster_hist()
