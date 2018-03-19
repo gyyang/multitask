@@ -1,1 +1,5 @@
 *.pyc
+data/*
+figure/*
+debug/*
+previous_versions/*
