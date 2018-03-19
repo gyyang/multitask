@@ -16,11 +16,11 @@ parser.add_argument('run')
 args = parser.parse_args()
 
 sbatchpath = './sbatch/'
-scratchpath = '/scratch/gy441/multitask/'
+scratchpath = '/scratch/mj98-share/multitask/'
 
 
 def write_jobfile(cmd, jobname, sbatchpath, scratchpath,
-                  nodes=1, ppn=1, gpus=0, mem=16, nhours=12):
+                  nodes=1, ppn=1, gpus=0, mem=16, nhours=18):
     """
     Create a job file.
 
