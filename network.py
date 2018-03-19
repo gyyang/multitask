@@ -147,12 +147,7 @@ class LeakyRNNCell(RNNCell):
             self._activation = tf.nn.softplus
             self._bias_start = 0.
             self._w_in_start = 1.0
-            if self._w_rec_init == 'diag':
-                self._w_rec_start = 0.54
-            elif self._w_rec_init == 'randortho':
-                self._w_rec_start = 1.0
-            elif self._w_rec_init == 'randgauss':
-                self._w_rec_start = 1.0
+            self._w_rec_start = 0.5
         elif activation == 'tanh':
             self._activation = tf.tanh
             self._bias_start = 0.
@@ -162,22 +157,17 @@ class LeakyRNNCell(RNNCell):
             self._activation = tf.nn.relu
             self._bias_start = 0.5
             self._w_in_start = 1.0
-            if self._w_rec_init == 'diag':
-                self._w_rec_start = 0.54
-            elif self._w_rec_init == 'randortho':
-                self._w_rec_start = 0.5
-            elif self._w_rec_init == 'randgauss':
-                self._w_rec_start = 1.0
-        elif activation == 'suplin':
+            self._w_rec_start = 0.5
+        elif activation == 'power':
             self._activation = lambda x: tf.square(tf.nn.relu(x))
             self._bias_start = 0.5
             self._w_in_start = 1.0
-            if self._w_rec_init == 'diag':
-                self._w_rec_start = 0.01  # Only using this now
-            elif self._w_rec_init == 'randortho':
-                self._w_rec_start = 1.0
-            elif self._w_rec_init == 'randgauss':
-                self._w_rec_start = 1.0
+            self._w_rec_start = 0.01
+        elif activation == 'retanh':
+            self._activation = lambda x: tf.tanh(tf.nn.relu(x))
+            self._bias_start = 0.5
+            self._w_in_start = 1.0
+            self._w_rec_start = 0.5
         else:
             raise ValueError('Unknown activation')
         self._alpha = alpha
@@ -590,7 +580,12 @@ class Model(object):
             self.c_mask = tf.placeholder("float", [None])
 
         # Activation functions
-        f_act = getattr(tf.nn, hparams['activation'])
+        if hparams['activation'] == 'power':
+            f_act = lambda x: tf.square(tf.nn.relu(x))
+        elif hparams['activation'] == 'retanh':
+            f_act = lambda x: tf.tanh(tf.nn.relu(x))
+        else:
+            f_act = getattr(tf.nn, hparams['activation'])
 
         # Recurrent activity
         if hparams['rnn_type'] == 'LeakyRNN':

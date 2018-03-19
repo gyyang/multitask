@@ -72,12 +72,12 @@ def train_vary_hparams(i):
     """
     # Ranges of hyperparameters to loop over
     hp_ranges = dict()
-    hp_ranges['activation'] = ['softplus','relu', 'tanh']
+    hp_ranges['activation'] = ['softplus','relu', 'tanh', 'retanh', 'power']
     hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
     hp_ranges['w_rec_init'] = ['diag', 'randortho']
-    hp_ranges['l1_h'] = [0, 1e-4]
-    hp_ranges['l2_h'] = [0, 1e-4]
-    hp_ranges['l1_weight'] = [0, 1e-4]
+    hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]
+    hp_ranges['l2_h'] = [0]
+    hp_ranges['l1_weight'] = [0, 1e-5, 1e-4, 1e-3]
 
     # Unravel the input index
     keys = hp_ranges.keys()
@@ -90,7 +90,7 @@ def train_vary_hparams(i):
     for key, index in zip(keys, indices):
         hparams[key] = hp_ranges[key][index]
 
-    train_dir = os.path.join(DATAPATH, 'debug', str(i))
+    train_dir = os.path.join(DATAPATH, 'varyhparams', str(i))
     #train.train(train_dir, hparams, ruleset='mante', max_steps=1e7)
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     train.train(train_dir, hparams, ruleset='all', rule_prob_map=rule_prob_map, max_steps=1e8)
