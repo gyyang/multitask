@@ -104,9 +104,9 @@ if args.run == 'all':
         subprocess.call(['sbatch', jobfile])
 
 if args.run == 'all_varyhp': 
-    for seed in range(0, 64):
-        jobname = 'train_varyhp_{:d}'.format(seed)
-        train_arg = '{:d}'.format(seed)
+    for i in range(0, 320):
+        jobname = 'train_varyhp_{:d}'.format(i)
+        train_arg = '{:d}'.format(i)
         cmd = r'''python -c "import experiment as e;e.train_vary_hparams('''+\
               train_arg+''')"'''
 
