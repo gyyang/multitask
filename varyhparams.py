@@ -10,23 +10,16 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 import tools
-import variance #maddy added
+import variance
 import clustering
-import standard_analysis #maddy added. 
+import standard_analysis #maddy added.
 
 matplotlib.rcParams.update({'font.size': 7})
 
 DATAPATH = os.path.join(os.getcwd(), 'data', 'train_varyhparams')
 FIGPATH = os.path.join(os.getcwd(), 'figure')
 
-# Get all the subdirectories
-train_dirs = [os.path.join(DATAPATH, d) for d in os.listdir(DATAPATH)]
-train_dirs = [d for d in train_dirs if os.path.isdir(d)]
-
-from os import listdir
-#check if training is completed 
-from os.path import isfile, join
-train_dirs = [d for d in train_dirs if 'variance_rule.pkl' in [f for f in listdir(d) if isfile(join(d, f))]]#maddy added
+model_dirs = tools.valid_model_dirs(DATAPATH)
 
 
 hp_name = {'activation': 'Activation Fun.',
@@ -51,54 +44,37 @@ standard_analysis.easy_activity_plot(root_dir, rule)
 print "easy_connectivity_plot"+root_dir
 """
 
-"""
-hparams_list = list()
-for train_dir in train_dirs:
-    
-    hparams = tools.load_hparams(train_dir)
-    #check if performance exceeds target
-    log = tools.load_log(train_dir) 
-    #if log['perf_avg'][-1] > hparams['target_perf']: 
-    if log['perf_min'][-1] > hparams['target_perf']:         
+def compute_n_cluster():
+    for model_dir in model_dirs:
+        print(model_dir)
+        log = tools.load_log(model_dir)
+        hparams = tools.load_hparams(model_dir)
+        try:
+            analysis = clustering.Analysis(model_dir, 'rule')
 
-            #if hparams['activation']=='tanh': #maddy added - check tanh
-            if hparams['rnn_type']=='LeakyGRU': #maddy added - check tanh
-            
-                countval+=1
-                #print countval, train_dir[-2:] #maddy added
-        
-                #print hparams['rnn_type'], log['perf_min'][-1] #maddy added 
-                #if hparams['rnn_type'] == 'LeakyGRU':
-                #    LeakyGRU_perfmin.append(log['perf_min'][-1])
-                
-                # variance.compute_variance(train_dir)
-                analysis = clustering.Analysis(train_dir, 'rule')
-                n_clusters.append(analysis.n_cluster)
-                scores.append(analysis.scores)
-                analysis.plot_cluster_score()
-                hparams_list.append(hparams)
-        
-                log['n_cluster'] = analysis.n_cluster #maddy added save no of clusters. 
-                log['train_dir'] =train_dir
-                #tools.save_log(log)
-                        
-                analysis.plot_example_unit()
-                analysis.plot_variance()
-                analysis.plot_2Dvisualization()
-    
-            print "done"
-"""
+            log['n_cluster'] = analysis.n_cluster
+            log['train_dir'] = model_dir
+            tools.save_log(log)
+        except IOError:
+            # Training never finished
+            assert log['perf_min'][-1] <= hparams['target_perf']
 
-        
+        # analysis.plot_example_unit()
+        # analysis.plot_variance()
+        # analysis.plot_2Dvisualization()
+
+    print("done")
+
+
 def plot_histogram():
     initdict = defaultdict(list)
     initdictother = defaultdict(list)
     initdictotherother = defaultdict(list)
 
-    for train_dir in train_dirs:
-        hparams = tools.load_hparams(train_dir)
+    for model_dir in model_dirs:
+        hparams = tools.load_hparams(model_dir)
         #check if performance exceeds target
-        log = tools.load_log(train_dir) 
+        log = tools.load_log(model_dir)
         #if log['perf_avg'][-1] > hparams['target_perf']: 
         if log['perf_min'][-1] > hparams['target_perf']:         
             print('no. of clusters', log['n_cluster'])
@@ -199,11 +175,11 @@ def plot_histogram():
 
 def get_n_clusters():
     hparams_list = list()
-    for i, train_dir in enumerate(train_dirs):
+    for i, model_dir in enumerate(model_dirs):
         if i % 10 == 0:
-            print('Analyzing model {:d}/{:d}'.format(i, len(train_dirs)))
-        hparams = tools.load_hparams(train_dir)
-        log = tools.load_log(train_dir)
+            print('Analyzing model {:d}/{:d}'.format(i, len(model_dirs)))
+        hparams = tools.load_hparams(model_dir)
+        log = tools.load_log(model_dir)
         # check if performance exceeds target
         if log['perf_min'][-1] > hparams['target_perf']:
             n_clusters.append(log['n_cluster'])
@@ -215,7 +191,7 @@ def plot_n_clusters():
     """Plot the number of clusters."""
     n_clusters, hparams_list = get_n_clusters()
     hp_ranges = OrderedDict()
-    hp_ranges['activation'] = ['softplus', 'relu', 'tanh']
+    hp_ranges['activation'] = ['softplus', 'relu', 'tanh', 'retanh', 'power']
     hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
     hp_ranges['w_rec_init'] = ['diag', 'randortho']
     hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]
@@ -320,15 +296,17 @@ def plot_hist_varprop_tanh():
                  'l1_h': 0,
                  'l1_weight': 0}
 
-    for i, train_dir in enumerate(train_dirs):
-        hp = tools.load_hparams(train_dir)
+    for i, model_dir in enumerate(model_dirs):
+        hp = tools.load_hparams(model_dir)
         if all(hp[key]==val for key, val in hp_target.items()):
             break
-    log = tools.load_log(train_dir)
+    log = tools.load_log(model_dir)
     # check if performance exceeds target
     assert log['perf_min'][-1] > hp['target_perf']
-    variance.plot_hist_varprop_selection(train_dir, figname_extra='_tanh')
+    variance.plot_hist_varprop_selection(model_dir, figname_extra='_tanh')
 
 
 if __name__ == '__main__':
-    plot_n_cluster_hist()
+    compute_n_cluster()
+    # plot_n_clusters()
+    # plot_n_cluster_hist()

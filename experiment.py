@@ -5,8 +5,10 @@ from __future__ import division
 import os
 import numpy as np
 
+import tools
 import train
 import variance
+import clustering
 
 # TODO: make this flexible
 DATAPATH = os.path.join(os.getcwd(), 'data')
@@ -95,7 +97,12 @@ def train_vary_hparams(i):
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     train.train(train_dir, hparams, ruleset='all', rule_prob_map=rule_prob_map, max_steps=1e8)
 
+    # Analyses
     variance.compute_variance(train_dir)
+    log = tools.load_log(train_dir)
+    analysis = clustering.Analysis(train_dir, 'rule')
+    log['n_cluster'] = analysis.n_cluster
+    tools.save_log(log)
 
 
 if __name__ == '__main__':
