@@ -256,7 +256,7 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
         if hp_plot == 'activation' and hp['rnn_type'] != 'LeakyGRU':
             # For activation, only analyze LeakyGRU cells
             continue
-        if hp_plot == 'rnn_type' and hp['activation'] == 'tanh':
+        if hp_plot == 'rnn_type' and hp['activation'] in ['tanh', 'retanh']:
             # For rnn_type, exclude tanh units
             continue
         n_cluster_dict[hp[hp_plot]].append(n_cluster)
@@ -265,24 +265,36 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     colors = sns.color_palette("hls", 5)
     label_map = {'softplus': 'softplus',
                  'relu': 'ReLU',
+                 'retanh': 'Retanh',
                  'tanh': 'tanh',
                  'LeakyGRU': 'GRU',
                  'LeakyRNN': 'RNN'}
-    fig = plt.figure(figsize=(1.5, 1.2))
-    ax = fig.add_axes([0.2, 0.2, 0.7, 0.7])
+    # fig = plt.figure(figsize=(1.5, 1.2))
+    # ax = fig.add_axes([0.2, 0.2, 0.7, 0.7])
+    f, axs = plt.subplots(len(n_cluster_dict), 1,
+                          sharex=True, figsize=(1.5, 2))
     for i, (key, val) in enumerate(n_cluster_dict.items()):
-        hist, bin_edges = np.histogram(val, density=True, range=(0, 30), bins=30)
+        ax = axs[i]
+        hist, bin_edges = np.histogram(val, density=True, range=(0, 30),
+                                       bins=30)
         # plt.bar(bin_edges[:-1], hist, label=key)
         ax.hist(val, label=label_map.get(key, str(key)), range=(0, 30),
-                density=True, bins=16, ec=colors[i], facecolor='None', lw=1.5)
-    ax.legend(loc=3, bbox_to_anchor=(1, 0), title=hp_name[hp_plot], frameon=False)
-    ax.spines["left"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["top"].set_visible(False)
-    ax.set_yticks([])
-    ax.set_xticks([0, 15, 30])
+                density=True, bins=16, ec=colors[i], facecolor=colors[i],
+                lw=1.5)
+        ax.spines["left"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.set_yticks([])
+        ax.set_xticks([0, 15, 30])
+        ax.set_xlim([0, 30])
+        ax.text(0.7, 0.7, label_map.get(key, str(key)), fontsize=7,
+                transform=ax.transAxes)
+        if i == 0:
+            ax.set_title(hp_name[hp_plot], fontsize=7)
+    # ax.legend(loc=3, bbox_to_anchor=(1, 0), title=hp_name[hp_plot], frameon=False)
     ax.set_xlabel('Number of clusters')
-    figname = os.path.join(FIGPATH, 'NumClustersHist'+hp_plot+'.eps')
+    plt.tight_layout()
+    figname = os.path.join(FIGPATH, 'NumClustersHist' + hp_plot + '.eps')
     plt.savefig(figname, transparent=True)
 
     return n_cluster_dict
