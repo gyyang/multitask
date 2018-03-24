@@ -202,12 +202,11 @@ def pretty_singleneuron_plot(model_dir,
 
     Args:
         model_dir:
-        neurons: indices of neurons to plot
         rules: rules to plot
+        neurons: indices of neurons to plot
         epoch: epoch to plot
         save: save figure?
         ylabel_firstonly: if True, only plot ylabel for the first rule in rules
-
     """
 
     if isinstance(rules, str):
@@ -286,6 +285,45 @@ def pretty_singleneuron_plot(model_dir,
             if save:
                 plt.savefig(figname, transparent=True)
             plt.show()
+
+
+def activity_histogram(model_dir,
+                       rules,
+                       title=None,
+                       save_name=''):
+    """Plot the activity histogram."""
+
+    if isinstance(rules, str):
+        rules = [rules]
+
+    h_all = list()
+    model = Model(model_dir)
+    hparams = model.hparams
+    with tf.Session() as sess:
+        model.restore()
+
+        t_start = int(500/hparams['dt'])
+
+        for rule in rules:
+            # Generate a batch of trial from the test mode
+            trial = generate_trials(rule, hparams, mode='test')
+            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            h = sess.run(model.h, feed_dict=feed_dict)
+            h_all.append(h.flatten())
+
+    h_all = np.array(h_all).flatten()
+
+    fig = plt.figure(figsize=(1.5, 1.2))
+    ax = fig.add_axes([0.2, 0.2, 0.7, 0.6])
+    ax.hist(h_all, bins=20, density=True)
+    ax.set_xlabel('Activity', fontsize=7)
+    [ax.spines[s].set_visible(False) for s in ['left', 'top', 'right']]
+    ax.set_yticks([])
+    if title:
+        ax.set_title(title, fontsize=7)
+    figname = 'figure/activity_histogram' + save_name + '.eps'
+    plt.savefig(figname, transparent=True)
+
 
 def schematic_plot(model_dir, rule=None):
     import seaborn as sns

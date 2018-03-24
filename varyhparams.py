@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 import tools
 import variance
 import clustering
-import standard_analysis #maddy added.
+import standard_analysis
 
 matplotlib.rcParams.update({'font.size': 7})
 
-DATAPATH = os.path.join(os.getcwd(), 'data', 'train_varyhparams')
+DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhparams')
 FIGPATH = os.path.join(os.getcwd(), 'figure')
 
 model_dirs = tools.valid_model_dirs(DATAPATH)
@@ -175,6 +175,7 @@ def plot_histogram():
 
 def get_n_clusters():
     hparams_list = list()
+    n_clusters = list()
     for i, model_dir in enumerate(model_dirs):
         if i % 10 == 0:
             print('Analyzing model {:d}/{:d}'.format(i, len(model_dirs)))
@@ -240,13 +241,6 @@ def plot_n_clusters():
     plt.savefig(os.path.join(FIGPATH, 'NumClusters.eps'), transparent=True)
 
 
-def plot_n_cluster_hist():
-    n_clusters, hparams_list = get_n_clusters()
-    hp_plots = ['activation', 'rnn_type', 'w_rec_init', 'l1_h', 'l1_weight']
-    for hp_plot in hp_plots:
-        _plot_n_cluster_hist(hp_plot, n_clusters, hparams_list)
-
-
 def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     """Plot histogram for number of clusters."""
     if hparams_list is None:
@@ -266,7 +260,7 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
         n_cluster_dict[hp[hp_plot]].append(n_cluster)
 
     import seaborn as sns
-    colors = sns.color_palette("hls", 4)
+    colors = sns.color_palette("hls", 5)
     label_map = {'softplus': 'softplus',
                  'relu': 'ReLU',
                  'tanh': 'tanh',
@@ -287,10 +281,19 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     ax.set_xticks([0, 15, 30])
     ax.set_xlabel('Number of clusters')
 
+    return n_cluster_dict
 
-def plot_hist_varprop_tanh():
-    """Plot FTV distribution for tanh network."""
-    hp_target = {'activation': 'tanh',
+
+def plot_n_cluster_hist():
+    n_clusters, hparams_list = get_n_clusters()
+    hp_plots = ['activation', 'rnn_type', 'w_rec_init', 'l1_h', 'l1_weight']
+    hp_plots = ['activation']
+    for hp_plot in hp_plots:
+        n_cluster_dict = _plot_n_cluster_hist(hp_plot, n_clusters, hparams_list)
+
+
+def get_model_by_activation(activation):
+    hp_target = {'activation': activation,
                  'rnn_type': 'LeakyGRU',
                  'w_rec_init': 'diag',
                  'l1_h': 0,
@@ -298,15 +301,49 @@ def plot_hist_varprop_tanh():
 
     for i, model_dir in enumerate(model_dirs):
         hp = tools.load_hparams(model_dir)
-        if all(hp[key]==val for key, val in hp_target.items()):
+        if all(hp[key] == val for key, val in hp_target.items()):
             break
+
     log = tools.load_log(model_dir)
     # check if performance exceeds target
     assert log['perf_min'][-1] > hp['target_perf']
+
+    return model_dir, hp
+
+
+def plot_hist_varprop(activation):
+    """Plot FTV distribution."""
+    model_dir, hp = get_model_by_activation(activation)
     variance.plot_hist_varprop_selection(model_dir, figname_extra='_tanh')
 
 
+def pretty_singleneuron_plot(activation='tanh'):
+    """Plot single neuron activity."""
+    model_dir, hp = get_model_by_activation(activation)
+    standard_analysis.pretty_singleneuron_plot(
+        model_dir, ['contextdm1', 'contextdm2'], range(2)
+    )
+
+
+def activity_histogram(activation):
+    """Plot FTV distribution for tanh network."""
+    model_dir, hp = get_model_by_activation(activation)
+    title = activation
+    save_name = '_' + activation
+    standard_analysis.activity_histogram(
+        model_dir, ['contextdm1', 'contextdm2'], title=title,
+        save_name=save_name
+    )
+
+
+
 if __name__ == '__main__':
-    compute_n_cluster()
+    pass
+    # compute_n_cluster()
     # plot_n_clusters()
     # plot_n_cluster_hist()
+    # pretty_singleneuron_plot('tanh')
+    # pretty_singleneuron_plot('relu')
+    activity_histogram('tanh')
+    activity_histogram('relu')
+
