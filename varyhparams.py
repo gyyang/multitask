@@ -254,8 +254,10 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     n_cluster_dict = defaultdict(list)
     for hp, n_cluster in zip(hparams_list, n_clusters):
         if hp_plot == 'activation' and hp['rnn_type'] != 'LeakyGRU':
+            # For activation, only analyze LeakyGRU cells
             continue
         if hp_plot == 'rnn_type' and hp['activation'] == 'tanh':
+            # For rnn_type, exclude tanh units
             continue
         n_cluster_dict[hp[hp_plot]].append(n_cluster)
 
@@ -280,6 +282,8 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     ax.set_yticks([])
     ax.set_xticks([0, 15, 30])
     ax.set_xlabel('Number of clusters')
+    figname = os.path.join(FIGPATH, 'NumClustersHist'+hp_plot+'.eps')
+    plt.savefig(figname, transparent=True)
 
     return n_cluster_dict
 
@@ -287,7 +291,7 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
 def plot_n_cluster_hist():
     n_clusters, hparams_list = get_n_clusters()
     hp_plots = ['activation', 'rnn_type', 'w_rec_init', 'l1_h', 'l1_weight']
-    hp_plots = ['activation']
+    # hp_plots = ['activation']
     for hp_plot in hp_plots:
         n_cluster_dict = _plot_n_cluster_hist(hp_plot, n_clusters, hparams_list)
 
@@ -341,9 +345,7 @@ if __name__ == '__main__':
     pass
     # compute_n_cluster()
     # plot_n_clusters()
-    # plot_n_cluster_hist()
+    plot_n_cluster_hist()
     # pretty_singleneuron_plot('tanh')
     # pretty_singleneuron_plot('relu')
-    activity_histogram('tanh')
-    activity_histogram('relu')
-
+    # [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
