@@ -290,13 +290,13 @@ def pretty_singleneuron_plot(model_dir,
 def activity_histogram(model_dir,
                        rules,
                        title=None,
-                       save_name=''):
+                       save_name=None):
     """Plot the activity histogram."""
 
     if isinstance(rules, str):
         rules = [rules]
 
-    h_all = list()
+    h_all = None
     model = Model(model_dir)
     hparams = model.hparams
     with tf.Session() as sess:
@@ -309,20 +309,23 @@ def activity_histogram(model_dir,
             trial = generate_trials(rule, hparams, mode='test')
             feed_dict = tools.gen_feed_dict(model, trial, hparams)
             h = sess.run(model.h, feed_dict=feed_dict)
-            h_all.append(h.flatten())
+            h = h[t_start:, :, :]
+            if h_all is None:
+                h_all = h
+            else:
+                h_all = np.concatenate((h_all, h), axis=1)
 
-    h_all = np.array(h_all).flatten()
+    # var = h_all.var(axis=0).mean(axis=0)
+    # ind = var > 1e-2
+    # h_plot = h_all[:, :, ind].flatten()
+    h_plot = h_all.flatten()
 
     fig = plt.figure(figsize=(1.5, 1.2))
     ax = fig.add_axes([0.2, 0.2, 0.7, 0.6])
-    ax.hist(h_all, bins=20, density=True)
+    ax.hist(h_plot, bins=20, density=True)
     ax.set_xlabel('Activity', fontsize=7)
     [ax.spines[s].set_visible(False) for s in ['left', 'top', 'right']]
     ax.set_yticks([])
-    if title:
-        ax.set_title(title, fontsize=7)
-    figname = 'figure/activity_histogram' + save_name + '.eps'
-    plt.savefig(figname, transparent=True)
 
 
 def schematic_plot(model_dir, rule=None):
@@ -499,5 +502,10 @@ if __name__ == "__main__":
     # pretty_singleneuron_plot(model_dir, rule, [0], epoch=None, save=False,
     #                          trace_only=True, plot_stim_avg=True)
 
+    # Plot activity histogram
+    # model_dir = '/Users/guangyuyang/MyPython/RecurrentNetworkTraining/multitask/data/varyhparams/33'
+    # activity_histogram(model_dir, ['contextdm1', 'contextdm2'])
+
     # Plot schematic
-    schematic_plot(model_dir, rule)
+    # schematic_plot(model_dir, rule)
+
