@@ -356,8 +356,8 @@ def activity_histogram(activation):
 if __name__ == '__main__':
     pass
     # compute_n_cluster()
-    # plot_n_clusters()
-    plot_n_cluster_hist()
+    plot_n_clusters()
+    # plot_n_cluster_hist()
     # pretty_singleneuron_plot('tanh')
     # pretty_singleneuron_plot('relu')
     # [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
