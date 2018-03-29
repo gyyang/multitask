@@ -5,20 +5,16 @@ Analysis of the choice att tasks
 from __future__ import division
 
 import os
-import numpy as np
 import pickle
-import time
-import copy
 from collections import OrderedDict
-import scipy.stats as stats
-from scipy.optimize import curve_fit, minimize
-import matplotlib as mpl
+import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
-from task import *
-from run import Run
-from network import get_perf
+import seaborn as sns
+
+from task import generate_trials, rule_name
+from network import Model
+import tools
 from slowpoints import search_slowpoints
 
 save = False # TEMP
@@ -34,7 +30,7 @@ def generate_surrogate_data():
     perfs = np.ones(batch_size)
 
     # Generate choice
-    rel_mod = '1' if rule == CHOICEATTEND_MOD1 else '2' # relevant modality
+    rel_mod = '1' if rule == 'contextdm1' else '2' # relevant modality
     rel_coh = params['tar1_mod'+rel_mod+'_strengths']-params['tar2_mod'+rel_mod+'_strengths']
     y_choice = (rel_coh>0)*2-1
 
@@ -54,15 +50,15 @@ def generate_surrogate_data():
     return h_sample, y_choice, perfs
 
 class UnitAnalysis(object):
-    def __init__(self, save_addon, fast_eval=True):
+    def __init__(self, model_dir, fast_eval=True):
         data_type  = 'rule'
-        fname = 'data/variance'+data_type+save_addon
-        with open(fname+'.pkl','rb') as f:
+        fname = os.path.join(model_dir, 'variance_' + data_type)
+        with open(fname + '.pkl', 'rb') as f:
             res = pickle.load(f)
         h_var_all = res['h_var_all']
         keys      = res['keys']
 
-        rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+        rules = ['contextdm1', 'contextdm2']
         ind_rules = [keys.index(rule) for rule in rules]
         h_var_all = h_var_all[:, ind_rules]
 
@@ -82,13 +78,13 @@ class UnitAnalysis(object):
 
         ind_lesions_orig = {key: ind_active[val] for key, val in ind_lesions.items()}
 
-        self.save_addon         = save_addon
-        self.ind_lesions        = ind_lesions
-        self.ind_lesions_orig   = ind_lesions_orig
-        self.fast_eval          = fast_eval
-        self.h_normvar_all      = h_normvar_all
-        self.rules              = rules
-        self.ind_active         = ind_active
+        self.model_dir = model_dir
+        self.ind_lesions = ind_lesions
+        self.ind_lesions_orig = ind_lesions_orig
+        self.fast_eval = fast_eval
+        self.h_normvar_all = h_normvar_all
+        self.rules = rules
+        self.ind_active = ind_active
         self.colors = dict(zip([None, '1', '2', '12'],
                                sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
         self.lesion_group_names = {None : 'intact',
@@ -140,8 +136,8 @@ class UnitAnalysis(object):
         from performance import psychometric_choicefamily_2D
 
         # Rules for performance
-        # rules_perf = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
-        rules_perf = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+        # rules_perf = ['contextdm1', 'contextdm2', CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
+        rules_perf = ['contextdm1', 'contextdm2']
         lesion_group_list = [None, '1', '2', '12']
 
         perf_stores = OrderedDict()
@@ -288,7 +284,7 @@ class UnitAnalysis(object):
         l = 0.35
         l0 = (1-1.5*l)/nh
 
-        w_in_rule = w_in[:,2*nr+1+np.array([CHOICEATTEND_MOD1,CHOICEATTEND_MOD2])]
+        w_in_rule = w_in[:,2*nr+1+np.array(['contextdm1','contextdm2'])]
 
         plot_infos = [(w_rec              , [l               ,l          ,nh*l0    ,nh*l0]),
                       (w_in[:,[0]]        , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
@@ -335,15 +331,14 @@ class UnitAnalysis(object):
     def plot_inout_connectivity(self, conn_type='input'):
         # Plot connectivity
         # Sort data by labels and by input connectivity
+        model = Model(model_dir)
+        hparams = model.hparams
+        with tf.Session() as sess:
+            model.restore()
+            w_in, w_out, w_rec = sess.run(
+                [model.w_in, model.w_out, model.w_rec])
 
-        with Run(save_addon, sigma_rec=0) as R:
-            w_in  = R.w_in # for later sorting
-            w_out = R.w_out
-            w_rec = R.w_rec
-            config = R.config
-        nx, nh, ny = config['shape']
-        n_ring = config['N_RING']
-
+        n_ring = hparams['n_eachring']
         groups = ['1', '2', '12']
 
         ############# Plot recurrent connectivity #############################
@@ -373,7 +368,7 @@ class UnitAnalysis(object):
 
         ############# Plot input from rule ####################################
         elif conn_type == 'rule':
-            rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2, CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
+            rules = ['contextdm1', 'contextdm2', CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
 
 
             w_stores = OrderedDict()
@@ -498,7 +493,7 @@ class StateSpaceAnalysis(object):
 
         #################### Computing Neural Activity #########################
         # Get rules and regressors
-        rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+        rules = ['contextdm1', 'contextdm2']
         regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
 
         n_rule = len(rules)
@@ -991,7 +986,7 @@ class StateSpaceAnalysis(object):
             ind *= (self.Regrs[:, 2] == coh2)
 
         if rule is not None:
-            j_rule = 1 if rule == CHOICEATTEND_MOD1 else -1
+            j_rule = 1 if rule == 'contextdm1' else -1
             ind *= (self.Regrs[:, 3] == j_rule)
 
         return ind
@@ -1137,7 +1132,7 @@ class StateSpaceAnalysis(object):
 
         ind_group, ind_active_group = self.sort_ind_bygroup()
 
-        rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+        rules = ['contextdm1', 'contextdm2']
 
         t_plot = np.arange(self.H.shape[0])*self.config['dt_new']/1000
 
@@ -1202,7 +1197,7 @@ class StateSpaceAnalysis(object):
 
         ind_group, ind_active_group = self.sort_ind_bygroup()
 
-        rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+        rules = ['contextdm1', 'contextdm2']
 
         t_plot = np.arange(self.H.shape[0])*self.config['dt_new']/1000
 
@@ -1310,7 +1305,7 @@ def plot_betaweights(save_type, save_type_end=None):
 
 def quick_statespace(save_addon):
     # Quick state space analysis from mode='test'
-    rules = [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]
+    rules = ['contextdm1', 'contextdm2']
     h_lastts = dict()
     with Run(save_addon, sigma_rec=0, fast_eval=True) as R:
         config = R.config
@@ -1393,7 +1388,7 @@ def compute_frac_var(save_type, save_type_end=None, var_list=None, **kwargs):
 def run_all_analyses(save_addon):
     from performance import plot_trainingprogress, plot_choicefamily_varytime, psychometric_choiceattend
     plot_trainingprogress(save_addon)
-    for rule in [CHOICEATTEND_MOD1, CHOICEATTEND_MOD2]:
+    for rule in ['contextdm1', 'contextdm2']:
         pass
         # plot_choicefamily_varytime(save_addon, rule)
 
@@ -1422,18 +1417,19 @@ def run_all_analyses(save_addon):
 
 
 if __name__ == '__main__':
+    root_dir = './data/train_all'
+    model_dir = root_dir + '/0'
+
     ######################### Connectivity and Lesioning ##########################
-    # save_addon = 'attendonly_relu_randortho_200earlystop'
-    # save_addon = 'attendonly_softplus_200latest'
-    # ua = UnitAnalysis(save_addon)
-    # ua.plot_inout_connectivity(conn_type='rec')
+    ua = UnitAnalysis(model_dir)
+    ua.plot_inout_connectivity(conn_type='rec')
     # ua.plot_inout_connectivity(conn_type='rule')
     # ua.plot_inout_connectivity(conn_type='input')
     # ua.plot_inout_connectivity(conn_type='output')
     # ua.prettyplot_hist_varprop()
     # ua.plot_performance_choicetasks()
 
-    rule = CHOICEATTEND_MOD1
+    rule = 'contextdm1'
     # ua.plot_performance_2D(rule=rule)
     # for lesion_group in ['1', '2', '12', '1+2']:
     #     ua.plot_performance_2D(rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
@@ -1486,53 +1482,51 @@ if __name__ == '__main__':
     # run_all_analyses(save_addon)
 
 
-    ssa = StateSpaceAnalysis(save_addon, z_score=False)
-
-    h = ssa.H
-
-    h_context1 = h[:,ssa.Regrs[:,3]== 1,:]
-    h_context2 = h[:,ssa.Regrs[:,3]==-1,:]
-
-    # Last time point variance
-    # h_var1 = h_context1[-1].var(axis=0)
-    # h_var2 = h_context2[-1].var(axis=0)
-
-    h_var1 = h_context1.var(axis=1).mean(axis=0)
-    h_var2 = h_context2.var(axis=1).mean(axis=0)
-
-    var_noise = 0.0
-    h_var1, h_var2 = h_var1+var_noise, h_var2+var_noise
-
-    frac_var = (h_var1-h_var2)/(h_var1+h_var2)   
-    
-    ssa = StateSpaceAnalysis(save_addon, redefine_choice=True)
-
-
-    regr_names = ['Choice', 'Motion', 'Color', 'Rule']
-    fig, axarr = plt.subplots(4, 1, figsize=(1.6,5), sharex=True)
-    for i in range(4):
-        ax = axarr[i]
-        ax.scatter(frac_var, ssa.coef[:,i], s=3,
-                   facecolor='black', edgecolor='none')
-
-        ax.set_xlim([-1.1,1.1])
-        if i == 3:
-            ax.set_xticks([-1,0,1])
-            ax.set_xlabel('FracVar', fontsize=7)
-        else:
-            ax.set_xticks([-1,0,1],['']*3)
-        ax.set_ylim([-2,2])
-        ax.set_yticks([-2,0,2])
-        ax.set_ylabel(regr_names[i], fontsize=7)
-        ax.spines["right"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
-        ax.tick_params(axis='both', which='major', labelsize=7)
-
-    plt.tight_layout()
-
-    
+    # ssa = StateSpaceAnalysis(save_addon, z_score=False)
+    #
+    # h = ssa.H
+    #
+    # h_context1 = h[:,ssa.Regrs[:,3]== 1,:]
+    # h_context2 = h[:,ssa.Regrs[:,3]==-1,:]
+    #
+    # # Last time point variance
+    # # h_var1 = h_context1[-1].var(axis=0)
+    # # h_var2 = h_context2[-1].var(axis=0)
+    #
+    # h_var1 = h_context1.var(axis=1).mean(axis=0)
+    # h_var2 = h_context2.var(axis=1).mean(axis=0)
+    #
+    # var_noise = 0.0
+    # h_var1, h_var2 = h_var1+var_noise, h_var2+var_noise
+    #
+    # frac_var = (h_var1-h_var2)/(h_var1+h_var2)
+    #
+    # ssa = StateSpaceAnalysis(save_addon, redefine_choice=True)
+    #
+    #
+    # regr_names = ['Choice', 'Motion', 'Color', 'Rule']
+    # fig, axarr = plt.subplots(4, 1, figsize=(1.6,5), sharex=True)
+    # for i in range(4):
+    #     ax = axarr[i]
+    #     ax.scatter(frac_var, ssa.coef[:,i], s=3,
+    #                facecolor='black', edgecolor='none')
+    #
+    #     ax.set_xlim([-1.1,1.1])
+    #     if i == 3:
+    #         ax.set_xticks([-1,0,1])
+    #         ax.set_xlabel('FracVar', fontsize=7)
+    #     else:
+    #         ax.set_xticks([-1,0,1],['']*3)
+    #     ax.set_ylim([-2,2])
+    #     ax.set_yticks([-2,0,2])
+    #     ax.set_ylabel(regr_names[i], fontsize=7)
+    #     ax.spines["right"].set_visible(False)
+    #     ax.spines["top"].set_visible(False)
+    #     ax.xaxis.set_ticks_position('bottom')
+    #     ax.yaxis.set_ticks_position('left')
+    #     ax.tick_params(axis='both', which='major', labelsize=7)
+    #
+    # plt.tight_layout()
 
     ################ Pretty Plotting of State-space Results #######################
     # save_addon = 'attendonly_relu_260tuesday'
