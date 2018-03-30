@@ -478,11 +478,12 @@ class StateSpaceAnalysis(object):
     def __init__(self,
                  model_dir,
                  lesion_units=None,
+                 select_group=None,
+                 sigma_rec=None,
                  analyze_allunits=False,
                  redefine_choice=False,
                  z_score=True,
                  surrogate_data=False,
-                 select_group=None,
                  n_rep=1
                  ):
         """State space analysis.
@@ -491,13 +492,14 @@ class StateSpaceAnalysis(object):
 
         Args:
             lesion_units: None of list of ints, the units to lesion
+            select_group: None or list of ints, the group of units to analyze
+            sigma_rec: None or float, if float, override the original value
             analyze_allunits: bool, if True analyze all units, else exclude
               units with low task variance
             redefine_choice: bool, if True redefine choice such that choice 1
               is always the preferred motor response
             z_score: bool, if True z-score the data as pre-processing
             surrogate_data: bool, if True use surrogate data
-            select_group: None or list of ints, the group of units to analyze
             n_rep: int, the number of different stimulus locations used
         """
 
@@ -523,7 +525,7 @@ class StateSpaceAnalysis(object):
         coef_maxt_list = list()
         H_new_list = list()
 
-        model = Model(model_dir)
+        model = Model(model_dir, sigma_rec=sigma_rec)
         hparams = model.hparams
         with tf.Session() as sess:
             model.restore()
@@ -735,6 +737,8 @@ class StateSpaceAnalysis(object):
         self.stim1_locs = stim1_locs
         self.q = q
         self.lesion_units = lesion_units
+        self.z_score = z_score
+        self.model_dir = model_dir
         self.colors = dict(zip([None, '1', '2', '12'],
                            sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
 
@@ -781,7 +785,7 @@ class StateSpaceAnalysis(object):
         # ind_group are indices for the current matrix, not original
         # ind_active_group are for original matrix
 
-        ua = UnitAnalysis(self.setting['model_dir'])
+        ua = UnitAnalysis(self.model_dir)
 
         ind_group = dict()
         ind_active_group = dict()
@@ -865,12 +869,13 @@ class StateSpaceAnalysis(object):
             save_name = 'beta_weights_sub'
             if fancy_color:
                 save_name = save_name + '_color'
-            plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
+            plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
         plt.show()
 
     def get_slowpoints(self):
+        raise NotImplementedError()
         ####################### Find Fixed & Slow Points ######################
-        if self.setting['redefine_choice']:
+        if self.redefine_choice:
             ValueError('Finding slow points is invalid when choices are redefined')
 
         if self.lesion_units is not None:
@@ -914,7 +919,7 @@ class StateSpaceAnalysis(object):
             tmp = np.array(tmp)
 
             # Notice H is z-scored. Now get the sstimting point in original space
-            if self.setting['z_score']:
+            if self.z_score:
                 tmp *= self.stdh
                 tmp += self.meanh
 
@@ -940,7 +945,7 @@ class StateSpaceAnalysis(object):
 
                 # Transformed space
                 fixed_points = res.x[self.ind_active]
-                if self.setting['z_score']:
+                if self.z_score:
                     fixed_points -= self.meanh
                     fixed_points /= self.stdh
 
@@ -975,7 +980,7 @@ class StateSpaceAnalysis(object):
             for i, res in enumerate(res_list):
                 # Transformed space
                 slow_points = res.x[self.ind_active]
-                if self.setting['z_score']:
+                if self.z_score:
                     slow_points -= self.meanh
                     slow_points /= self.stdh
 
@@ -1133,8 +1138,9 @@ class StateSpaceAnalysis(object):
             ax.set_ylim([-3,3])
 
         if save:
-            plt.savefig(os.path.join('figure',
-        'fixpoint_choicetasks_statespace'+self.setting['model_dir']+'.pdf'), transparent=True)
+            figname = os.path.join(
+                'figure', 'fixpoint_choicetasks_statespace.pdf')
+            plt.savefig(figname, transparent=True)
         plt.show()
 
     def plot_units_intime(self, plot_individual=False):
@@ -1166,7 +1172,7 @@ class StateSpaceAnalysis(object):
                 h_plot = h_plot.mean(axis=1)
                 _ = ax.plot(t_plot, h_plot, color='gray', alpha=0.1)
 
-            if not self.setting['z_score']:
+            if not self.z_score:
                 ax.set_ylim([0, 1.5])
 
             ax.tick_params(axis='both', which='major', labelsize=7)
@@ -1251,7 +1257,7 @@ class StateSpaceAnalysis(object):
         plt.tight_layout()
 
         if save:
-            save_name = 'choiceatt_intime_'+self.setting['model_dir']+'_group'+group_from+'-'+group_to
+            save_name = 'choiceatt_intime_group'+group_from+'-'+group_to
             plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
 
         return
@@ -1354,9 +1360,8 @@ def quick_statespace(model_dir):
 
 
 def _compute_frac_var(model_dir, **kwargs):
-    # FracVar analysis for Mante et al. experimental setup
+    """FracVar analysis for Mante et al. experimental setup."""
 
-    # model_dir = 'allrule_softplus_340largeinput'
     ssa = StateSpaceAnalysis(model_dir, z_score=False, **kwargs)
 
     h = ssa.H
@@ -1378,32 +1383,25 @@ def _compute_frac_var(model_dir, **kwargs):
 
     return frac_var
 
-def compute_frac_var(save_type, save_type_end=None, var_list=None, **kwargs):
-    # save_type = 'allrule_softplus'
-    # kwargs = dict(save_type_end='largeinput')
 
-    if var_list is None:
-        var_list = range(200, 1000)
+def plot_frac_var(model_dir, **kwargs):
+    """Plot the fractional variance.
+
+        Args:
+            model_dir: the root model directory. All valid model directories under
+              it would be used
+    """
+
     frac_vars = list()
-    vars = list()
-    for var in var_list:
-        model_dir = save_type+'_'+str(var)
-        if save_type_end is not None:
-            model_dir = model_dir + save_type_end
+    model_dirs = tools.valid_model_dirs(model_dir)
 
-        fname = os.path.join('data','hparams'+model_dir+'.pkl')
-        if not os.path.isfile(fname):
-            continue
-
-        frac_var = _compute_frac_var(model_dir, **kwargs)
+    for d in model_dirs:
+        frac_var = _compute_frac_var(d, **kwargs)
         frac_vars.append(frac_var)
-
-        # Store
-        vars.append(var)
-
-    tmp = np.concatenate(frac_vars)
+        tmp = np.concatenate(frac_vars)
 
     _ = plt.hist(tmp)
+
 
 def run_all_analyses(model_dir):
     from performance import plot_trainingprogress, plot_choicefamily_varytime, psychometric_contextdm
@@ -1440,8 +1438,8 @@ if __name__ == '__main__':
     root_dir = './data/train_all'
     model_dir = root_dir + '/0'
 
-    ######################### Connectivity and Lesioning ##########################
-    ua = UnitAnalysis(model_dir)
+    ######################### Connectivity and Lesioning ######################
+    # ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
@@ -1458,10 +1456,10 @@ if __name__ == '__main__':
     # ua.plot_fullconnectivity()
     # plot_groupsize('allrule_weaknoise')  # disabled now
 
-    ################### State space ##############################################
+    ################### State space ###########################################
     # Plot State space
-    ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False)
-    ssa.plot_statespace(plot_slowpoints=False)
+    # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False)
+    # ssa.plot_statespace(plot_slowpoints=False)
 
     # Plot beta weights
     # plot_betaweights(model_dir)
@@ -1473,71 +1471,10 @@ if __name__ == '__main__':
     # Quick state space analysis
     # quick_statespace(model_dir)
 
-    ################### Modified state space ##############################################
-    ua = UnitAnalysis(model_dir)
-    ssa = StateSpaceAnalysis(model_dir, select_group=ua.ind_lesions_orig['12'])
-    ssa.plot_statespace(plot_slowpoints=False)
-
-    ################### Frac Var ##############################################
-    # frac_var = _compute_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
-    # _ = plt.hist(frac_var)
-
-    # run_all_analyses(model_dir)
-
-
-    # ssa = StateSpaceAnalysis(model_dir, z_score=False)
-    #
-    # h = ssa.H
-    #
-    # h_context1 = h[:,ssa.Regrs[:,3]== 1,:]
-    # h_context2 = h[:,ssa.Regrs[:,3]==-1,:]
-    #
-    # # Last time point variance
-    # # h_var1 = h_context1[-1].var(axis=0)
-    # # h_var2 = h_context2[-1].var(axis=0)
-    #
-    # h_var1 = h_context1.var(axis=1).mean(axis=0)
-    # h_var2 = h_context2.var(axis=1).mean(axis=0)
-    #
-    # var_noise = 0.0
-    # h_var1, h_var2 = h_var1+var_noise, h_var2+var_noise
-    #
-    # frac_var = (h_var1-h_var2)/(h_var1+h_var2)
-    #
-    # ssa = StateSpaceAnalysis(model_dir, redefine_choice=True)
-    #
-    #
-    # regr_names = ['Choice', 'Motion', 'Color', 'Rule']
-    # fig, axarr = plt.subplots(4, 1, figsize=(1.6,5), sharex=True)
-    # for i in range(4):
-    #     ax = axarr[i]
-    #     ax.scatter(frac_var, ssa.coef[:,i], s=3,
-    #                facecolor='black', edgecolor='none')
-    #
-    #     ax.set_xlim([-1.1,1.1])
-    #     if i == 3:
-    #         ax.set_xticks([-1,0,1])
-    #         ax.set_xlabel('FracVar', fontsize=7)
-    #     else:
-    #         ax.set_xticks([-1,0,1],['']*3)
-    #     ax.set_ylim([-2,2])
-    #     ax.set_yticks([-2,0,2])
-    #     ax.set_ylabel(regr_names[i], fontsize=7)
-    #     ax.spines["right"].set_visible(False)
-    #     ax.spines["top"].set_visible(False)
-    #     ax.xaxis.set_ticks_position('bottom')
-    #     ax.yaxis.set_ticks_position('left')
-    #     ax.tick_params(axis='both', which='major', labelsize=7)
-    #
-    # plt.tight_layout()
-
-    ################ Pretty Plotting of State-space Results #######################
-    # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False, z_score=True)
+    ################### Modified state space ##################################
+    # ua = UnitAnalysis(model_dir)
+    # ssa = StateSpaceAnalysis(model_dir, select_group=ua.ind_lesions_orig['12'])
     # ssa.plot_statespace(plot_slowpoints=False)
 
-
-    ####################### Fractional Variance ###############################
-    # save_type = 'attendonly_softplus_randortho'
-    # save_type_end = '_anchor1'
-
-    # compute_frac_var(save_type, save_type_end, var_list=range(30))
+    ################### Frac Var ##############################################
+    # plot_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
