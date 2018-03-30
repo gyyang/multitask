@@ -1140,11 +1140,12 @@ class StateSpaceAnalysis(object):
         plt.show()
 
     def plot_units_intime(self, plot_individual=False):
+        """Plot averaged unit activity in time for all groups."""
         for group in ['1', '2', '12']:
             self.plot_units_intime_bygroup(group, plot_individual)
 
     def plot_units_intime_bygroup(self, group, plot_individual=False):
-        # Plot averaged unit activity in time
+        """Plot averaged unit activity in time for one group."""
 
         ind_group, ind_active_group = self.sort_ind_bygroup()
 
@@ -1181,7 +1182,7 @@ class StateSpaceAnalysis(object):
 
         if save:
             plt.savefig(os.path.join('figure',
-        'choiceatt_intime_'+self.setting['model_dir']+'_group'+group+'.pdf'), transparent=True)
+        'choiceatt_intime_group'+group+'.pdf'), transparent=True)
 
         if not plot_individual:
             return
@@ -1203,14 +1204,13 @@ class StateSpaceAnalysis(object):
                 ax.yaxis.set_ticks_position('left')
 
     def plot_currents_intime(self):
+        """Plot averaged currents between all groups."""
         for group_from in ['1', '2', '12']:
             for group_to in ['1', '2', '12']:
                 self.plot_currents_intime_bygroup(group_from, group_to)
 
     def plot_currents_intime_bygroup(self, group_from, group_to):
-
-        # Plot averaged unit activity in time
-
+        """Plot averaged currents from one group to another."""
         ind_group, ind_active_group = self.sort_ind_bygroup()
 
         rules = ['contextdm1', 'contextdm2']
@@ -1465,9 +1465,9 @@ if __name__ == '__main__':
     # plot_betaweights(model_dir)
 
     # Plot units in time
-    # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, z_score=False)
-    # ssa.plot_units_intime()
-    # ssa.plot_currents_intime()
+    ssa = StateSpaceAnalysis(model_dir, lesion_units=None, z_score=False)
+    ssa.plot_units_intime()
+    ssa.plot_currents_intime()
     # Quick state space analysis
     # quick_statespace(model_dir)
 
