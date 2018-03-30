@@ -774,7 +774,7 @@ class Model(object):
             units : can be None, an integer index, or a list of integer indices
         """
         if self.hparams['rnn_type'] != 'LeakyRNN':
-            raise ValueError('Only supporting LearkyRNN for now')
+            raise ValueError('Only supporting LeakyRNN for now')
 
         if units is None:
             return
