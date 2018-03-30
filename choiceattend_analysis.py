@@ -12,9 +12,10 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from task import generate_trials, rule_name
+from task import generate_trials, rule_name, get_rule_index
 from network import Model
 import tools
+import performance
 from slowpoints import search_slowpoints
 
 save = False # TEMP
@@ -94,8 +95,7 @@ class UnitAnalysis(object):
                                    '1+2': 'lesion groups 1 & 2'}
 
     def prettyplot_hist_varprop(self):
-        # Similar to the function from variance.py, but prettier
-        # Plot the proportion of variance for the first rule
+        """Pretty version of variance.plot_hist_varprop."""
         rules = self.rules
 
         fs = 6
@@ -117,7 +117,7 @@ class UnitAnalysis(object):
         ax.set_xlabel(xlabel, fontsize=fs)
         ax.set_ylabel('Units', fontsize=fs)
         ax.set_ylim(bottom=-0.02*hist.max())
-        ax.set_xlim([-0.1,1.1])
+        ax.set_xlim((-0.1, 1.1))
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.xaxis.set_ticks_position('bottom')
@@ -130,11 +130,9 @@ class UnitAnalysis(object):
         plt.savefig('figure/prettyplot_hist_varprop'+
                 rule_name[rules[0]].replace(' ','')+
                 rule_name[rules[1]].replace(' ','')+
-                save_addon+'.pdf', transparent=True)
+                '.pdf', transparent=True)
 
     def plot_performance_choicetasks(self):
-        from performance import psychometric_choicefamily_2D
-
         # Rules for performance
         # rules_perf = ['contextdm1', 'contextdm2', CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
         rules_perf = ['contextdm1', 'contextdm2']
@@ -152,8 +150,9 @@ class UnitAnalysis(object):
                 lesion_units = self.ind_lesions_orig[lesion_group]
 
             for rule in rules_perf:
-                perf, prop1s, cohs = psychometric_choicefamily_2D(
-                    self.save_addon, rule, lesion_units=lesion_units, n_coh=4, n_tar_loc=10)
+                perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
+                    self.model_dir, rule, lesion_units=lesion_units,
+                    n_coh=4, n_stim_loc=10)
                 perf_stores[lesion_group].append(perf)
 
             perf_stores[lesion_group] = np.array(perf_stores[lesion_group])
@@ -181,7 +180,7 @@ class UnitAnalysis(object):
         ax.yaxis.set_ticks_position('left')
         ax.set_xlim([-0.8, len(rules_perf)-0.2])
         if save:
-            plt.savefig('figure/perf_choiceattend_lesion'+save_addon+'.pdf', transparent=True)
+            plt.savefig('figure/perf_contextdm_lesion.pdf', transparent=True)
         plt.show()
 
     def plot_performance_2D(self, rule, lesion_group=None, **kwargs):
@@ -199,8 +198,7 @@ class UnitAnalysis(object):
 
         title = rule_name[rule] + '\n' + self.lesion_group_names[lesion_group]
         save_name = rule_name[rule].replace(' ','')+\
-                    '_perf2D_lesion'+str(lesion_group)+\
-                    self.save_addon+'.pdf'
+                    '_perf2D_lesion'+str(lesion_group)+'.pdf'
         _plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=title, save_name=save_name, **kwargs)
 
     def plot_fullconnectivity(self):
@@ -325,11 +323,16 @@ class UnitAnalysis(object):
         ax2.set_ylim([0, len(labels)])
         ax1.axis('off')
         ax2.axis('off')
-        plt.savefig('figure/choiceattend_connectivity'+save_addon+'.pdf', transparent=True)
+        plt.savefig('figure/contextdm_connectivity.pdf', transparent=True)
         plt.show()
 
-    def plot_inout_connectivity(self, conn_type='input'):
-        # Plot connectivity
+    def plot_connectivity(self, conn_type='input'):
+        """Plot connectivity.
+
+        Args:
+            conn_type: str, type of connectivity to plot.
+        """
+
         # Sort data by labels and by input connectivity
         model = Model(model_dir)
         hparams = model.hparams
@@ -337,12 +340,13 @@ class UnitAnalysis(object):
             model.restore()
             w_in, w_out, w_rec = sess.run(
                 [model.w_in, model.w_out, model.w_rec])
+        w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
 
         n_ring = hparams['n_eachring']
         groups = ['1', '2', '12']
 
-        ############# Plot recurrent connectivity #############################
         if conn_type == 'rec':
+            # Plot recurrent connectivity
             w_rec_group = np.zeros((len(groups), len(groups)))
             for i1, group1 in enumerate(groups):
                 for i2, group2 in enumerate(groups):
@@ -365,11 +369,9 @@ class UnitAnalysis(object):
 
             return
 
-
-        ############# Plot input from rule ####################################
         elif conn_type == 'rule':
-            rules = ['contextdm1', 'contextdm2', CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
-
+            # Plot input rule connectivity
+            rules = ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']
 
             w_stores = OrderedDict()
 
@@ -377,7 +379,8 @@ class UnitAnalysis(object):
                 w_store_tmp = list()
                 ind = self.ind_lesions_orig[group]
                 for rule in rules:
-                    w_conn = w_in[ind, 2*n_ring+1+rule].mean(axis=0)
+                    ind_rule = get_rule_index(rule, hparams)
+                    w_conn = w_in[ind, ind_rule].mean(axis=0)
                     w_store_tmp.append(w_conn)
 
                 w_stores[group] = w_store_tmp
@@ -404,12 +407,12 @@ class UnitAnalysis(object):
             ax.yaxis.set_ticks_position('left')
             ax.set_xlim([-0.8, len(rules)-0.2])
             ax.plot([-0.5, len(rules)-0.5], [0, 0], color='gray', linewidth=0.5)
-            plt.savefig('figure/conn_'+conn_type+'_choiceattend_'+save_addon+'.pdf', transparent=True)
+            plt.savefig('figure/conn_'+conn_type+'_choiceattend.eps', transparent=True)
             plt.show()
 
             return
 
-        ############## Plot input from stim or output to loc ##################
+        # Plot input from stim or output to loc
         elif conn_type == 'input':
             w_conn = w_in[:, 1:n_ring+1]
             xlabel = 'From stim mod 1'
@@ -453,7 +456,8 @@ class UnitAnalysis(object):
         ax.spines["top"].set_visible(False)
         ax.xaxis.set_ticks_position('bottom')
         ax.yaxis.set_ticks_position('left')
-        plt.savefig('figure/conn_'+conn_type+'_choiceattend_'+save_addon+'.pdf', transparent=True)
+        plt.savefig('figure/conn_'+conn_type+'_choiceattend.pdf', transparent=True)
+
 
 class StateSpaceAnalysis(object):
     def __init__(self, save_addon, lesion_units=None, **kwargs):
@@ -1407,10 +1411,10 @@ def run_all_analyses(save_addon):
     _ = plt.hist(frac_var, bins=10, range=(-1,1))
 
     ua = UnitAnalysis(save_addon)
-    ua.plot_inout_connectivity(conn_type='rec')
-    ua.plot_inout_connectivity(conn_type='rule')
-    ua.plot_inout_connectivity(conn_type='input')
-    ua.plot_inout_connectivity(conn_type='output')
+    ua.plot_connectivity(conn_type='rec')
+    ua.plot_connectivity(conn_type='rule')
+    ua.plot_connectivity(conn_type='input')
+    ua.plot_connectivity(conn_type='output')
     ua.prettyplot_hist_varprop()
     # ua.plot_performance_choicetasks()
 
@@ -1422,12 +1426,12 @@ if __name__ == '__main__':
 
     ######################### Connectivity and Lesioning ##########################
     ua = UnitAnalysis(model_dir)
-    ua.plot_inout_connectivity(conn_type='rec')
-    # ua.plot_inout_connectivity(conn_type='rule')
-    # ua.plot_inout_connectivity(conn_type='input')
-    # ua.plot_inout_connectivity(conn_type='output')
+    # ua.plot_connectivity(conn_type='rec')
+    # ua.plot_connectivity(conn_type='rule')
+    # ua.plot_connectivity(conn_type='input')
+    # ua.plot_connectivity(conn_type='output')
     # ua.prettyplot_hist_varprop()
-    # ua.plot_performance_choicetasks()
+    ua.plot_performance_choicetasks()
 
     rule = 'contextdm1'
     # ua.plot_performance_2D(rule=rule)
@@ -1440,17 +1444,14 @@ if __name__ == '__main__':
 
     ################### State space ##############################################
     # Plot State space
-    save_addon = 'attendonly_softplus_300latest'
     # save_addon = 'attendonly_softplus_400latest'
     # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, redefine_choice=False)
     # ssa.plot_statespace(plot_slowpoints=False)
 
     # Plot beta weights
-    save_type = 'attendonly_softplus_randortho'
     # plot_betaweights(save_type, save_type_end='beta_anchor')
 
     # Plot units in time
-    save_addon = 'allrule_softplus_400largeinput'
     # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, z_score=False)
     # ssa.plot_units_intime()
     # ssa.plot_currents_intime()
@@ -1458,27 +1459,15 @@ if __name__ == '__main__':
     # quick_statespace(save_addon)
 
     ################### Modified state space ##############################################
-    # save_addon = 'allrule_softplus_200largeinput'
-    save_addon = 'attendonly_softplus_180latest'
     # ua = UnitAnalysis(save_addon)
     # ssa = StateSpaceAnalysis(save_addon, select_group=ua.ind_lesions_orig['12'])
     # ssa = StateSpaceAnalysis(save_addon)
     # ssa.plot_statespace(plot_slowpoints=False)
 
     ################### Frac Var ##############################################
-    save_addon = 'attendonly_relu_randortho_300earlystop'
-    # save_addon = 'attendonly_softplus_randortho_10beta_anchor'
-    # save_addon = 'attendonly_softplus_randortho_0beta_anchor'    # save_addon = 'attendonly_softplus_200latest'
     # frac_var = _compute_frac_var(save_addon, analyze_allunits=False, sigma_rec=0.5)
     # _ = plt.hist(frac_var)
 
-    
-    # save_addon = 'attendonly_softplus_140tuesday'
-    # save_addon = 'attendonly_softplus_randortho_260tuesday'
-    # save_addon = 'attendonly_relu_260tuesday'
-    # save_addon = 'attendonly_softplus_randortho_2_anchor1'
-    save_addon = 'cont_type7_32ksiintsyn'
-    # save_addon = 'cont_test_test'
     # run_all_analyses(save_addon)
 
 
@@ -1529,7 +1518,6 @@ if __name__ == '__main__':
     # plt.tight_layout()
 
     ################ Pretty Plotting of State-space Results #######################
-    # save_addon = 'attendonly_relu_260tuesday'
     # ssa = StateSpaceAnalysis(save_addon, lesion_units=None, redefine_choice=False, z_score=True)
     # ssa.plot_statespace(plot_slowpoints=False)
 
