@@ -19,7 +19,7 @@ import performance
 from slowpoints import search_slowpoints
 
 save = False # TEMP
-
+COLORS = sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])
 
 def generate_surrogate_data():
     # Generate surrogate data
@@ -134,214 +134,8 @@ class UnitAnalysis(object):
                 rule_name[rules[1]].replace(' ','')+
                 '.pdf', transparent=True)
 
-    def plot_performance_choicetasks(self):
-        # Rules for performance
-        # rules_perf = ['contextdm1', 'contextdm2', CHOICE_MOD1, CHOICE_MOD2, CHOICE_INT]
-        rules_perf = ['contextdm1', 'contextdm2']
-        lesion_group_list = [None, '1', '2', '12']
-
-        perf_stores = OrderedDict()
-        for lesion_group in lesion_group_list:
-            perf_stores[lesion_group] = list()
-
-            if lesion_group is None:
-                lesion_units = None
-            elif lesion_group == '1+2':
-                lesion_units = np.concatenate((self.group_ind_orig['1'],self.group_ind_orig['2']))
-            else:
-                lesion_units = self.group_ind_orig[lesion_group]
-
-            for rule in rules_perf:
-                perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
-                    self.model_dir, rule, lesion_units=lesion_units,
-                    n_coh=4, n_stim_loc=10)
-                perf_stores[lesion_group].append(perf)
-
-            perf_stores[lesion_group] = np.array(perf_stores[lesion_group])
-
-        fs = 6
-        width = 0.15
-        fig = plt.figure(figsize=(3,1.5))
-        ax = fig.add_axes([0.17,0.35,0.8,0.4])
-        for i, lesion_group in enumerate(lesion_group_list):
-            b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width, perf_stores[lesion_group],
-                   width=width, color=self.colors[lesion_group], edgecolor='none')
-        ax.set_xticks(np.arange(len(rules_perf)))
-        ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
-        ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
-        ax.set_ylabel('performance', fontsize=fs)
-        lg = ax.legend(['Intact']+['Lesion group {:s}'.format(l) for l in ['1','2','12']],
-                       fontsize=fs, ncol=2, bbox_to_anchor=(1,1.4),
-                       labelspacing=0.2, loc=1, frameon=False)
-        plt.setp(lg.get_title(),fontsize=fs)
-        ax.tick_params(axis='both', which='major', labelsize=fs)
-        plt.locator_params(axis='y',nbins=2)
-        ax.spines["right"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
-        ax.set_xlim([-0.8, len(rules_perf)-0.2])
-        if save:
-            plt.savefig('figure/perf_contextdm_lesion.pdf', transparent=True)
-        plt.show()
-
-    def plot_performance_2D(self, rule, lesion_group=None, **kwargs):
-        """Plot performance as function of both modality coherence."""
-        if lesion_group is None:
-            lesion_units = None
-        elif lesion_group == '1+2':
-            lesion_units = np.concatenate((self.group_ind_orig['1'],
-                                           self.group_ind_orig['2']))
-        else:
-            lesion_units = self.group_ind_orig[lesion_group]
-
-        perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
-            self.model_dir, rule, lesion_units=lesion_units,
-            n_coh=8, n_stim_loc=20)
-
-        title = rule_name[rule] + '\n' + self.lesion_group_names[lesion_group]
-        save_name = rule_name[rule].replace(' ','')+\
-                    '_perf2D_lesion'+str(lesion_group)+'.pdf'
-        performance._plot_psychometric_choicefamily_2D(
-            prop1s, cohs, rule, title=title, save_name=save_name, **kwargs)
-
-    def plot_fullconnectivity(self):
-        """Plot connectivity of the entire matrix."""
-        ind_active = self.ind_active
-        h_normvar_all = self.h_normvar_all
-        # Sort data by labels and by input connectivity
-        model = Model(self.model_dir)
-        hparams = model.hparams
-        with tf.Session() as sess:
-            model.restore()
-            w_in, w_out, w_rec = sess.run(
-                [model.w_in, model.w_out, model.w_rec])
-        w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
-
-        nx, nh, ny = hparams['n_input'], hparams['n_rnn'], hparams['n_output']
-        n_ring = hparams['n_eachring']
-
-        ind_active_new = list()
-        labels = list()
-        for i in range(len(ind_active)):
-            ind_active_addnew = True
-            if h_normvar_all[i,0]>0.85:
-                labels.append(0)
-            elif h_normvar_all[i,0]<0.15:
-                labels.append(1)
-            elif (h_normvar_all[i,0]>0.15) and (h_normvar_all[i,0]<0.85):
-                # labels.append(2)
-
-                # Further divide
-                # This condition works especially for networks trained only for contextdm
-                if np.max(w_in[ind_active[i],1:2*n_ring+1]) > 1.0:
-                    labels.append(2)
-                else:
-                    labels.append(3)
-
-                    # if np.var(w_out[1:, ind_active[i]])>0.005:
-                    #     labels.append(3)
-                    # else:
-                    #     labels.append(4)
-            else:
-                ind_active_addnew = False
-
-            if ind_active_addnew:
-                ind_active_new.append(ind_active[i])
-
-        labels = np.array(labels)
-        ind_active = np.array(ind_active_new)
-
-        # Preferences
-        # w_in preferences
-        w_in = w_in[ind_active, :]
-        w_in_mod1 = w_in[:, 1:n_ring+1]
-        w_in_mod2 = w_in[:, n_ring+1:2*n_ring+1]
-        w_in_modboth = w_in_mod1 + w_in_mod2
-        w_in_prefs = np.argmax(w_in_modboth, axis=1)
-        # w_out preferences
-        w_out = w_out[1:, ind_active]
-        w_out_prefs = np.argmax(w_out, axis=0)
-
-        label_sort_by_w_in = [0,1,2]
-        sort_by_w_in = np.array([(label in label_sort_by_w_in) for label in labels])
-
-        w_prefs = (1-sort_by_w_in)*w_out_prefs + sort_by_w_in*w_in_prefs
-
-        ind_sort        = np.lexsort((w_prefs, labels)) # sort by labels then by prefs
-        labels          = labels[ind_sort]
-        ind_active      = ind_active[ind_sort]
-
-
-        nh = len(ind_active)
-        nr = n_ring
-        nrule = 2
-        nx = 2*nr+1+nrule
-        ind = ind_active
-
-        model = Model(self.model_dir)
-        with tf.Session() as sess:
-            model.restore()
-            w_in, w_out, w_rec, b_rec, b_out = sess.run([
-                model.w_in, model.w_out, model.w_rec, model.b_rec, model.b_out
-            ])
-        w_in = (w_in.T)[ind, :]
-        w_rec = (w_rec.T)[ind, :][:, ind]
-        w_out = (w_out.T)[:, ind]
-        b_rec = b_rec[ind, np.newaxis]
-        b_out = b_out[:, np.newaxis]
-
-        l = 0.35
-        l0 = (1-1.5*l)/nh
-
-        rules = ['contextdm1', 'contextdm2']
-        ind_rule = [get_rule_index(r, hparams) for r in rules]
-        w_in_rule = w_in[:, ind_rule]
-
-        plot_infos = [(w_rec              , [l               ,l          ,nh*l0    ,nh*l0]),
-                      (w_in[:,[0]]        , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
-                      (w_in[:,1:nr+1]     , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
-                      (w_in[:,nr+1:2*nr+1], [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
-                      (w_in_rule          , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
-                      (w_out[[0],:]       , [l               ,l-(4)*l0   ,nh*l0    ,1*l0]),
-                      (w_out[1:, :]       , [l               ,l-(ny+6)*l0,nh*l0    ,(ny-1)*l0]),
-                      (b_rec              , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
-                      (b_out              , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
-
-        cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
-        fig = plt.figure(figsize=(6,6))
-        for plot_info in plot_infos:
-            ax = fig.add_axes(plot_info[1])
-            # vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [5,50,95])
-            vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [2,50,98])
-            vmid = 0
-            _ = ax.imshow(plot_info[0], interpolation='nearest', cmap=cmap, aspect='auto',
-                          vmin=vmid-(vmax-vmin)/2, vmax=vmid+(vmax-vmin)/2)
-
-            # vabs = np.max(abs(plot_info[0]))*0.3
-            # _ = ax.imshow(plot_info[0], interpolation='nearest', cmap=cmap, aspect='auto', vmin=-vabs, vmax=vabs)
-            ax.axis('off')
-
-        # colors = sns.xkcd_palette(['green', 'sky blue', 'pink'])
-        # colors = sns.color_palette('deep', len(np.unique(labels)))
-        colors = [self.colors[group] for group in ['1', '2', '12']] + ['gray']
-        ax1 = fig.add_axes([l     , l+nh*l0, nh*l0, 6*l0])
-        ax2 = fig.add_axes([l-6*l0, l      , 6*l0 , nh*l0])
-        for l in np.unique(labels):
-            ind_l = np.where(labels==l)[0][[0, -1]]+np.array([0,1])
-            ax1.plot(ind_l, [0,0], linewidth=2, solid_capstyle='butt',
-                    color=colors[l])
-            ax2.plot([0,0], len(labels)-ind_l, linewidth=2, solid_capstyle='butt',
-                    color=colors[l])
-        ax1.set_xlim([0, len(labels)])
-        ax2.set_ylim([0, len(labels)])
-        ax1.axis('off')
-        ax2.axis('off')
-        plt.savefig('figure/contextdm_connectivity.pdf', transparent=True)
-        plt.show()
-
     def plot_connectivity(self, conn_type='input'):
-        """Plot connectivity.
+        """Plot connectivity while sorting by group.
 
         Args:
             conn_type: str, type of connectivity to plot.
@@ -1266,6 +1060,214 @@ class StateSpaceAnalysis(object):
             plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
 
         return
+
+
+def plot_performance_choicetasks(model_dir):
+    """Plot performance across tasks for different lesioning."""
+    rules_perf = ['contextdm1', 'contextdm2']
+    lesion_group_list = [None, '1', '2', '12']
+
+    perf_stores = OrderedDict()
+    for lesion_group in lesion_group_list:
+        perf_stores[lesion_group] = list()
+
+        if lesion_group is None:
+            lesion_units = None
+        elif lesion_group == '1+2':
+            lesion_units = np.concatenate((self.group_ind_orig['1'],self.group_ind_orig['2']))
+        else:
+            lesion_units = self.group_ind_orig[lesion_group]
+
+        for rule in rules_perf:
+            perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
+                model_dir, rule, lesion_units=lesion_units,
+                n_coh=4, n_stim_loc=10)
+            perf_stores[lesion_group].append(perf)
+
+        perf_stores[lesion_group] = np.array(perf_stores[lesion_group])
+
+    fs = 6
+    width = 0.15
+    fig = plt.figure(figsize=(3,1.5))
+    ax = fig.add_axes([0.17,0.35,0.8,0.4])
+    for i, lesion_group in enumerate(lesion_group_list):
+        b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width,
+                    perf_stores[lesion_group],
+                    width=width, color=COLORS[i], edgecolor='none')
+    ax.set_xticks(np.arange(len(rules_perf)))
+    ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
+    ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
+    ax.set_ylabel('performance', fontsize=fs)
+    lg = ax.legend(['Intact']+['Lesion group {:s}'.format(l) for l in ['1','2','12']],
+                   fontsize=fs, ncol=2, bbox_to_anchor=(1,1.4),
+                   labelspacing=0.2, loc=1, frameon=False)
+    plt.setp(lg.get_title(),fontsize=fs)
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+    plt.locator_params(axis='y',nbins=2)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    ax.set_xlim([-0.8, len(rules_perf)-0.2])
+    if save:
+        plt.savefig('figure/perf_contextdm_lesion.pdf', transparent=True)
+    plt.show()
+
+
+def plot_performance_2D(model_dir, rule, lesion_group=None, **kwargs):
+    """Plot performance as function of both modality coherence."""
+    if lesion_group is None:
+        lesion_units = None
+    elif lesion_group == '1+2':
+        lesion_units = np.concatenate((self.group_ind_orig['1'],
+                                       self.group_ind_orig['2']))
+    else:
+        lesion_units = self.group_ind_orig[lesion_group]
+
+    perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
+        model_dir, rule, lesion_units=lesion_units,
+        n_coh=8, n_stim_loc=20)
+
+    title = rule_name[rule] + '\n' + self.lesion_group_names[lesion_group]
+    save_name = rule_name[rule].replace(' ','')+\
+                '_perf2D_lesion'+str(lesion_group)+'.pdf'
+    performance._plot_psychometric_choicefamily_2D(
+        prop1s, cohs, rule, title=title, save_name=save_name, **kwargs)
+
+
+def plot_fullconnectivity(model_dir):
+    """Plot connectivity of the entire matrix."""
+    ind_active = self.ind_active
+    h_normvar_all = self.h_normvar_all
+    # Sort data by labels and by input connectivity
+    model = Model(model_dir)
+    hparams = model.hparams
+    with tf.Session() as sess:
+        model.restore()
+        w_in, w_out, w_rec = sess.run(
+            [model.w_in, model.w_out, model.w_rec])
+    w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
+
+    nx, nh, ny = hparams['n_input'], hparams['n_rnn'], hparams['n_output']
+    n_ring = hparams['n_eachring']
+
+    ind_active_new = list()
+    labels = list()
+    for i in range(len(ind_active)):
+        ind_active_addnew = True
+        if h_normvar_all[i,0]>0.85:
+            labels.append(0)
+        elif h_normvar_all[i,0]<0.15:
+            labels.append(1)
+        elif (h_normvar_all[i,0]>0.15) and (h_normvar_all[i,0]<0.85):
+            # labels.append(2)
+
+            # Further divide
+            # This condition works especially for networks trained only for contextdm
+            if np.max(w_in[ind_active[i],1:2*n_ring+1]) > 1.0:
+                labels.append(2)
+            else:
+                labels.append(3)
+
+                # if np.var(w_out[1:, ind_active[i]])>0.005:
+                #     labels.append(3)
+                # else:
+                #     labels.append(4)
+        else:
+            ind_active_addnew = False
+
+        if ind_active_addnew:
+            ind_active_new.append(ind_active[i])
+
+    labels = np.array(labels)
+    ind_active = np.array(ind_active_new)
+
+    # Preferences
+    # w_in preferences
+    w_in = w_in[ind_active, :]
+    w_in_mod1 = w_in[:, 1:n_ring+1]
+    w_in_mod2 = w_in[:, n_ring+1:2*n_ring+1]
+    w_in_modboth = w_in_mod1 + w_in_mod2
+    w_in_prefs = np.argmax(w_in_modboth, axis=1)
+    # w_out preferences
+    w_out = w_out[1:, ind_active]
+    w_out_prefs = np.argmax(w_out, axis=0)
+
+    label_sort_by_w_in = [0,1,2]
+    sort_by_w_in = np.array([(label in label_sort_by_w_in) for label in labels])
+
+    w_prefs = (1-sort_by_w_in)*w_out_prefs + sort_by_w_in*w_in_prefs
+
+    ind_sort        = np.lexsort((w_prefs, labels)) # sort by labels then by prefs
+    labels          = labels[ind_sort]
+    ind_active      = ind_active[ind_sort]
+
+    nh = len(ind_active)
+    nr = n_ring
+    nrule = 2
+    nx = 2*nr+1+nrule
+    ind = ind_active
+
+    model = Model(model_dir)
+    with tf.Session() as sess:
+        model.restore()
+        w_in, w_out, w_rec, b_rec, b_out = sess.run([
+            model.w_in, model.w_out, model.w_rec, model.b_rec, model.b_out
+        ])
+    w_in = (w_in.T)[ind, :]
+    w_rec = (w_rec.T)[ind, :][:, ind]
+    w_out = (w_out.T)[:, ind]
+    b_rec = b_rec[ind, np.newaxis]
+    b_out = b_out[:, np.newaxis]
+
+    l = 0.35
+    l0 = (1-1.5*l)/nh
+
+    rules = ['contextdm1', 'contextdm2']
+    ind_rule = [get_rule_index(r, hparams) for r in rules]
+    w_in_rule = w_in[:, ind_rule]
+
+    plot_infos = [(w_rec              , [l               ,l          ,nh*l0    ,nh*l0]),
+                  (w_in[:,[0]]        , [l-(nx+15)*l0    ,l          ,1*l0     ,nh*l0]), # Fixation input
+                  (w_in[:,1:nr+1]     , [l-(nx+11)*l0    ,l          ,nr*l0    ,nh*l0]), # Mod 1 stimulus
+                  (w_in[:,nr+1:2*nr+1], [l-(nx-nr+8)*l0  ,l          ,nr*l0    ,nh*l0]), # Mod 2 stimulus
+                  (w_in_rule          , [l-(nx-2*nr+5)*l0,l          ,nrule*l0 ,nh*l0]), # Rule inputs
+                  (w_out[[0],:]       , [l               ,l-(4)*l0   ,nh*l0    ,1*l0]),
+                  (w_out[1:, :]       , [l               ,l-(ny+6)*l0,nh*l0    ,(ny-1)*l0]),
+                  (b_rec              , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
+                  (b_out              , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
+
+    cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
+    fig = plt.figure(figsize=(6,6))
+    for plot_info in plot_infos:
+        ax = fig.add_axes(plot_info[1])
+        # vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [5,50,95])
+        vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [2,50,98])
+        vmid = 0
+        _ = ax.imshow(plot_info[0], interpolation='nearest', cmap=cmap, aspect='auto',
+                      vmin=vmid-(vmax-vmin)/2, vmax=vmid+(vmax-vmin)/2)
+
+        # vabs = np.max(abs(plot_info[0]))*0.3
+        # _ = ax.imshow(plot_info[0], interpolation='nearest', cmap=cmap, aspect='auto', vmin=-vabs, vmax=vabs)
+        ax.axis('off')
+
+    # colors = sns.xkcd_palette(['green', 'sky blue', 'pink'])
+    # colors = sns.color_palette('deep', len(np.unique(labels)))
+    colors = COLORS[1:] + ['gray']
+    ax1 = fig.add_axes([l     , l+nh*l0, nh*l0, 6*l0])
+    ax2 = fig.add_axes([l-6*l0, l      , 6*l0 , nh*l0])
+    for l in np.unique(labels):
+        ind_l = np.where(labels==l)[0][[0, -1]]+np.array([0,1])
+        ax1.plot(ind_l, [0,0], linewidth=2, solid_capstyle='butt',
+                color=colors[l])
+        ax2.plot([0,0], len(labels)-ind_l, linewidth=2, solid_capstyle='butt',
+                color=colors[l])
+    ax1.set_xlim([0, len(labels)])
+    ax2.set_ylim([0, len(labels)])
+    ax1.axis('off')
+    ax2.axis('off')
+    plt.savefig('figure/contextdm_connectivity.pdf', transparent=True)
+    plt.show()
 
 
 def plot_groupsize_TEMPDISABLED(save_type):
