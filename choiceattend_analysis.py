@@ -782,7 +782,7 @@ class StateSpaceAnalysis(object):
         return params, batch_size
 
     def sort_ind_bygroup(self):
-        # Sort ind by group 1, 2, 12, and others
+        """Sort ind by group 1, 2, 12, and others."""
         # ind_group are indices for the current matrix, not original
         # ind_active_group are for original matrix
 
@@ -805,11 +805,11 @@ class StateSpaceAnalysis(object):
         return ind_group, ind_active_group
 
     def sort_coefs_bygroup(self, coefs=None):
-        # Sort coefs by group 1, 2, 12, and others
-        # If coefs is not None, then update coefs
+        """Sort coefs by group 1, 2, 12, and others."""
 
+        # If coefs is not None, then update coefs
         if coefs is None:
-            coefs = dict() # Initialize
+            coefs = dict()
 
         ind_group, _ = self.sort_ind_bygroup()
 
@@ -822,10 +822,7 @@ class StateSpaceAnalysis(object):
         return coefs
 
     def plot_betaweights(self, coefs, fancy_color=False):
-        '''
-        Plot beta weights
-        :return:
-        '''
+        """Plot beta weights."""
 
         regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
 
@@ -847,8 +844,10 @@ class StateSpaceAnalysis(object):
                         color = 'gray'
                 else:
                     color = 'gray'
-                # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
-                ax.plot(coefs[group][:,i], coefs[group][:,j], 'o', color=color, ms=1.5, mec='white', mew=0.2)
+                # Find all units here that belong to group 1, 2, or 12
+                # as defined in UnitAnalysis
+                ax.plot(coefs[group][:,i], coefs[group][:,j], 'o',
+                        color=color, ms=1.5, mec='white', mew=0.2)
 
             ax.plot([-2, 2], [0, 0], color='gray')
             ax.plot([0, 0], [-2, 2], color='gray')
@@ -993,7 +992,7 @@ class StateSpaceAnalysis(object):
             self.slow_points_trans_all[rule] = slow_points_trans
 
     def get_regr_ind(self, choice=None, coh1=None, coh2=None, rule=None):
-        # For given choice, coh1, coh2, rule, get the indices of trials
+        """For given choice, coh1, coh2, rule, get the indices of trials."""
         ind = np.ones(self.Regrs.shape[0], dtype=bool) # initialize
 
         if choice is not None:
@@ -1012,11 +1011,7 @@ class StateSpaceAnalysis(object):
         return ind
 
     def plot_statespace(self, plot_slowpoints=True):
-        '''
-        Plot state space analysis
-        :param plot_slowpoints:
-        :return:
-        '''
+        """Plot state space analysis."""
 
         if plot_slowpoints:
             try:
@@ -1033,7 +1028,8 @@ class StateSpaceAnalysis(object):
         colors2 = sns.diverging_palette(280, 145, sep=1, s=99, l=30, n=6)
 
         fig, axarr = plt.subplots(2, len(self.rules),
-                                  sharex=True, sharey='row', figsize=(len(self.rules)*1,2))
+                                  sharex=True, sharey='row',
+                                  figsize=(len(self.rules)*1, 2))
         for i_col, rule in enumerate(self.rules):
             # Different ways of separation, either by Mod1 or Mod2
             # Also different subspaces shown
@@ -1065,11 +1061,16 @@ class StateSpaceAnalysis(object):
 
 
                 if i_col == 0:
-                    anc = [self.H_tran[:,:,pcs[0]].min()+1, self.H_tran[:,:,pcs[1]].max()-5] # anchor point
-                    ax.plot([anc[0], anc[0]], [anc[1]-5, anc[1]-1], color='black', lw=1.0)
-                    ax.plot([anc[0]+1, anc[0]+5], [anc[1], anc[1]], color='black', lw=1.0)
-                    ax.text(anc[0], anc[1], self.regr_names[pcs[0]], fontsize=fs, va='bottom')
-                    ax.text(anc[0], anc[1], self.regr_names[pcs[1]], fontsize=fs, rotation=90, ha='right', va='top')
+                    anc = [self.H_tran[:,:,pcs[0]].min()+1,
+                           self.H_tran[:,:,pcs[1]].max()-5]  # anchor point
+                    ax.plot([anc[0], anc[0]], [anc[1]-5, anc[1]-1],
+                            color='black', lw=1.0)
+                    ax.plot([anc[0]+1, anc[0]+5], [anc[1], anc[1]],
+                            color='black', lw=1.0)
+                    ax.text(anc[0], anc[1], self.regr_names[pcs[0]],
+                            fontsize=fs, va='bottom')
+                    ax.text(anc[0], anc[1], self.regr_names[pcs[1]],
+                            fontsize=fs, rotation=90, ha='right', va='top')
 
                 # ind = self.get_regr_ind(rule=rule) # for batch
                 # ax.plot(self.H_tran[:,ind,pcs[0]], self.H_tran[:,ind,pcs[1]],
@@ -1083,10 +1084,10 @@ class StateSpaceAnalysis(object):
 
                         if choice == 1:
                             # Solid circles
-                            kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
+                            kwargs = {'markerfacecolor':colors[i], 'linewidth':1}
                         else:
                             # Empty circles
-                            kwargs = {'markerfacecolor' : 'white', 'linewidth' : 0.5}
+                            kwargs = {'markerfacecolor':'white', 'linewidth':0.5}
 
                         if i_row == 0:
                             # Separate by coherence of Mod 1
@@ -1130,11 +1131,14 @@ class StateSpaceAnalysis(object):
 
             for i in range(6):
                 kwargs = {'markerfacecolor' : colors[i], 'linewidth' : 1}
-                ax.plot([i], [0], '.-', color=colors[i], markersize=4, markeredgewidth=0.5, **kwargs)
+                ax.plot([i], [0], '.-', color=colors[i],
+                        markersize=4, markeredgewidth=0.5, **kwargs)
             ax.axis('off')
-            ax.text(2.5, 1, 'Strong Weak Strong', fontsize=5, va='bottom', ha='center')
+            ax.text(2.5, 1, 'Strong Weak Strong',
+                    fontsize=5, va='bottom', ha='center')
             # During looping, we use coherence to choice 1 from high to low
-            ax.text(2.5, -1, 'To choice 1    To choice 2', fontsize=5, va='top', ha='center')
+            ax.text(2.5, -1, 'To choice 1    To choice 2',
+                    fontsize=5, va='top', ha='center')
             ax.set_xlim([-1,6])
             ax.set_ylim([-3,3])
 
