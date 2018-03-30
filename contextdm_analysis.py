@@ -614,7 +614,8 @@ class StateSpaceAnalysis(object):
             if group not in coefs:
                 coefs[group] = self.coef[ind_group[group], :]
             else:
-                coefs[group] = np.concatenate((coefs[group], self.coef[ind_group[group], :]))
+                coefs[group] = np.concatenate((coefs[group],
+                                               self.coef[ind_group[group], :]))
 
         return coefs
 
@@ -1143,8 +1144,9 @@ def plot_performance_2D_all(model_dir, rule):
 
 def plot_fullconnectivity(model_dir):
     """Plot connectivity of the entire matrix."""
-    ind_active = self.ind_active
-    h_normvar_all = self.h_normvar_all
+    ua = UnitAnalysis(model_dir)
+    ind_active = ua.ind_active
+    h_normvar_all = ua.h_normvar_all
     # Sort data by labels and by input connectivity
     model = Model(model_dir)
     hparams = model.hparams
@@ -1457,19 +1459,18 @@ if __name__ == '__main__':
     model_dir, _ = tools.find_model(root_dir, hp_target)
 
     ######################### Connectivity and Lesioning ######################
-    ua = UnitAnalysis(model_dir)
+    # ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
     # ua.prettyplot_hist_varprop()
-    lesion_units_list = [None] + [ua.group_ind_orig[g] for g in ['1', '2', '12']]
+    # lesion_units_list = [None] + [ua.group_ind_orig[g] for g in ['1', '2', '12']]
     # plot_performance_choicetasks(model_dir, lesion_units_list)
 
-    plot_performance_2D_all(model_dir, 'contextdm1')
+    # plot_performance_2D_all(model_dir, 'contextdm1')
 
-
-    # ua.plot_fullconnectivity()
+    # plot_fullconnectivity(model_dir)
     # plot_groupsize('allrule_weaknoise')  # disabled now
 
     ################### State space ###########################################
@@ -1478,7 +1479,7 @@ if __name__ == '__main__':
     # ssa.plot_statespace(plot_slowpoints=False)
 
     # Plot beta weights
-    # plot_betaweights(model_dir)
+    plot_betaweights(model_dir)
 
     # Plot units in time
     # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, z_score=False)
