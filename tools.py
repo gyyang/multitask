@@ -89,6 +89,32 @@ def save_hparams(hparams, save_dir):
         json.dump(hparams_copy, f)
 
 
+def find_model(root_dir, hp_target):
+    """Find model that satisfy hyperparameters.
+
+    Args:
+        root_dir: root directory
+        hp_target: dictionary of hyperparameters
+
+    Returns:
+        d: model directory
+        hp: model hyperparameters
+    """
+    dirs = valid_model_dirs(root_dir)
+
+    for i, d in enumerate(dirs):
+        hp = load_hparams(d)
+        if all(hp[key] == val for key, val in hp_target.items()):
+            break
+
+    log = load_log(d)
+    # check if performance exceeds target
+    if log['perf_min'][-1] < hp['target_perf']:
+        print('Warning: the network found did not reach target performance.')
+
+    return d, hp
+
+
 def mkdir_p(path):
     """
     Portable mkdir -p

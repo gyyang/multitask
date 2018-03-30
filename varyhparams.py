@@ -315,16 +315,7 @@ def get_model_by_activation(activation):
                  'l1_h': 0,
                  'l1_weight': 0}
 
-    for i, model_dir in enumerate(model_dirs):
-        hp = tools.load_hparams(model_dir)
-        if all(hp[key] == val for key, val in hp_target.items()):
-            break
-
-    log = tools.load_log(model_dir)
-    # check if performance exceeds target
-    assert log['perf_min'][-1] > hp['target_perf']
-
-    return model_dir, hp
+    return tools.find_model(DATAPATH, hp_target)
 
 
 def plot_hist_varprop(activation):
@@ -357,7 +348,7 @@ if __name__ == '__main__':
     pass
     # compute_n_cluster()
     plot_n_clusters()
-    # plot_n_cluster_hist()
-    # pretty_singleneuron_plot('tanh')
-    # pretty_singleneuron_plot('relu')
-    # [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
+    plot_n_cluster_hist()
+    pretty_singleneuron_plot('tanh')
+    pretty_singleneuron_plot('relu')
+    [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
