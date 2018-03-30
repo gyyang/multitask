@@ -1435,8 +1435,13 @@ def run_all_analyses(model_dir):
 
 
 if __name__ == '__main__':
-    root_dir = './data/train_all'
-    model_dir = root_dir + '/0'
+    root_dir = './data/varyhparams'
+    hp_target = {'activation': 'tanh',
+                 'rnn_type': 'LeakyGRU',
+                 'w_rec_init': 'diag',
+                 'l1_h': 0,
+                 'l1_weight': 0}
+    model_dir, _ = tools.find_model(root_dir, hp_target)
 
     ######################### Connectivity and Lesioning ######################
     # ua = UnitAnalysis(model_dir)
@@ -1458,11 +1463,11 @@ if __name__ == '__main__':
 
     ################### State space ###########################################
     # Plot State space
-    # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False)
-    # ssa.plot_statespace(plot_slowpoints=False)
+    ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False)
+    ssa.plot_statespace(plot_slowpoints=False)
 
     # Plot beta weights
-    # plot_betaweights(model_dir)
+    plot_betaweights(model_dir)
 
     # Plot units in time
     # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, z_score=False)

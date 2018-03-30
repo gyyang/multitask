@@ -102,10 +102,16 @@ def find_model(root_dir, hp_target):
     """
     dirs = valid_model_dirs(root_dir)
 
+    model_found = False
     for i, d in enumerate(dirs):
         hp = load_hparams(d)
         if all(hp[key] == val for key, val in hp_target.items()):
+            model_found = True
             break
+
+    if not model_found:
+        print('Model not found')
+        return None, None
 
     log = load_log(d)
     # check if performance exceeds target
