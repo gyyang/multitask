@@ -21,6 +21,7 @@ from slowpoints import search_slowpoints
 save = False # TEMP
 COLORS = sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])
 
+
 def generate_surrogate_data():
     # Generate surrogate data
 
@@ -76,9 +77,11 @@ class UnitAnalysis(object):
 
         group_ind = dict()
 
-        group_ind['1']  = np.where(h_normvar_all[:,0]>0.9)[0]
-        group_ind['12'] = np.where(np.logical_and(h_normvar_all[:,0]>0.4, h_normvar_all[:,0]<0.6))[0]
-        group_ind['2']  = np.where(h_normvar_all[:,0]<0.1)[0]
+        group_ind['1'] = np.where(h_normvar_all[:,0] > 0.9)[0]
+        group_ind['2'] = np.where(h_normvar_all[:, 0] < 0.1)[0]
+        group_ind['12'] = np.where(np.logical_and(h_normvar_all[:,0] > 0.4,
+                                                  h_normvar_all[:,0] < 0.6))[0]
+        group_ind['1+2'] = np.concatenate((group_ind['1'], group_ind['2']))
 
         group_ind_orig = {key: ind_active[val] for key, val in group_ind.items()}
 
@@ -1062,29 +1065,28 @@ class StateSpaceAnalysis(object):
         return
 
 
-def plot_performance_choicetasks(model_dir):
-    """Plot performance across tasks for different lesioning."""
+def plot_performance_choicetasks(model_dir, lesion_units_list):
+    """Plot performance across tasks for different lesioning.
+
+    Args:
+        model_dir: str, model directory
+        lesion_units_list: list of lists of units to lesion
+    """
     rules_perf = ['contextdm1', 'contextdm2']
     lesion_group_list = [None, '1', '2', '12']
 
-    perf_stores = OrderedDict()
-    for lesion_group in lesion_group_list:
-        perf_stores[lesion_group] = list()
-
-        if lesion_group is None:
-            lesion_units = None
-        elif lesion_group == '1+2':
-            lesion_units = np.concatenate((self.group_ind_orig['1'],self.group_ind_orig['2']))
-        else:
-            lesion_units = self.group_ind_orig[lesion_group]
+    perf_stores = list()
+    for lesion_units in lesion_units_list:
+        perf_stores_tmp = list()
 
         for rule in rules_perf:
             perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
                 model_dir, rule, lesion_units=lesion_units,
                 n_coh=4, n_stim_loc=10)
-            perf_stores[lesion_group].append(perf)
+            perf_stores_tmp.append(perf)
 
-        perf_stores[lesion_group] = np.array(perf_stores[lesion_group])
+        perf_stores_tmp = np.array(perf_stores_tmp)
+        perf_stores.append(perf_stores_tmp)
 
     fs = 6
     width = 0.15
@@ -1092,7 +1094,7 @@ def plot_performance_choicetasks(model_dir):
     ax = fig.add_axes([0.17,0.35,0.8,0.4])
     for i, lesion_group in enumerate(lesion_group_list):
         b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width,
-                    perf_stores[lesion_group],
+                    perf_stores[i],
                     width=width, color=COLORS[i], edgecolor='none')
     ax.set_xticks(np.arange(len(rules_perf)))
     ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
@@ -1114,25 +1116,29 @@ def plot_performance_choicetasks(model_dir):
     plt.show()
 
 
-def plot_performance_2D(model_dir, rule, lesion_group=None, **kwargs):
+def plot_performance_2D(model_dir, rule, lesion_units=None,
+                        title=None, save_name=None, **kwargs):
     """Plot performance as function of both modality coherence."""
-    if lesion_group is None:
-        lesion_units = None
-    elif lesion_group == '1+2':
-        lesion_units = np.concatenate((self.group_ind_orig['1'],
-                                       self.group_ind_orig['2']))
-    else:
-        lesion_units = self.group_ind_orig[lesion_group]
-
     perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
         model_dir, rule, lesion_units=lesion_units,
         n_coh=8, n_stim_loc=20)
 
-    title = rule_name[rule] + '\n' + self.lesion_group_names[lesion_group]
-    save_name = rule_name[rule].replace(' ','')+\
-                '_perf2D_lesion'+str(lesion_group)+'.pdf'
     performance._plot_psychometric_choicefamily_2D(
         prop1s, cohs, rule, title=title, save_name=save_name, **kwargs)
+
+
+def plot_performance_2D_all(model_dir, rule):
+    """Plot performance of both modality coherence for all groups."""
+    ua = UnitAnalysis(model_dir)
+    plot_performance_2D(model_dir, rule)
+    for lesion_group in ['1', '2', '12', '1+2']:
+        lesion_units = ua.group_ind_orig[lesion_group]
+        title = rule_name[rule] + '\n' + ua.lesion_group_names[lesion_group]
+        save_name = rule_name[rule].replace(' ', '') + \
+                    '_perf2D_lesion' + str(lesion_group) + '.pdf'
+        plot_performance_2D(
+            model_dir, rule, lesion_units=lesion_units,
+            title=title, save_name=save_name, ylabel=False, colorbar=False)
 
 
 def plot_fullconnectivity(model_dir):
@@ -1443,7 +1449,7 @@ def run_all_analyses(model_dir):
 
 if __name__ == '__main__':
     root_dir = './data/varyhparams'
-    hp_target = {'activation': 'tanh',
+    hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyGRU',
                  'w_rec_init': 'diag',
                  'l1_h': 0,
@@ -1457,13 +1463,11 @@ if __name__ == '__main__':
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
     # ua.prettyplot_hist_varprop()
-    # ua.plot_performance_choicetasks()
+    lesion_units_list = [None] + [ua.group_ind_orig[g] for g in ['1', '2', '12']]
+    # plot_performance_choicetasks(model_dir, lesion_units_list)
 
-    rule = 'contextdm1'
-    # ua.plot_performance_2D(rule=rule)
-    # for lesion_group in ['1', '2', '12', '1+2']:
-    #     ua.plot_performance_2D(
-    #         rule=rule, lesion_group=lesion_group, ylabel=False, colorbar=False)
+    plot_performance_2D_all(model_dir, 'contextdm1')
+
 
     # ua.plot_fullconnectivity()
     # plot_groupsize('allrule_weaknoise')  # disabled now
