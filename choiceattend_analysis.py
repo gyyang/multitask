@@ -74,17 +74,17 @@ class UnitAnalysis(object):
         # Normalize by the total variance across tasks
         h_normvar_all = (h_var_all.T/np.sum(h_var_all, axis=1)).T
 
-        ind_lesions = dict()
+        group_ind = dict()
 
-        ind_lesions['1']  = np.where(h_normvar_all[:,0]>0.9)[0]
-        ind_lesions['12'] = np.where(np.logical_and(h_normvar_all[:,0]>0.4, h_normvar_all[:,0]<0.6))[0]
-        ind_lesions['2']  = np.where(h_normvar_all[:,0]<0.1)[0]
+        group_ind['1']  = np.where(h_normvar_all[:,0]>0.9)[0]
+        group_ind['12'] = np.where(np.logical_and(h_normvar_all[:,0]>0.4, h_normvar_all[:,0]<0.6))[0]
+        group_ind['2']  = np.where(h_normvar_all[:,0]<0.1)[0]
 
-        ind_lesions_orig = {key: ind_active[val] for key, val in ind_lesions.items()}
+        group_ind_orig = {key: ind_active[val] for key, val in group_ind.items()}
 
         self.model_dir = model_dir
-        self.ind_lesions = ind_lesions
-        self.ind_lesions_orig = ind_lesions_orig
+        self.group_ind = group_ind
+        self.group_ind_orig = group_ind_orig
         self.h_normvar_all = h_normvar_all
         self.rules = rules
         self.ind_active = ind_active
@@ -109,7 +109,7 @@ class UnitAnalysis(object):
                color='gray', edgecolor='none')
         bs = list()
         for i, group in enumerate(['1', '2', '12']):
-            data_plot = self.h_normvar_all[self.ind_lesions[group], 0]
+            data_plot = self.h_normvar_all[self.group_ind[group], 0]
             hist, bins_edge = np.histogram(data_plot, bins=30, range=(0,1))
             b_tmp = ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
                    color=self.colors[group], edgecolor='none', label=group)
@@ -147,9 +147,9 @@ class UnitAnalysis(object):
             if lesion_group is None:
                 lesion_units = None
             elif lesion_group == '1+2':
-                lesion_units = np.concatenate((self.ind_lesions_orig['1'],self.ind_lesions_orig['2']))
+                lesion_units = np.concatenate((self.group_ind_orig['1'],self.group_ind_orig['2']))
             else:
-                lesion_units = self.ind_lesions_orig[lesion_group]
+                lesion_units = self.group_ind_orig[lesion_group]
 
             for rule in rules_perf:
                 perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
@@ -190,10 +190,10 @@ class UnitAnalysis(object):
         if lesion_group is None:
             lesion_units = None
         elif lesion_group == '1+2':
-            lesion_units = np.concatenate((self.ind_lesions_orig['1'],
-                                           self.ind_lesions_orig['2']))
+            lesion_units = np.concatenate((self.group_ind_orig['1'],
+                                           self.group_ind_orig['2']))
         else:
-            lesion_units = self.ind_lesions_orig[lesion_group]
+            lesion_units = self.group_ind_orig[lesion_group]
 
         perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
             self.model_dir, rule, lesion_units=lesion_units,
@@ -364,8 +364,8 @@ class UnitAnalysis(object):
             w_rec_group = np.zeros((len(groups), len(groups)))
             for i1, group1 in enumerate(groups):
                 for i2, group2 in enumerate(groups):
-                    ind1 = self.ind_lesions_orig[group1]
-                    ind2 = self.ind_lesions_orig[group2]
+                    ind1 = self.group_ind_orig[group1]
+                    ind2 = self.group_ind_orig[group2]
                     w_rec_group[i2, i1] = w_rec[:, ind1][ind2, :].mean()
 
             fs = 6
@@ -391,7 +391,7 @@ class UnitAnalysis(object):
 
             for group in groups:
                 w_store_tmp = list()
-                ind = self.ind_lesions_orig[group]
+                ind = self.group_ind_orig[group]
                 for rule in rules:
                     ind_rule = get_rule_index(rule, hparams)
                     w_conn = w_in[ind, ind_rule].mean(axis=0)
@@ -441,7 +441,7 @@ class UnitAnalysis(object):
         w_aves = dict()
 
         for group in groups:
-            ind_group  = self.ind_lesions_orig[group]
+            ind_group  = self.group_ind_orig[group]
             n_group    = len(ind_group)
             w_group = np.zeros((n_group, n_ring))
 
@@ -529,7 +529,8 @@ class StateSpaceAnalysis(object):
         hparams = model.hparams
         with tf.Session() as sess:
             model.restore()
-            model.lesion_units(sess, lesion_units)
+            if lesion_units is not None:
+                model.lesion_units(sess, lesion_units)
 
             for stim1_loc in stim1_loc_list:
                 # Generate task parameters used
@@ -793,9 +794,9 @@ class StateSpaceAnalysis(object):
         for group in ['1', '2', '12', None]:
             if group is not None:
                 # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
-                ind_group[group] = [k for k, ind in enumerate(self.ind_active) if ind in ua.ind_lesions_orig[group]]
+                ind_group[group] = [k for k, ind in enumerate(self.ind_active) if ind in ua.group_ind_orig[group]]
             else:
-                ind_othergroup = np.concatenate(ua.ind_lesions_orig.values())
+                ind_othergroup = np.concatenate(ua.group_ind_orig.values())
                 ind_group[group] = [k for k, ind in enumerate(self.ind_active) if ind not in ind_othergroup]
 
             # Transform to original matrix indices
@@ -1274,7 +1275,7 @@ def plot_groupsize_TEMPDISABLED(save_type):
             continue
         ua = UnitAnalysis(model_dir)
         for key in ['1', '2', '12']:
-            group_sizes[key].append(len(ua.ind_lesions[key]))
+            group_sizes[key].append(len(ua.group_ind[key]))
 
         HDIM_plot.append(HDIM)
 
@@ -1444,7 +1445,7 @@ if __name__ == '__main__':
     model_dir, _ = tools.find_model(root_dir, hp_target)
 
     ######################### Connectivity and Lesioning ######################
-    # ua = UnitAnalysis(model_dir)
+    ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
@@ -1463,11 +1464,11 @@ if __name__ == '__main__':
 
     ################### State space ###########################################
     # Plot State space
-    ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False)
-    ssa.plot_statespace(plot_slowpoints=False)
+    # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False)
+    # ssa.plot_statespace(plot_slowpoints=False)
 
     # Plot beta weights
-    plot_betaweights(model_dir)
+    # plot_betaweights(model_dir)
 
     # Plot units in time
     # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, z_score=False)
@@ -1478,7 +1479,7 @@ if __name__ == '__main__':
 
     ################### Modified state space ##################################
     # ua = UnitAnalysis(model_dir)
-    # ssa = StateSpaceAnalysis(model_dir, select_group=ua.ind_lesions_orig['12'])
+    # ssa = StateSpaceAnalysis(model_dir, select_group=ua.group_ind_orig['12'])
     # ssa.plot_statespace(plot_slowpoints=False)
 
     ################### Frac Var ##############################################
