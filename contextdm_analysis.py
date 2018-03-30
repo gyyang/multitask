@@ -399,7 +399,7 @@ class StateSpaceAnalysis(object):
             H = H.reshape((-1, nh))
 
             H = H[:, ind_active]
-            nh = len(ind_active) # new nh
+            nh = len(ind_active)  # new nh
 
             # TODO: Temporary
             self.H_orig_active = (H.copy()).reshape((nt, nb, nh))
@@ -413,7 +413,6 @@ class StateSpaceAnalysis(object):
 
             # Transform back
             H = H.reshape((nt, nb, nh))
-
 
             # Get neuronal preferences (+1 if activity is higher for choice=+1)
             # preferences = (H[:, (y_actual_choice== 1)*(perfs==1), :].mean(axis=(0,1)) >
@@ -430,7 +429,6 @@ class StateSpaceAnalysis(object):
 
             preferences = (H[-1, y_stimget_choice== 1, :].mean(axis=0) >
                            H[-1, y_stimget_choice==-1, :].mean(axis=0))*2-1
-
 
             ########################## Define Regressors ##################################
             # Coherences
@@ -591,36 +589,43 @@ class StateSpaceAnalysis(object):
         for group in ['1', '2', '12', None]:
             if group is not None:
                 # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
-                ind_group[group] = [k for k, ind in enumerate(self.ind_active) if ind in ua.group_ind_orig[group]]
+                ind_group[group] = [k for k, ind in enumerate(self.ind_active)
+                                    if ind in ua.group_ind_orig[group]]
             else:
                 ind_othergroup = np.concatenate(ua.group_ind_orig.values())
-                ind_group[group] = [k for k, ind in enumerate(self.ind_active) if ind not in ind_othergroup]
+                ind_group[group] = [k for k, ind in enumerate(self.ind_active)
+                                    if ind not in ind_othergroup]
 
             # Transform to original matrix indices
             ind_active_group[group] = [self.ind_active[k] for k in ind_group[group]]
 
         return ind_group, ind_active_group
 
-    def sort_coefs_bygroup(self, coefs=None):
+    def sort_coefs_bygroup(self, coefs_dict=None):
         """Sort coefs by group 1, 2, 12, and others."""
 
         # If coefs is not None, then update coefs
-        if coefs is None:
-            coefs = dict()
+        if coefs_dict is None:
+            coefs_dict = dict()
 
         ind_group, _ = self.sort_ind_bygroup()
 
         for group in ['1', '2', '12', None]:
-            if group not in coefs:
-                coefs[group] = self.coef[ind_group[group], :]
+            if group not in coefs_dict:
+                coefs_dict[group] = self.coef[ind_group[group], :]
             else:
-                coefs[group] = np.concatenate((coefs[group],
-                                               self.coef[ind_group[group], :]))
+                coefs_dict[group] = np.concatenate(
+                    (coefs_dict[group], self.coef[ind_group[group], :]))
 
-        return coefs
+        return coefs_dict
 
-    def plot_betaweights(self, coefs, fancy_color=False):
-        """Plot beta weights."""
+    def plot_betaweights(self, coefs_dict, fancy_color=False):
+        """Plot beta weights.
+
+        Args:
+            coefs_dict: dict of np arrays (N, 4), coefficients
+            fancy_color: bool, whether to use fancy colors
+        """
 
         regr_names = ['Choice', 'Mod 1', 'Mod 2', 'Rule']
 
@@ -644,7 +649,7 @@ class StateSpaceAnalysis(object):
                     color = 'gray'
                 # Find all units here that belong to group 1, 2, or 12
                 # as defined in UnitAnalysis
-                ax.plot(coefs[group][:,i], coefs[group][:,j], 'o',
+                ax.plot(coefs_dict[group][:,i], coefs_dict[group][:,j], 'o',
                         color=color, ms=1.5, mec='white', mew=0.2)
 
             ax.plot([-2, 2], [0, 0], color='gray')
@@ -1322,7 +1327,7 @@ def plot_betaweights(model_dir):
         model_dir: the root model directory. All valid model directories under
           it would be used
     """
-    coefs = {}
+    coefs_dict = {}
 
     # sigma_rec = 0.15
     sigma_rec = 0.0
@@ -1334,10 +1339,10 @@ def plot_betaweights(model_dir):
                                  redefine_choice=True, sigma_rec=sigma_rec)
 
         # Update coefficient dictionary
-        coefs = ssa.sort_coefs_bygroup(coefs)
+        coefs_dict = ssa.sort_coefs_bygroup(coefs_dict)
 
-    ssa.plot_betaweights(coefs, fancy_color=False)
-    ssa.plot_betaweights(coefs, fancy_color=True)
+    # ssa.plot_betaweights(coefs_dict, fancy_color=False)
+    ssa.plot_betaweights(coefs_dict, fancy_color=True)
 
 
 def quick_statespace(model_dir):
@@ -1448,25 +1453,24 @@ def run_all_analyses(model_dir):
     # ua.plot_performance_choicetasks()
 
 
-
 if __name__ == '__main__':
     root_dir = './data/varyhparams'
-    hp_target = {'activation': 'softplus',
+    hp_target = {'activation': 'tanh',
                  'rnn_type': 'LeakyGRU',
-                 'w_rec_init': 'diag',
-                 'l1_h': 0,
+                 'w_rec_init': 'randortho',
+                 'l1_h': 1e-3,
                  'l1_weight': 0}
     model_dir, _ = tools.find_model(root_dir, hp_target)
 
     ######################### Connectivity and Lesioning ######################
-    # ua = UnitAnalysis(model_dir)
+    ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
     # ua.prettyplot_hist_varprop()
-    # lesion_units_list = [None] + [ua.group_ind_orig[g] for g in ['1', '2', '12']]
-    # plot_performance_choicetasks(model_dir, lesion_units_list)
+    lesion_units_list = [None] + [ua.group_ind_orig[g] for g in ['1', '2', '12']]
+    plot_performance_choicetasks(model_dir, lesion_units_list)
 
     # plot_performance_2D_all(model_dir, 'contextdm1')
 
@@ -1495,3 +1499,33 @@ if __name__ == '__main__':
 
     ################### Frac Var ##############################################
     # plot_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
+
+    # Define groups based on beta weights
+    ssa = StateSpaceAnalysis(model_dir, lesion_units=None,
+                             redefine_choice=True, sigma_rec=0)
+
+    def _get_group_ind(g, theta=0):
+        if g == '1':
+            ind = (ssa.coef[:, 1] > theta) * (ssa.coef[:, 2] < theta)
+        elif g == '2':
+            ind = (ssa.coef[:, 1] < theta) * (ssa.coef[:, 2] > theta)
+        elif g == '12':
+            ind = (ssa.coef[:, 1] > theta) * (ssa.coef[:, 2] > theta)
+        elif g is None:
+            ind = (ssa.coef[:, 1] < theta) * (ssa.coef[:, 2] < theta)
+        else:
+            raise ValueError()
+        return ind
+
+    # Update coefficient dictionary
+    groups = ['1', '2', '12', None]
+    coefs_dict = {key: ssa.coef[_get_group_ind(key), :] for key in groups}
+
+    ssa.plot_betaweights(coefs_dict, fancy_color=True)
+
+    lesion_units_list = [None]
+    for group in ['1', '2', '12']:
+        ind = _get_group_ind(group)
+        ind_orig = ssa.ind_active[ind]
+        lesion_units_list.append(ind_orig)
+    plot_performance_choicetasks(model_dir, lesion_units_list)
