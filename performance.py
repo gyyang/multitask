@@ -19,7 +19,7 @@ import scipy.stats as stats
 from scipy.optimize import curve_fit, minimize
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
+import seaborn as sns # If you don't have this, then some colormaps won't work
 
 import tensorflow as tf
 

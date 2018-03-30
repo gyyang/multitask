@@ -184,7 +184,7 @@ def _plot_hist_varprop(hist_plot, bins_edge, rule_pair, hist_example=None,
     if hist_example is not None:
         hist_example = hist_example/np.sum(hist_example)
 
-    import seaborn.apionly as sns
+    import seaborn as sns
     fs = 6
     fig = plt.figure(figsize=(1.5,1.2))
     ax = fig.add_axes([0.2,0.3,0.6,0.5])

@@ -11,7 +11,7 @@ import pickle
 from collections import OrderedDict
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn.apionly as sns
+import seaborn as sns
 
 import tensorflow as tf
 

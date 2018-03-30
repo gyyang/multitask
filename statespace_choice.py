@@ -15,7 +15,7 @@ from scipy.optimize import curve_fit, minimize
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
+import seaborn as sns # If you don't have this, then some colormaps won't work
 from task import *
 from run import Run
 from network import get_perf
