@@ -2,4 +2,5 @@
 data/*
 figure/*
 debug/*
+datasets/
 previous_versions/*
