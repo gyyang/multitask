@@ -20,6 +20,7 @@ from slowpoints import search_slowpoints
 
 save = False # TEMP
 
+
 def generate_surrogate_data():
     # Generate surrogate data
 
@@ -473,38 +474,41 @@ class UnitAnalysis(object):
 
 
 class StateSpaceAnalysis(object):
-    def __init__(self, model_dir, lesion_units=None, **kwargs):
 
-        # Default settings
-        default_setting = {
-            'model_dir': model_dir,
-            'analyze_threerules': False,
-            'analyze_allunits': False,
-            'redefine_choice': False,
-            'regress_product': False, # regression of interaction terms
-            'z_score': True,
-            'fast_eval': True,
-            'surrogate_data': False,
-            'sigma_rec': 0.,
-            'select_group': False,
-            'n_rep': 1}
+    def __init__(self,
+                 model_dir,
+                 lesion_units=None,
+                 analyze_allunits=False,
+                 redefine_choice=False,
+                 z_score=True,
+                 surrogate_data=False,
+                 select_group=None,
+                 n_rep=1
+                 ):
+        """State space analysis.
 
-        # Update settings with kwargs
-        setting = default_setting
-        for key, val in kwargs.items():
-            setting[key] = val
+        Perform state space analysis in the style of Mante, Sussillo 2013
 
-        print('Current analysis setting:')
-        for key, val in default_setting.items():
-            print('{:20s} : {:s}'.format(key, str(val)))
+        Args:
+            lesion_units: None of list of ints, the units to lesion
+            analyze_allunits: bool, if True analyze all units, else exclude
+              units with low task variance
+            redefine_choice: bool, if True redefine choice such that choice 1
+              is always the preferred motor response
+            z_score: bool, if True z-score the data as pre-processing
+            surrogate_data: bool, if True use surrogate data
+            select_group: None or list of ints, the group of units to analyze
+            n_rep: int, the number of different stimulus locations used
+        """
 
-        # # If using surrogate data, create random matrix for later use
-        # if setting['surrogate_data']:
-        #     from scipy.stats import ortho_group
-        #     with Run(model_dir, fast_eval=True) as R:
-        #         w_rec  = R.w_rec
-        #     nh = w_rec.shape[0]
-        #     random_ortho_matrix = ortho_group.rvs(dim=nh)
+        # If using surrogate data, create random matrix for later use
+        if surrogate_data:
+            raise NotImplementedError()
+            from scipy.stats import ortho_group
+            with Run(model_dir, fast_eval=True) as R:
+                w_rec  = R.w_rec
+            nh = w_rec.shape[0]
+            random_ortho_matrix = ortho_group.rvs(dim=nh)
 
         #################### Computing Neural Activity #########################
         # Get rules and regressors
@@ -531,7 +535,7 @@ class StateSpaceAnalysis(object):
                 # stim1_loc  = 0
                 # stim1_loc  = np.pi/2
                 # stim1_loc  = np.pi/4
-                params, batch_size = self.gen_taskparams(stim1_loc, n_stim=6, n_rep=setting['n_rep'])
+                params, batch_size = self.gen_taskparams(stim1_loc, n_stim=6, n_rep=n_rep)
                 stim1_locs = np.tile(params['stim1_locs'], n_rule)
 
                 x     = list() # Network input
@@ -579,22 +583,18 @@ class StateSpaceAnalysis(object):
             nt, nb, nh = H.shape
 
             # Analyze all units or only active units
-            if setting['analyze_allunits']:
+            if analyze_allunits:
                 ind_active = range(nh)
             else:
-                if 'ind_active' in kwargs:
-                    ind_active = kwargs['ind_active']
-                else:
-                    # The way to select these units are important
-                    ind_active = np.where(H[-1].var(axis=0) > 1e-3)[0] # current setting
-                    # ind_active = np.where(H[-1].var(axis=0) > 1e-5)[0] # current setting
+                # The way to select these units are important
+                ind_active = np.where(H[-1].var(axis=0) > 1e-3)[0] # current setting
+                # ind_active = np.where(H[-1].var(axis=0) > 1e-5)[0] # current setting
 
+                # ind_active = np.where(H.reshape((-1, nh)).var(axis=0) > 1e-10)[0]
+                # ind_active = np.where(H.var(axis=1).mean(axis=0) > 1e-4)[0]
 
-                    # ind_active = np.where(H.reshape((-1, nh)).var(axis=0) > 1e-10)[0]
-                    # ind_active = np.where(H.var(axis=1).mean(axis=0) > 1e-4)[0]
-
-            if setting['select_group'] is not False:
-                ind_active = setting['select_group']
+            if select_group is not None:
+                ind_active = select_group
 
             H = H.reshape((-1, nh))
 
@@ -605,7 +605,7 @@ class StateSpaceAnalysis(object):
             self.H_orig_active = (H.copy()).reshape((nt, nb, nh))
 
             # Z-scoring response across time and trials (can have a strong impact on results)
-            if setting['z_score']:
+            if z_score:
                 self.meanh = H.mean(axis=0)
                 self.stdh  = H.std(axis=0)
                 H = H - self.meanh
@@ -665,7 +665,7 @@ class StateSpaceAnalysis(object):
             for i_cond in range(n_cond):
                 regr = Regrs_new[i_cond, :]
 
-                if setting['redefine_choice']:
+                if redefine_choice:
                     for pref in [1, -1]:
                         batch_ind = ((Regrs[:,0]==pref*regr[0])*(Regrs[:,1]==pref*regr[1])*
                                      (Regrs[:,2]==pref*regr[2])*(Regrs[:,3]==regr[3]))
@@ -675,8 +675,6 @@ class StateSpaceAnalysis(object):
                     batch_ind = ((Regrs[:,0]==regr[0])*(Regrs[:,1]==regr[1])*
                                  (Regrs[:,2]==regr[2])*(Regrs[:,3]==regr[3]))
                     H_new[:, i_cond, :] = H[:, batch_ind, :].mean(axis=1)
-
-
 
             ################################### Regression ################################
             from sklearn import linear_model
@@ -723,26 +721,26 @@ class StateSpaceAnalysis(object):
 
         H_new_tran = np.dot(H_new, q)
 
-        self.hparams     = hparams
-        self.setting    = setting
-        self.task_var   = task_var
+        self.hparams = hparams
+        self.task_var = task_var
         self.Regrs_orig = Regrs
-        self.Regrs      = Regrs_new
-        self.H          = H_new
-        self.H_tran     = H_new_tran
+        self.Regrs = Regrs_new
+        self.H = H_new
+        self.H_tran = H_new_tran
         self.H_original = H_original
         self.regr_names = regr_names
-        self.coef       = coef_maxt
-        self.rules      = rules
+        self.coef = coef_maxt
+        self.rules = rules
         self.ind_active = ind_active
-        self.stim1_locs  = stim1_locs
-        self.q          = q
+        self.stim1_locs = stim1_locs
+        self.q = q
         self.lesion_units = lesion_units
-        self.colors     = dict(zip([None, '1', '2', '12'],
+        self.colors = dict(zip([None, '1', '2', '12'],
                            sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
 
     @staticmethod
     def gen_taskparams(stim1_loc, n_stim, n_rep=1, n_stimloc=10):
+        """Generate parameters for task."""
         if stim1_loc is not None:
             # Do not loop over stim1_loc
             # Generate task parameterse for state-space analysis
@@ -867,7 +865,7 @@ class StateSpaceAnalysis(object):
             save_name = 'beta_weights_sub'
             if fancy_color:
                 save_name = save_name + '_color'
-            plt.savefig(os.path.join('figure',save_name+self.setting['model_dir']+'.pdf'), transparent=True)
+            plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
         plt.show()
 
     def get_slowpoints(self):
@@ -1322,16 +1320,19 @@ def plot_betaweights(model_dir):
 
 
 def quick_statespace(model_dir):
-    # Quick state space analysis from mode='test'
+    """Quick state space analysis using simply PCA."""
     rules = ['contextdm1', 'contextdm2']
     h_lastts = dict()
-    with Run(model_dir, sigma_rec=0, fast_eval=True) as R:
-        hparams = R.hparams
-
+    model = Model(model_dir)
+    hparams = model.hparams
+    with tf.Session() as sess:
+        model.restore()
         for rule in rules:
-            task = generate_onebatch(rule=rule, hparams=hparams, mode='test')
-            h = R.f_h(task.x)
-            lastt = task.epochs['stim1'][-1]
+            # Generate a batch of trial from the test mode
+            trial = generate_trials(rule, hparams, mode='test')
+            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            h = sess.run(model.h, feed_dict=feed_dict)
+            lastt = trial.epochs['stim1'][-1]
             h_lastts[rule] = h[lastt,:,:]
 
     from sklearn.decomposition import PCA
@@ -1350,6 +1351,7 @@ def quick_statespace(model_dir):
                    loc=1, frameon=False)
     if save:
         plt.savefig('figure/choiceatt_quickstatespace.pdf',transparent=True)
+
 
 def _compute_frac_var(model_dir, **kwargs):
     # FracVar analysis for Mante et al. experimental setup
@@ -1458,24 +1460,23 @@ if __name__ == '__main__':
 
     ################### State space ##############################################
     # Plot State space
-    # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False)
-    # ssa.plot_statespace(plot_slowpoints=False)
+    ssa = StateSpaceAnalysis(model_dir, lesion_units=None, redefine_choice=False)
+    ssa.plot_statespace(plot_slowpoints=False)
 
     # Plot beta weights
     # plot_betaweights(model_dir)
 
     # Plot units in time
-    ssa = StateSpaceAnalysis(model_dir, lesion_units=None, z_score=False)
-    ssa.plot_units_intime()
-    ssa.plot_currents_intime()
+    # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, z_score=False)
+    # ssa.plot_units_intime()
+    # ssa.plot_currents_intime()
     # Quick state space analysis
     # quick_statespace(model_dir)
 
     ################### Modified state space ##############################################
-    # ua = UnitAnalysis(model_dir)
-    # ssa = StateSpaceAnalysis(model_dir, select_group=ua.ind_lesions_orig['12'])
-    # ssa = StateSpaceAnalysis(model_dir)
-    # ssa.plot_statespace(plot_slowpoints=False)
+    ua = UnitAnalysis(model_dir)
+    ssa = StateSpaceAnalysis(model_dir, select_group=ua.ind_lesions_orig['12'])
+    ssa.plot_statespace(plot_slowpoints=False)
 
     ################### Frac Var ##############################################
     # frac_var = _compute_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
