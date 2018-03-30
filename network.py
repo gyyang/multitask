@@ -564,10 +564,9 @@ class Model(object):
 
         # Input, target output, and cost mask
         # Shape: [Time, Batch, Num_units]
-        if hparams['in_type'] == 'normal':
-            n_input = hparams['n_input']
-        elif hparams['in_type'] == 'multi':
-            n_input = hparams['rule_start'] * hparams['n_rule']
+        if hparams['in_type'] != 'normal':
+            raise ValueError('Only support in_type ' + hparams['in_type'])
+        n_input = hparams['n_input']
         n_rnn = hparams['n_rnn']
         n_output = hparams['n_output']
 
@@ -687,6 +686,7 @@ class Model(object):
         for v in self.var_list:
             if 'rnn' in v.name:
                 if 'kernel' in v.name or 'weight' in v.name:
+                    # TODO(gryang): For GRU, fix
                     self.w_rec = v[n_input:, :]
                     self.w_in = v[:n_input, :]
                 else:
@@ -771,11 +771,11 @@ class Model(object):
         """Lesion units given by units
 
         Args:
+            sess: tensorflow session
             units : can be None, an integer index, or a list of integer indices
         """
-        if self.hparams['rnn_type'] != 'LeakyRNN':
-            raise ValueError('Only supporting LeakyRNN for now')
 
+        # Convert to numpy array
         if units is None:
             return
         elif not hasattr(units, '__iter__'):
@@ -783,16 +783,19 @@ class Model(object):
         else:
             units = np.array(units)
 
-        w_out = sess.run(self.w_out)
-        w_rec = sess.run(self.w_rec)
-
-        # Set output projections from these units to zero
-        w_out[units, :] = 0
-        w_rec[units, :] = 0
-
-        # Apply the lesioning
-        sess.run(self.w_out.assign(w_out))
-        sess.run(self.w_rec.assign(w_rec))
+        # This lesioning will work for both RNN and GRU
+        n_input = self.hparams['n_input']
+        for v in self.var_list:
+            if 'kernel' in v.name or 'weight' in v.name:
+                # Connection weights
+                v_val = sess.run(v)
+                if 'output' in v.name:
+                    # output weights
+                    v_val[units, :] = 0
+                elif 'rnn' in v.name:
+                    # recurrent weights
+                    v_val[n_input + units, :] = 0
+                sess.run(v.assign(v_val))
 
         if verbose:
             print('Lesioned units:')
