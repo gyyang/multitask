@@ -27,29 +27,35 @@ from task import generate_trials, rule_name, get_dist
 from network import Model, get_perf
 import tools
 
-rule_color={'reactgo'           : sns.xkcd_palette(['green'])[0],
-            'delaygo'           : sns.xkcd_palette(['olive'])[0],
-            'fdgo'              : sns.xkcd_palette(['forest green'])[0],
-            'reactanti'         : sns.xkcd_palette(['mustard'])[0],
-            'delayanti'         : sns.xkcd_palette(['tan'])[0],
-            'fdanti'            : sns.xkcd_palette(['brown'])[0],
-            'dm1'               : sns.xkcd_palette(['lavender'])[0],
-            'dm2'               : sns.xkcd_palette(['aqua'])[0],
-            'contextdm1'        : sns.xkcd_palette(['bright purple'])[0],
-            'contextdm2'        : sns.xkcd_palette(['green blue'])[0],
-            'multidm'           : sns.xkcd_palette(['blue'])[0],
-            'delaydm1'          : sns.xkcd_palette(['indigo'])[0],
-            'delaydm2'          : sns.xkcd_palette(['grey blue'])[0],
-            'contextdelaydm1'   : sns.xkcd_palette(['royal purple'])[0],
-            'contextdelaydm2'   : sns.xkcd_palette(['dark cyan'])[0],
-            'multidelaydm'      : sns.xkcd_palette(['royal blue'])[0],
-            'dmsgo'             : sns.xkcd_palette(['red'])[0],
-            'dmsnogo'           : sns.xkcd_palette(['rose'])[0],
-            'dmcgo'             : sns.xkcd_palette(['orange'])[0],
-            'dmcnogo'           : sns.xkcd_palette(['peach'])[0]
+
+_rule_color = {
+    'reactgo': 'green',
+            'delaygo': 'olive',
+            'fdgo': 'forest green',
+            'reactanti': 'mustard',
+            'delayanti': 'tan',
+            'fdanti': 'brown',
+            'dm1': 'lavender',
+            'dm2': 'aqua',
+            'contextdm1': 'bright purple',
+            'contextdm2': 'green blue',
+            'multidm': 'blue',
+            'delaydm1': 'indigo',
+            'delaydm2': 'grey blue',
+            'contextdelaydm1': 'royal purple',
+            'contextdelaydm2': 'dark cyan',
+            'multidelaydm': 'royal blue',
+            'dmsgo': 'red',
+            'dmsnogo': 'rose',
+            'dmcgo': 'orange',
+            'dmcnogo': 'peach'
             }
 
+rule_color = {k: sns.xkcd_palette([v])[0] for k, v in _rule_color.items()}
+
 save = True
+THETA = 0.3 * np.pi
+
 
 def plot_trainingprogress(model_dir, rule_plot=None, save=True):
     # Plot Training Progress
@@ -101,6 +107,7 @@ def plot_trainingprogress(model_dir, rule_plot=None, save=True):
         plt.savefig('figure/Training_Progress'+model_dir+'.pdf', transparent=True)
     plt.show()
 
+
 def plot_performanceprogress(model_dir, rule_plot=None, save=False):
     # Plot Training Progress
     log = tools.load_log(model_dir)
@@ -145,10 +152,12 @@ def plot_performanceprogress(model_dir, rule_plot=None, save=False):
         plt.savefig('figure/Performance_Progresss.pdf', transparent=True)
     plt.show()
 
+
 def plot_performanceprogress_cont(model_dirs, save=True, **kwargs):
     model_dir1, model_dir2 = model_dirs
     _plot_performanceprogress_cont(model_dir1, save=save, **kwargs)
     _plot_performanceprogress_cont(model_dir1, model_dir2=model_dir2, save=save, **kwargs)
+
 
 def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=None):
     # Plot Training Progress
@@ -265,6 +274,7 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=N
         plt.savefig('figure/'+name+'.pdf', transparent=True)
     plt.show()
 
+
 def get_finalperformance(save_pattern):
     model_dirs = tools.valid_model_dirs(save_pattern)
 
@@ -352,6 +362,7 @@ def obsolete_plot_finalperformance(save_type, save_type_end=None):
         plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
     plt.show()
 
+
 def plot_finalperformance_cont(save_pattern1, save_pattern2):
     final_cost, final_perf1, rule_plot, training_time_plot = \
         get_finalperformance(save_pattern1)
@@ -421,6 +432,7 @@ def get_allperformance(save_pattern, param_list=None):
         print(key),
         print('{:0.3f}'.format(final_perfs[key])),
         print(filenames[key])
+
 
 def plot_finalperformance_lr():
     # Specialized for varyign learning rate. Can be rewritten, but I'm lazy.
@@ -499,9 +511,7 @@ def plot_finalperformance_lr():
     # plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
     # plt.show()
 
-
 ################ Psychometric - Varying Coherence #############################
-
 def _psychometric_dm(model_dir, rule, params_list, batch_shape):
     """Base function for computing psychometric performance in 2AFC tasks
 
@@ -534,8 +544,8 @@ def _psychometric_dm(model_dir, rule, params_list, batch_shape):
             stim2_locs_ = np.reshape(params['stim2_locs'], batch_shape)
 
             # Average over the first dimension of each batch
-            choose1 = (get_dist(y_loc_sample - stim1_locs_) < 0.3*np.pi).sum(axis=0)
-            choose2 = (get_dist(y_loc_sample - stim2_locs_) < 0.3*np.pi).sum(axis=0)
+            choose1 = (get_dist(y_loc_sample - stim1_locs_) < THETA).sum(axis=0)
+            choose2 = (get_dist(y_loc_sample - stim2_locs_) < THETA).sum(axis=0)
             ydatas.append(choose1/(choose1 + choose2))
 
     return ydatas
@@ -575,6 +585,7 @@ def psychometric_choice(model_dir, **kwargs):
                               colors=sns.dark_palette("light blue", 3, input="xkcd"),
                               legtitle='Stim. time (ms)', rule=rule, **kwargs)
 
+
 def psychometric_delaychoice(model_dir, **kwargs):
     rule = 'delaydm1'
 
@@ -601,7 +612,7 @@ def psychometric_delaychoice(model_dir, **kwargs):
     for dtar in dtars:
         stim2_ons  = stim1_offs + dtar
         stim2_offs = stim2_ons + 200
-        params = {'stim1_locs'    : stim1_locs,
+        params = {'stim1_locs' : stim1_locs,
                   'stim2_locs'    : stim2_locs,
                   'stim1_strengths' : stim1_strengths,
                   'stim2_strengths' : stim2_strengths,
@@ -620,9 +631,11 @@ def psychometric_delaychoice(model_dir, **kwargs):
                               colors=sns.dark_palette("light blue", 3, input="xkcd"),
                               legtitle='Delay (ms)',rule=rule, **kwargs)
 
+
 def psychometric_choiceattend(model_dir, **kwargs):
     psychometric_choiceattend_(model_dir, 'contextdm1', **kwargs)
     psychometric_choiceattend_(model_dir, 'contextdm2', **kwargs)
+
 
 def psychometric_choiceattend_(model_dir, rule, **kwargs):
     stim_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.05
@@ -662,6 +675,7 @@ def psychometric_choiceattend_(model_dir, rule, **kwargs):
                               colors=sns.color_palette("Set2",2),
                               legtitle='Modality',rule=rule, **kwargs)
 
+
 def psychometric_choiceint(model_dir, **kwargs):
     rule = 'multidm'
     stim_cohs = np.array([-0.5, -0.15, -0.05, 0, 0.05, 0.15, 0.5])*0.05
@@ -699,6 +713,7 @@ def psychometric_choiceint(model_dir, **kwargs):
     sigmas = [fit[1] for fit in fits]
     print('Fit sigmas:')
     print(sigmas)
+
 
 def psychometric_intrepro(model_dir):
     with Run(model_dir, fast_eval=fast_eval) as R:
@@ -748,6 +763,7 @@ def psychometric_intrepro(model_dir):
         ax.yaxis.set_ticks_position('left')
         plt.savefig('figure/analyze_'+rule_name[INTREPRO].replace(' ','')+'_performance.pdf', transparent=True)
         plt.show()
+
 
 def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     """
@@ -809,6 +825,7 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
         plt.savefig(figname+'.pdf', transparent=True)
     plt.show()
     return fits
+
 
 def psychometric_choicefamily_2D(model_dir, rule, lesion_units=None,
                                  n_coh=8, n_stim_loc=20, coh_range=0.1):
@@ -886,36 +903,26 @@ def psychometric_choicefamily_2D(model_dir, rule, lesion_units=None,
         feed_dict = tools.gen_feed_dict(model, trial, hparams)
         y_sample, y_loc_sample = sess.run([model.y_hat, model.y_hat_loc],
                                           feed_dict=feed_dict)
-        # y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
-
-    # perf = get_perf(y_sample, trial.y_loc)
-    # stim1_locs_ = np.reshape(params['stim1_locs'], batch_shape)
-    # stim2_locs_ = np.reshape(params['stim2_locs'], batch_shape)
-    #
-    # # Average over the first dimension of each batch
-    # choose1 = (get_dist(y_loc_sample - stim1_locs_) < 0.3 * np.pi).sum(axis=0)
-    # choose2 = (get_dist(y_loc_sample - stim2_locs_) < 0.3 * np.pi).sum(axis=0)
-    # perf = choose1 / (choose1 + choose2)
-    # print('Performance {:0.3f}'.format(np.mean(perf)))
 
     # Compute the overall performance.
-    # Importantly, discard trials where no decision was made to one of the choices
-    loc_cor = trial.y_loc[-1] # last time point, correct locations
+    # Importantly, discard trials where no decision was made
+    loc_cor = trial.y_loc[-1]  # last time point, correct locations
     loc_err = (loc_cor+np.pi)%(2*np.pi)
-    choose_cor = (get_dist(y_loc_sample[-1] - loc_cor) < 0.3*np.pi).sum()
-    choose_err = (get_dist(y_loc_sample[-1] - loc_err) < 0.3*np.pi).sum()
+    choose_cor = (get_dist(y_loc_sample[-1] - loc_cor) < THETA).sum()
+    choose_err = (get_dist(y_loc_sample[-1] - loc_err) < THETA).sum()
     perf = choose_cor/(choose_cor+choose_err)
 
-    # Compute the proportion of choosing choice 1, while maintaining the batch_shape
+    # Compute the proportion of choosing choice 1 and maintain the batch_shape
     stim1_locs_ = np.reshape(stim1_locs, batch_shape)
     stim2_locs_ = np.reshape(stim2_locs, batch_shape)
 
     y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
-    choose1 = (get_dist(y_loc_sample - stim1_locs_) < 0.3*np.pi).sum(axis=0)
-    choose2 = (get_dist(y_loc_sample - stim2_locs_) < 0.3*np.pi).sum(axis=0)
+    choose1 = (get_dist(y_loc_sample - stim1_locs_) < THETA).sum(axis=0)
+    choose2 = (get_dist(y_loc_sample - stim2_locs_) < THETA).sum(axis=0)
     prop1s = choose1/(choose1 + choose2)
 
     return perf, prop1s, cohs
+
 
 def _plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=None, **kwargs):
     n_coh = len(cohs)
@@ -958,13 +965,13 @@ def _plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=None, **kwargs)
 
     plt.show()
 
+
 def plot_psychometric_choicefamily_2D(model_dir, rule, **kwargs):
     perf, prop1s, cohs = psychometric_choicefamily_2D(model_dir, rule, **kwargs)
     _plot_psychometric_choicefamily_2D(prop1s, cohs, rule)
 
 
 ################ Psychometric - Varying Stim Time #############################
-
 def compute_choicefamily_varytime(model_dir, rule):
     assert rule in ['dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm']
     print('Starting vary time analysis of the {:s} task...'.format(rule_name[rule]))
@@ -1037,6 +1044,7 @@ def compute_choicefamily_varytime(model_dir, rule):
     savename = 'data/varytime_'+rule_name[rule].replace(' ','') +model_dir
     with open(savename+'.pkl','wb') as f:
         pickle.dump(result, f)
+
 
 def plot_choicefamily_varytime(model_dir, rule):
     assert rule in ['dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm']
@@ -1148,6 +1156,7 @@ def psychometric_delaychoice_varytime(model_dir, rule):
                                legtitle='Stim. 1 - Stim. 2',rule=rule,
                                xlabel='Delay time (ms)')
 
+
 def plot_psychometric_varytime(xdatas, ydatas, figname, labels, colors, **kwargs):
     """
     Standard function for plotting the psychometric curves
@@ -1191,8 +1200,8 @@ def plot_psychometric_varytime(xdatas, ydatas, figname, labels, colors, **kwargs
         plt.savefig('figure/'+figname+'.pdf', transparent=True)
     plt.show()
 
-################ Psychometric - Varying Stim Loc ##############################
 
+################ Psychometric - Varying Stim Loc ##############################
 def psychometric_choice_varyloc(model_dir, **kwargs):
     print('Starting standard analysis of the CHOICE task...')
     with Run(model_dir, fast_eval=fast_eval) as R:
@@ -1225,8 +1234,8 @@ def psychometric_choice_varyloc(model_dir, **kwargs):
         stim2_locs_ = np.reshape(stim2_locs, batch_shape)
 
         y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
-        choose1 = (get_dist(y_sample_loc - stim1_locs_) < 0.3*np.pi).sum(axis=0)
-        choose2 = (get_dist(y_sample_loc - stim2_locs_) < 0.3*np.pi).sum(axis=0)
+        choose1 = (get_dist(y_sample_loc - stim1_locs_) < THETA).sum(axis=0)
+        choose2 = (get_dist(y_sample_loc - stim2_locs_) < THETA).sum(axis=0)
         ydatas = choose1/(choose1 + choose2)
 
     xdatas = [2*np.pi*np.arange(n_stim_loc)/n_stim_loc] * n_stim
@@ -1235,6 +1244,7 @@ def psychometric_choice_varyloc(model_dir, **kwargs):
                               labels=['{:0.3f}'.format(t) for t in 2*cohs],
                               colors=sns.dark_palette("light blue", n_stim, input="xkcd"),
                               legtitle='Tar1 - Tar2',rule='dm1', **kwargs)
+
 
 def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
     """
@@ -1278,11 +1288,12 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
         plt.savefig(figname+'.pdf', transparent=True)
     # plt.show()
 
-################ Psychometric - Delay Matching Tasks ##########################
 
+################ Psychometric - Delay Matching Tasks ##########################
 def psychometric_delaymatching(model_dir, rule):
     with Run(model_dir, fast_eval=True) as R:
         psychometric_delaymatching_fromsession(R, rule)
+
 
 def psychometric_delaymatching_fromsession(R, rule):
     # Input is a Run session
@@ -1345,8 +1356,8 @@ def psychometric_delaymatching_fromsession(R, rule):
     #             self.model_dir+'.pdf', transparent=True)
     plt.show()
 
-################ Psychometric - Anti Tasks ####################################
 
+################ Psychometric - Anti Tasks ####################################
 def psychometric_goantifamily_2D(model_dir, rule, title=None, **kwargs):
     n_rep = 20
     n_stim_loc = 20 # increase repeat by increasing this
@@ -1420,7 +1431,6 @@ def psychometric_goantifamily_2D(model_dir, rule, title=None, **kwargs):
         plt.savefig(os.path.join('figure', model_dir), transparent=True)
 
     plt.show()
-
 
 
 if __name__ == '__main__':
