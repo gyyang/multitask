@@ -829,16 +829,16 @@ def psychometric_choicefamily_2D(model_dir, rule, lesion_units=None,
     stim_mod2_cohs = cohs[ind_stim_mod2]
 
     params_dict = dict()
-    params_dict[CHOICE_MOD1] = \
+    params_dict['dm1'] = \
          {'stim1_locs' : stim1_locs,
           'stim2_locs' : stim2_locs,
           'stim1_strengths' : 1 + stim_mod1_cohs, # Just use mod 1 value
           'stim2_strengths' : 1 - stim_mod1_cohs,
           'stim_time'    : 800
           }
-    params_dict[CHOICE_MOD2] = params_dict[CHOICE_MOD1]
+    params_dict['dm2'] = params_dict['dm1']
 
-    params_dict[CHOICEATTEND_MOD1] = \
+    params_dict['contextdm1'] = \
          {'stim1_locs' : stim1_locs,
           'stim2_locs' : stim2_locs,
           'stim1_mod1_strengths' : 1 + stim_mod1_cohs,
@@ -848,13 +848,13 @@ def psychometric_choicefamily_2D(model_dir, rule, lesion_units=None,
           'stim_time'    : 800
           }
 
-    params_dict[CHOICEATTEND_MOD2] = params_dict[CHOICEATTEND_MOD1]
+    params_dict['contextdm2'] = params_dict['contextdm1']
 
-    params_dict[CHOICEDELAYATTEND_MOD1] = params_dict[CHOICEATTEND_MOD1]
-    params_dict[CHOICEDELAYATTEND_MOD1]['stim_time'] = 800
-    params_dict[CHOICEDELAYATTEND_MOD2] = params_dict[CHOICEDELAYATTEND_MOD1]
+    params_dict['contextdelaydm1'] = params_dict['contextdm1']
+    params_dict['contextdelaydm1']['stim_time'] = 800
+    params_dict['contextdelaydm2'] = params_dict['contextdelaydm1']
 
-    params_dict[CHOICE_INT] = \
+    params_dict['multidm'] = \
          {'stim1_locs' : stim1_locs,
           'stim2_locs' : stim2_locs,
           'stim1_mod1_strengths' : 1 + stim_mod1_cohs,
@@ -864,7 +864,7 @@ def psychometric_choicefamily_2D(model_dir, rule, lesion_units=None,
           'stim_time'    : 800
           }
 
-    params_dict[CHOICEDELAYATTEND_MOD1] = \
+    params_dict['contextdelaydm1'] = \
          {'stim1_locs' : stim1_locs,
           'stim2_locs' : stim2_locs,
           'stim1_mod1_strengths' : 1 + stim_mod1_cohs,
@@ -874,37 +874,45 @@ def psychometric_choicefamily_2D(model_dir, rule, lesion_units=None,
           'stim_time'    : 800
           }
 
-    with Run(model_dir, lesion_units=lesion_units, fast_eval=True) as R:
+    model = Model(model_dir)
+    hparams = model.hparams
+    with tf.Session() as sess:
+        model.restore()
+        model.lesion_units(sess, lesion_units)
 
         params = params_dict[rule]
-        task  = generate_onebatch(rule, R.hparams, 'psychometric', params=params)
+        trial = generate_trials(rule, hparams, 'psychometric',
+                                params=params)
+        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+        y_sample, y_loc_sample = sess.run([model.y_hat, model.y_hat_loc],
+                                          feed_dict=feed_dict)
+        # y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
 
-        # print('Using temporary rule setup')
-        # task  = generate_onebatch(rule, R.hparams, 'psychometric', params=params,
-        #                           add_rule=[CHOICEDELAY_MOD2, CHOICEATTEND_MOD2, CHOICE_INT],
-        #                           rule_strength=[0., 1., -0.])
-
-        y_sample = R.f_y_from_x(task.x)
-        y_sample_loc = R.f_y_loc(y_sample)
-
-    perf = get_perf(y_sample, task.y_loc)
-    print('Performance {:0.3f}'.format(np.mean(perf)))
+    # perf = get_perf(y_sample, trial.y_loc)
+    # stim1_locs_ = np.reshape(params['stim1_locs'], batch_shape)
+    # stim2_locs_ = np.reshape(params['stim2_locs'], batch_shape)
+    #
+    # # Average over the first dimension of each batch
+    # choose1 = (get_dist(y_loc_sample - stim1_locs_) < 0.3 * np.pi).sum(axis=0)
+    # choose2 = (get_dist(y_loc_sample - stim2_locs_) < 0.3 * np.pi).sum(axis=0)
+    # perf = choose1 / (choose1 + choose2)
+    # print('Performance {:0.3f}'.format(np.mean(perf)))
 
     # Compute the overall performance.
     # Importantly, discard trials where no decision was made to one of the choices
-    loc_cor = task.y_loc[-1] # last time point, correct locations
+    loc_cor = trial.y_loc[-1] # last time point, correct locations
     loc_err = (loc_cor+np.pi)%(2*np.pi)
-    choose_cor = (get_dist(y_sample_loc[-1] - loc_cor) < 0.3*np.pi).sum()
-    choose_err = (get_dist(y_sample_loc[-1] - loc_err) < 0.3*np.pi).sum()
+    choose_cor = (get_dist(y_loc_sample[-1] - loc_cor) < 0.3*np.pi).sum()
+    choose_err = (get_dist(y_loc_sample[-1] - loc_err) < 0.3*np.pi).sum()
     perf = choose_cor/(choose_cor+choose_err)
 
     # Compute the proportion of choosing choice 1, while maintaining the batch_shape
     stim1_locs_ = np.reshape(stim1_locs, batch_shape)
     stim2_locs_ = np.reshape(stim2_locs, batch_shape)
 
-    y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
-    choose1 = (get_dist(y_sample_loc - stim1_locs_) < 0.3*np.pi).sum(axis=0)
-    choose2 = (get_dist(y_sample_loc - stim2_locs_) < 0.3*np.pi).sum(axis=0)
+    y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
+    choose1 = (get_dist(y_loc_sample - stim1_locs_) < 0.3*np.pi).sum(axis=0)
+    choose2 = (get_dist(y_loc_sample - stim2_locs_) < 0.3*np.pi).sum(axis=0)
     prop1s = choose1/(choose1 + choose2)
 
     return perf, prop1s, cohs
@@ -972,7 +980,7 @@ def compute_choicefamily_varytime(model_dir, rule):
     stim1_locs = 2*np.pi*ind_stim_loc/n_stim_loc
     stim2_locs = (stim1_locs+np.pi)%(2*np.pi)
 
-    # if rule == CHOICE_INT:
+    # if rule == 'multidm':
     #     stim_str_range = 0.02
     # else:
     #     stim_str_range = 0.04
@@ -1209,7 +1217,7 @@ def psychometric_choice_varyloc(model_dir, **kwargs):
                   'stim2_strengths' : stim2_strengths,
                   'stim_time'    : 600}
 
-        task  = generate_onebatch(CHOICE_MOD1, R.hparams, 'psychometric', params=params)
+        task  = generate_onebatch('dm1', R.hparams, 'psychometric', params=params)
         y_sample = R.f_y_from_x(task.x)
         y_sample_loc = R.f_y_loc(y_sample)
 
@@ -1226,7 +1234,7 @@ def psychometric_choice_varyloc(model_dir, **kwargs):
     plot_psychometric_varyloc(xdatas, ydatas,
                               labels=['{:0.3f}'.format(t) for t in 2*cohs],
                               colors=sns.dark_palette("light blue", n_stim, input="xkcd"),
-                              legtitle='Tar1 - Tar2',rule=CHOICE_MOD1, **kwargs)
+                              legtitle='Tar1 - Tar2',rule='dm1', **kwargs)
 
 def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
     """
