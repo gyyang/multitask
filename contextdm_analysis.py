@@ -576,11 +576,13 @@ class StateSpaceAnalysis(object):
 
         return params, batch_size
 
-    def sort_ind_bygroup(self):
-        """Sort ind by group 1, 2, 12, and others."""
-        # ind_group are indices for the current matrix, not original
-        # ind_active_group are for original matrix
+    def _sort_ind_byvariance(self):
+        """Sort ind into group 1, 2, 12, and others according task variance
 
+        Returns:
+            ind_group: indices for the current matrix, not original
+            ind_active_group: indices for original matrix
+        """
         ua = UnitAnalysis(self.model_dir)
 
         ind_group = dict()
@@ -601,14 +603,62 @@ class StateSpaceAnalysis(object):
 
         return ind_group, ind_active_group
 
-    def sort_coefs_bygroup(self, coefs_dict=None):
-        """Sort coefs by group 1, 2, 12, and others."""
+    def _sort_ind_bybeta(self):
+        """Sort ind into group 1, 2, 12, and others according beta weights
+
+        Returns:
+            ind_group: indices for the current matrix, not original
+            ind_active_group: indices for original matrix
+        """
+        theta = 0
+
+        ind_group = dict()
+        ind_active_group = dict()
+
+        for group in ['1', '2', '12', None]:
+            if group == '1':
+                ind = (self.coef[:, 1] > theta) * (self.coef[:, 2] < theta)
+            elif group == '2':
+                ind = (self.coef[:, 1] < theta) * (self.coef[:, 2] > theta)
+            elif group == '12':
+                ind = (self.coef[:, 1] > theta) * (self.coef[:, 2] > theta)
+            elif group is None:
+                ind = (self.coef[:, 1] < theta) * (self.coef[:, 2] < theta)
+            else:
+                raise ValueError()
+            ind = np.arange(len(ind))[ind]
+            ind_group[group] = ind
+
+            # Transform to original matrix indices
+            ind_active_group[group] = [self.ind_active[k] for k in ind]
+
+        return ind_group, ind_active_group
+
+    def sort_ind_bygroup(self, grouping):
+        """Sort indices by group."""
+        if grouping == 'var':
+            return self._sort_ind_byvariance()
+        elif grouping == 'beta':
+            return self._sort_ind_bybeta()
+        else:
+            raise ValueError()
+
+    def sort_coefs_bygroup(self, coefs_dict, grouping):
+        """Sort coefs by group 1, 2, 12, and others.
+
+        Args:
+            coefs_dict: dictionary of np arrays
+            grouping: str, type of grouping to perform, 'var' or 'beta'
+
+        Returns:
+            coefs_dict: updated dictionary of np arrays
+        """
 
         # If coefs is not None, then update coefs
         if coefs_dict is None:
             coefs_dict = dict()
 
-        ind_group, _ = self.sort_ind_bygroup()
+        ind_group, _ = self.sort_ind_bygroup(grouping)
 
         for group in ['1', '2', '12', None]:
             if group not in coefs_dict:
@@ -1071,7 +1121,7 @@ class StateSpaceAnalysis(object):
         return
 
 
-def plot_performance_choicetasks(model_dir, lesion_units_list):
+def _plot_performance_choicetasks(model_dir, lesion_units_list):
     """Plot performance across tasks for different lesioning.
 
     Args:
@@ -1084,7 +1134,6 @@ def plot_performance_choicetasks(model_dir, lesion_units_list):
     perf_stores = list()
     for lesion_units in lesion_units_list:
         perf_stores_tmp = list()
-
         for rule in rules_perf:
             perf, prop1s, cohs = performance.psychometric_choicefamily_2D(
                 model_dir, rule, lesion_units=lesion_units,
@@ -1120,6 +1169,20 @@ def plot_performance_choicetasks(model_dir, lesion_units_list):
     if save:
         plt.savefig('figure/perf_contextdm_lesion.pdf', transparent=True)
     plt.show()
+
+
+def plot_performance_choicetasks(model_dir, grouping):
+    """Plot performance across tasks for different lesioning.
+
+    Args:
+        model_dir: str, model directory
+        grouping: str, how to group different populations
+    """
+    ssa = StateSpaceAnalysis(model_dir, lesion_units=None,
+                             redefine_choice=True, sigma_rec=0)
+    ind_group, ind_group_orig = ssa.sort_ind_bygroup(grouping=grouping)
+    lesion_units_list = [None] + [ind_group_orig[g] for g in ['1', '2', '12']]
+    _plot_performance_choicetasks(model_dir, lesion_units_list)
 
 
 def plot_performance_2D(model_dir, rule, lesion_units=None,
@@ -1320,26 +1383,23 @@ def plot_groupsize_TEMPDISABLED(save_type):
     plt.savefig('figure/contextdm_groupsize'+save_type+'.pdf', transparent=True)
 
 
-def plot_betaweights(model_dir):
+def plot_betaweights(model_dir, grouping):
     """Plot the beta weights.
 
     Args:
         model_dir: the root model directory. All valid model directories under
           it would be used
     """
-    coefs_dict = {}
-
-    # sigma_rec = 0.15
     sigma_rec = 0.0
-
     model_dirs = tools.valid_model_dirs(model_dir)
 
+    coefs_dict = {}
     for d in model_dirs:
         ssa = StateSpaceAnalysis(d, lesion_units=None,
                                  redefine_choice=True, sigma_rec=sigma_rec)
 
         # Update coefficient dictionary
-        coefs_dict = ssa.sort_coefs_bygroup(coefs_dict)
+        coefs_dict = ssa.sort_coefs_bygroup(coefs_dict, grouping)
 
     # ssa.plot_betaweights(coefs_dict, fancy_color=False)
     ssa.plot_betaweights(coefs_dict, fancy_color=True)
@@ -1455,7 +1515,7 @@ def run_all_analyses(model_dir):
 
 if __name__ == '__main__':
     root_dir = './data/varyhparams'
-    hp_target = {'activation': 'tanh',
+    hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyGRU',
                  'w_rec_init': 'randortho',
                  'l1_h': 1e-3,
@@ -1463,14 +1523,15 @@ if __name__ == '__main__':
     model_dir, _ = tools.find_model(root_dir, hp_target)
 
     ######################### Connectivity and Lesioning ######################
-    ua = UnitAnalysis(model_dir)
+    # ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
     # ua.prettyplot_hist_varprop()
-    lesion_units_list = [None] + [ua.group_ind_orig[g] for g in ['1', '2', '12']]
-    plot_performance_choicetasks(model_dir, lesion_units_list)
+
+    plot_performance_choicetasks(model_dir, grouping='var')
+    plot_performance_choicetasks(model_dir, grouping='beta')
 
     # plot_performance_2D_all(model_dir, 'contextdm1')
 
@@ -1483,7 +1544,8 @@ if __name__ == '__main__':
     # ssa.plot_statespace(plot_slowpoints=False)
 
     # Plot beta weights
-    plot_betaweights(model_dir)
+    # plot_betaweights(model_dir, grouping='var')
+    # plot_betaweights(model_dir, grouping='beta')
 
     # Plot units in time
     # ssa = StateSpaceAnalysis(model_dir, lesion_units=None, z_score=False)
@@ -1500,32 +1562,3 @@ if __name__ == '__main__':
     ################### Frac Var ##############################################
     # plot_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
 
-    # Define groups based on beta weights
-    ssa = StateSpaceAnalysis(model_dir, lesion_units=None,
-                             redefine_choice=True, sigma_rec=0)
-
-    def _get_group_ind(g, theta=0):
-        if g == '1':
-            ind = (ssa.coef[:, 1] > theta) * (ssa.coef[:, 2] < theta)
-        elif g == '2':
-            ind = (ssa.coef[:, 1] < theta) * (ssa.coef[:, 2] > theta)
-        elif g == '12':
-            ind = (ssa.coef[:, 1] > theta) * (ssa.coef[:, 2] > theta)
-        elif g is None:
-            ind = (ssa.coef[:, 1] < theta) * (ssa.coef[:, 2] < theta)
-        else:
-            raise ValueError()
-        return ind
-
-    # Update coefficient dictionary
-    groups = ['1', '2', '12', None]
-    coefs_dict = {key: ssa.coef[_get_group_ind(key), :] for key in groups}
-
-    ssa.plot_betaweights(coefs_dict, fancy_color=True)
-
-    lesion_units_list = [None]
-    for group in ['1', '2', '12']:
-        ind = _get_group_ind(group)
-        ind_orig = ssa.ind_active[ind]
-        lesion_units_list.append(ind_orig)
-    plot_performance_choicetasks(model_dir, lesion_units_list)
