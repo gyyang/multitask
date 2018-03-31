@@ -279,6 +279,42 @@ def get_trial_avg_rate(data_unit, context=1, random_shuffle=False,
         return tmp
 
 
+def compute_var(rate1s, rate2s, var_method):
+    """Compute task variance.
+
+    Args:
+        Rate1s: numpy array (n_unit, n_condition, n_time),
+            trial-averaged activities for context 1
+        Rate2s: numpy array (n_unit, n_condition, n_time),
+            trial-averaged activities for context 2
+        var_method: str, method to compute variance
+
+    Return:
+        var1s: numpy array (n_unit,), task variance for context 1
+        var2s: numpy array (n_unit,), task variance for context 2
+    """
+    if var_method == 'time_avg_late':
+        # variance across conditions, then average across time
+        var1s = rate1s.var(axis=1).mean(axis=1)
+        var2s = rate2s.var(axis=1).mean(axis=1)
+    elif var_method == 'time_avg_none':
+        # variance across conditions and time
+        # The noise is much stronger in this case
+        # Even after shuffling we see trimodal distribution in this case.
+        # So we shouldn't use this method
+        var1s = rate1s.reshape((rate1s.shape[0], -1)).var(axis=1)
+        var2s = rate2s.reshape((rate2s.shape[0], -1)).var(axis=1)
+    elif var_method == 'time_avg_early':
+        # first average across time, then variance across conditions
+        # The noise is much weaker in this case
+        var1s = rate1s.mean(axis=2).var(axis=1)
+        var2s = rate2s.mean(axis=2).var(axis=1)
+    else:
+        raise ValueError('Variance method var_method unrecognized')
+
+    return var1s, var2s
+
+
 def get_shuffle_var(data, **kwargs):
     start = time.time()
     n_rep = 200
@@ -545,18 +581,29 @@ class AnalyzeManteData(object):
 
 
     def compute_var_all(self, var_method='time_avg_early'):
+        """Compute task variance for data and shuffled data.
+
+        Args:
+            var_method: str, method to compute the variance
+        """
 
         self.var_method = var_method
 
         # Generate a random orthogonal matrix for later use
-        self.rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
+        rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
 
-        self._var1s, self._var2s, self._var1s_rot, self._var2s_rot = self.get_trial_avg_var()
+        self._var1s, self._var2s, self._var1s_rot, self._var2s_rot = self.get_trial_avg_var(rotation_matrix, var_method)
         self._var1s_shuffle, self._var2s_shuffle, \
-        self._var1s_rot_shuffle, self._var2s_rot_shuffle = self.get_shuffle_var()
+        self._var1s_rot_shuffle, self._var2s_rot_shuffle = self.get_shuffle_var(rotation_matrix, var_method)
 
 
-    def get_trial_avg_var(self, random_shuffle=False):
+    def get_trial_avg_var(self, rotation_matrix, var_method, random_shuffle=False):
+        """Compute the trial averaged variance.
+
+        Args:
+            rotation_matrix: np 2D array, the matrix to rotate the data
+            random_shuffle: bool, whether to randomly shuffle the data
+        """
 
         data = self.data
         n_unit = len(data)
@@ -575,46 +622,22 @@ class AnalyzeManteData(object):
         # Rotate with random orthogonal matrix
         rate1s_rot = np.swapaxes(rate1s, 0, 1)
         rate2s_rot = np.swapaxes(rate2s, 0, 1)
-        rate1s_rot = np.dot(self.rotation_matrix, rate1s_rot)
-        rate2s_rot = np.dot(self.rotation_matrix, rate2s_rot)
+        rate1s_rot = np.dot(rotation_matrix, rate1s_rot)
+        rate2s_rot = np.dot(rotation_matrix, rate2s_rot)
 
-        var1s, var2s = self.compute_var(rate1s, rate2s)
-        var1s_rot, var2s_rot = self.compute_var(rate1s_rot, rate2s_rot)
+        var1s, var2s = compute_var(rate1s, rate2s, var_method)
+        var1s_rot, var2s_rot = compute_var(rate1s_rot, rate2s_rot, var_method)
 
         return var1s, var2s, var1s_rot, var2s_rot
 
-    def compute_var(self, rate1s, rate2s):
-        # Rate1s and rate2s are arrays (n_unit, n_condition, n_time)
-        # They are trial-averaged activities for context 1 and context 2 respectively
-
-        if self.var_method == 'time_avg_late':
-            # variance across conditions, then average across time
-            var1s = rate1s.var(axis=1).mean(axis=1)
-            var2s = rate2s.var(axis=1).mean(axis=1)
-        elif self.var_method == 'time_avg_none':
-            # variance across conditions and time
-            # The noise is much stronger in this case
-            # Even after shuffling we see trimodal distribution in this case.
-            # So we shouldn't use this method
-            var1s = rate1s.reshape((rate1s.shape[0], -1)).var(axis=1)
-            var2s = rate2s.reshape((rate2s.shape[0], -1)).var(axis=1)
-        elif self.var_method == 'time_avg_early':
-            # first average across time, then variance across conditions
-            # The noise is much weaker in this case
-            var1s = rate1s.mean(axis=2).var(axis=1)
-            var2s = rate2s.mean(axis=2).var(axis=1)
-        else:
-            raise ValueError('Variance method var_method unrecognized')
-
-        return var1s, var2s
-
-    def get_shuffle_var(self, n_rep=10, **kwargs):
+    def get_shuffle_var(self, rotation_matrix, var_method, n_rep=10, **kwargs):
+        """Get task variance when data is shuffled."""
         start = time.time()
 
         var1s_shuffle, var2s_shuffle = 0, 0
         var1s_rot_shuffle, var2s_rot_shuffle = 0, 0
         for i_rep in range(n_rep):
-            v1, v2, v1_rot, v2_rot = self.get_trial_avg_var(random_shuffle=True, **kwargs)
+            v1, v2, v1_rot, v2_rot = self.get_trial_avg_var(rotation_matrix, var_method, random_shuffle=True, **kwargs)
             var1s_shuffle += v1
             var2s_shuffle += v2
             var1s_rot_shuffle += v1_rot
