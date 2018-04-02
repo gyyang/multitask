@@ -13,6 +13,14 @@ DATASETPATH = './datasets'
 
 
 def load_mante_data(smooth=True):
+    """Load Mante data into raw format.
+
+    Args:
+        smooth: bool, whether to load smoothed data
+
+    Returns:
+        data: a list of mat_struct, storing info for each unit
+    """
     datasetpath = os.path.join(DATASETPATH, 'mante_dataset')
     if smooth:
         fname = 'dataT_smooth.mat'
@@ -29,14 +37,27 @@ def load_mante_data(smooth=True):
     # time = dataT['time']
 
     # Number of units
-    n_unit = len(data)
-    n_cond = 72 # condition
-    n_time = data[0].response.shape[1]
+    # n_unit = len(data)
+    # n_cond = 72  # condition
+    # n_time = data[0].response.shape[1]
     return data
 
 
-def get_trial_avg_rate(data_unit, context=1, random_shuffle=False,
+def get_trial_avg_rate_mante(data_unit, context=1, random_shuffle=False,
                        return_avg=True, only_correct=False):
+    """Get trial-averaged rate activity for Mante dataset.
+
+    Args:
+        data_unit: mat_struct, loaded from load_mante_data
+        context: +1 or -1, the context to study
+        random_shuffle: bool, whether to random shuffle trials
+        return_avg: bool, whether to return the average across trials
+        only_correct: bool, if True, only analyze correct trials
+
+    Returns:
+        data_avg: numpy array (n_condition, n_time),
+            the trial-averaged activity
+    """
     response = data_unit.response # (trial, time)
     task_var = data_unit.task_variable.__dict__ # turn into dictionary
 
@@ -86,6 +107,12 @@ def get_trial_avg_rate(data_unit, context=1, random_shuffle=False,
 
 
 def get_mante_data():
+    """Get Mante data in standard format.
+
+    Returns:
+        rate1s: numpy array (n_unit, n_condition, n_time) in context 1
+        rate2s: numpy array (n_unit, n_condition, n_time) in context 2
+    """
     data = load_mante_data()
 
     n_unit = len(data)
@@ -95,9 +122,9 @@ def get_mante_data():
     random_shuffle = True
     for i_unit in range(n_unit):
         # Get trial-averaged condition-based responses (n_condition, n_time)
-        rate1s.append(get_trial_avg_rate(data[i_unit], context=1,
+        rate1s.append(get_trial_avg_rate_mante(data[i_unit], context=1,
                                          random_shuffle=random_shuffle))
-        rate2s.append(get_trial_avg_rate(data[i_unit], context=-1,
+        rate2s.append(get_trial_avg_rate_mante(data[i_unit], context=-1,
                                          random_shuffle=random_shuffle))
     # (n_unit, n_condition, n_time)
     rate1s, rate2s = np.array(rate1s), np.array(rate2s)
