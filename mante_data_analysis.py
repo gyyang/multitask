@@ -229,56 +229,6 @@ def plot_vars():
     plt.plot([0, 1000], [0, 1000])
 
 
-def get_trial_avg_rate(data_unit, context=1, random_shuffle=False,
-                       return_avg=True, only_correct=False):
-    response = data_unit.response # (trial, time)
-    task_var = data_unit.task_variable.__dict__ # turn into dictionary
-
-    ctx = task_var['context'] == context
-
-    tmp = list()
-    for m in [1, -1]:
-        for c in [1, -1]:
-            # for choice in [1, -1]:
-            if m == 1:
-                m_ind = task_var['stim_dir'] > 0 # motion positive
-            else:
-                m_ind = task_var['stim_dir'] < 0 # motion positive
-
-            if c == 1:
-                c_ind = task_var['stim_col2dir'] > 0 # motion positive
-            else:
-                c_ind = task_var['stim_col2dir'] < 0 # motion positive
-
-            # if choice == 1:
-            #     choice_ind = task_var['targ_dir'] > 0
-            # else:
-            #     choice_ind = task_var['targ_dir'] < 0
-
-            # ind = m_ind*c_ind*ctx*choice_ind
-            ind = m_ind*c_ind*ctx
-
-            if only_correct:
-                ind = ind*task_var['correct']
-
-            if random_shuffle:
-                np.random.shuffle(ind)
-
-            ind = ind.astype(bool)
-
-            if return_avg:
-                # tmp.append(response[ind,:].mean())
-                # TODO: TEMPORARY
-                tmp.append(response[ind,:].mean(axis=0)) # average across trials
-            else:
-                tmp.append(response[ind,:])
-
-    if return_avg:
-        return np.array(tmp) # (n_condition, n_time)
-    else:
-        return tmp
-
-
 def compute_var(rate1s, rate2s, var_method):
     """Compute task variance.
 
@@ -630,14 +580,14 @@ class AnalyzeManteData(object):
 
         return var1s, var2s, var1s_rot, var2s_rot
 
-    def get_shuffle_var(self, rotation_matrix, var_method, n_rep=10, **kwargs):
+    def get_shuffle_var(self, rotation_matrix, var_method, n_rep=10):
         """Get task variance when data is shuffled."""
         start = time.time()
 
         var1s_shuffle, var2s_shuffle = 0, 0
         var1s_rot_shuffle, var2s_rot_shuffle = 0, 0
         for i_rep in range(n_rep):
-            v1, v2, v1_rot, v2_rot = self.get_trial_avg_var(rotation_matrix, var_method, random_shuffle=True, **kwargs)
+            v1, v2, v1_rot, v2_rot = self.get_trial_avg_var(rotation_matrix, var_method, random_shuffle=True)
             var1s_shuffle += v1
             var2s_shuffle += v2
             var1s_rot_shuffle += v1_rot
