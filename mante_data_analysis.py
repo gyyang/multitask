@@ -15,32 +15,11 @@ import matplotlib.pyplot as plt
 from scipy.io import loadmat, whosmat
 import seaborn as sns
 
+import dataset_preprocess
 from network import gen_ortho_matrix
 
 
 DATAPATH = './datasets/mante_dataset'
-
-
-def load_mante_data(smooth=True):
-    if smooth:
-        fname = 'dataT_smooth.mat'
-    else:
-        fname = 'dataT.mat'
-
-    fname = os.path.join(DATAPATH, fname)
-
-    mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
-
-    dataT = mat_dict['dataT'].__dict__ # as dictionary
-
-    data = dataT['unit']
-    # time = dataT['time']
-
-    # Number of units
-    n_unit = len(data)
-    n_cond = 72 # condition
-    n_time = data[0].response.shape[1]
-    return data
 
 
 def generate_data_in_standard_format():
@@ -498,7 +477,7 @@ class AnalyzeManteData(object):
             print('Loading smooth data')
         else:
             print('Loading original data')
-        data = load_mante_data(smooth=smooth)
+        data = dataset_preprocess.load_mante_data(smooth=smooth)
 
         ind_original = np.arange(len(data))
 
@@ -554,7 +533,6 @@ class AnalyzeManteData(object):
             rotation_matrix: np 2D array, the matrix to rotate the data
             random_shuffle: bool, whether to randomly shuffle the data
         """
-
         data = self.data
         n_unit = len(data)
 
@@ -563,8 +541,10 @@ class AnalyzeManteData(object):
         # Condition average activity
         for i_unit in range(n_unit):
             # Get trial-averaged condition-based responses (n_condition, n_time)
-            rate1s.append(get_trial_avg_rate(data[i_unit], context=1, random_shuffle=random_shuffle))
-            rate2s.append(get_trial_avg_rate(data[i_unit], context=-1, random_shuffle=random_shuffle))
+            rate1s.append(dataset_preprocess.get_trial_avg_rate_mante(
+                data[i_unit], context=1, random_shuffle=random_shuffle))
+            rate2s.append(dataset_preprocess.get_trial_avg_rate_mante(
+                data[i_unit], context=-1, random_shuffle=random_shuffle))
 
         # (n_unit, n_condition, n_time)
         rate1s, rate2s = np.array(rate1s), np.array(rate2s)
@@ -656,7 +636,6 @@ class AnalyzeManteData(object):
         ind_original = self.ind_original[ind]
 
         fracVar = (var1s-var2s)/(var1s+var2s)
-
 
         # Plot fracVar distribution
         fig = plt.figure(figsize=(4.0,3))
