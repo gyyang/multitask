@@ -91,24 +91,6 @@ def _get_valid_trials(trial_infos):
 
 
 def load_data():
-    pass
-
-# def _spike_to_rate(spikes_unit, times):
-#     """Convert spikes to rate.
-#
-#     Args:
-#         spikes_unit: list of float, a list of spike times
-#         times: list of float, a list of time points, default unit second
-#
-#     Returns:
-#         rates: list of float, a list of rate, default unit spike/second, Hz
-#             rates will be the same size as times
-#     """
-
-
-if __name__ == '__main__':
-    # rate1s, rate2s = get_mante_data()
-
     datasetpath = os.path.join(DATASETPATH, 'sorted')
 
     files = os.listdir(datasetpath)
@@ -132,12 +114,39 @@ if __name__ == '__main__':
     bin_size = 0.05  # unit: second
     bins = np.arange(-0.05, 0.2, bin_size)
     n_time = len(bins) - 1
-    rates = np.zeros((n_trial, n_time, n_unit))
 
+    data = list()
     for i_unit in range(n_unit):
+        rates = np.zeros((n_trial, n_time))
         for i_trial in range(n_trial):
             spikes_unit = spikes[i_trial, i_unit]
             # Compute PSTH
             hist, bin_edges = np.histogram(spikes_unit, bins=bins)
-            rate = hist/bin_size
-            rates[i_trial, :, i_unit] = rate
+            rates[i_trial, :] = hist / bin_size
+        unit_dict = {
+            'task_var': trial_infos,  # TODO(gryang): change keys
+            'rate': rates
+        }
+        data.append(unit_dict)
+    return data
+
+# def _spike_to_rate(spikes_unit, times):
+#     """Convert spikes to rate.
+#
+#     Args:
+#         spikes_unit: list of float, a list of spike times
+#         times: list of float, a list of time points, default unit second
+#
+#     Returns:
+#         rates: list of float, a list of rate, default unit spike/second, Hz
+#             rates will be the same size as times
+#     """
+
+
+if __name__ == '__main__':
+    # rate1s, rate2s = get_mante_data()
+    data = load_data()
+
+
+
+

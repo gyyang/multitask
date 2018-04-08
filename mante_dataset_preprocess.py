@@ -27,6 +27,7 @@ def load_data(smooth=True, single_units=False):
         data: standard format, list of dict of arrays/dict
             list is over neurons
             dict is for response array and task variable dict
+            response array has shape (n_trial, n_time)
 
     """
     if smooth:
