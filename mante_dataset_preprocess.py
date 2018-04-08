@@ -46,69 +46,6 @@ def load_mante_data(smooth=True):
     return data
 
 
-def get_trial_avg_rate_mante(data_unit, context=1, random_shuffle=False,
-                       return_avg=True, only_correct=False):
-    """Get trial-averaged rate activity for Mante dataset.
-
-    Args:
-        data_unit: mat_struct, loaded from load_mante_data
-        context: +1 or -1, the context to study
-        random_shuffle: bool, whether to random shuffle trials
-        return_avg: bool, whether to return the average across trials
-        only_correct: bool, if True, only analyze correct trials
-
-    Returns:
-        data_avg: numpy array (n_condition, n_time),
-            the trial-averaged activity
-    """
-    response = data_unit.response # (trial, time)
-    task_var = data_unit.task_variable.__dict__ # turn into dictionary
-
-    ctx = task_var['context'] == context
-
-    tmp = list()
-    for m in [1, -1]:
-        for c in [1, -1]:
-            # for choice in [1, -1]:
-            if m == 1:
-                m_ind = task_var['stim_dir'] > 0 # motion positive
-            else:
-                m_ind = task_var['stim_dir'] < 0 # motion positive
-
-            if c == 1:
-                c_ind = task_var['stim_col2dir'] > 0 # motion positive
-            else:
-                c_ind = task_var['stim_col2dir'] < 0 # motion positive
-
-            # if choice == 1:
-            #     choice_ind = task_var['targ_dir'] > 0
-            # else:
-            #     choice_ind = task_var['targ_dir'] < 0
-
-            # ind = m_ind*c_ind*ctx*choice_ind
-            ind = m_ind*c_ind*ctx
-
-            if only_correct:
-                ind = ind*task_var['correct']
-
-            if random_shuffle:
-                np.random.shuffle(ind)
-
-            ind = ind.astype(bool)
-
-            if return_avg:
-                # tmp.append(response[ind,:].mean())
-                # TODO: TEMPORARY
-                tmp.append(response[ind,:].mean(axis=0)) # average across trials
-            else:
-                tmp.append(response[ind,:])
-
-    if return_avg:
-        return np.array(tmp) # (n_condition, n_time)
-    else:
-        return tmp
-
-
 def get_mante_data():
     """Get Mante data in standard format.
 

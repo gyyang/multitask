@@ -1,7 +1,4 @@
-"""
-Data analysis
-Delay-match-to-category task: The boundary is at 45 and 225 for both monkeys
-"""
+"""Data analysis."""
 
 from __future__ import division
 
@@ -15,7 +12,8 @@ import matplotlib.pyplot as plt
 from scipy.io import loadmat, whosmat
 import seaborn as sns
 
-import dataset_preprocess
+import mante_dataset_preprocess
+import siegel_dataset_preprocess
 from network import gen_ortho_matrix
 
 
@@ -57,6 +55,69 @@ def generate_data_in_standard_format():
     import pickle, os
     with open(os.path.join('data', 'ManteData.pkl'), 'wb') as f:
         pickle.dump(Data, f)
+
+
+def get_trial_avg_rate(response, task_var, context=1, random_shuffle=False,
+                       return_avg=True, only_correct=False):
+    """Get trial-averaged rate activity for Mante dataset.
+
+    Args:
+        response: numpy array, (n_trial, n_time)
+        task_var: dictionary of numpy array, each array (n_trial, )
+        context: +1 or -1, the context to study
+        random_shuffle: bool, whether to random shuffle trials
+        return_avg: bool, whether to return the average across trials
+        only_correct: bool, if True, only analyze correct trials
+
+    Returns:
+        data_avg: numpy array (n_condition, n_time),
+            the trial-averaged activity
+    """
+    assert len(task_var.values()[0]) == response.shape[0]
+
+    ctx = task_var['context'] == context
+
+    tmp = list()
+    for m in [1, -1]:
+        for c in [1, -1]:
+            # for choice in [1, -1]:
+            if m == 1:
+                m_ind = task_var['stim_dir'] > 0 # motion positive
+            else:
+                m_ind = task_var['stim_dir'] < 0 # motion positive
+
+            if c == 1:
+                c_ind = task_var['stim_col2dir'] > 0 # motion positive
+            else:
+                c_ind = task_var['stim_col2dir'] < 0 # motion positive
+
+            # if choice == 1:
+            #     choice_ind = task_var['targ_dir'] > 0
+            # else:
+            #     choice_ind = task_var['targ_dir'] < 0
+
+            # ind = m_ind*c_ind*ctx*choice_ind
+            ind = m_ind*c_ind*ctx
+
+            if only_correct:
+                ind = ind*task_var['correct']
+
+            if random_shuffle:
+                np.random.shuffle(ind)
+
+            ind = ind.astype(bool)
+
+            if return_avg:
+                # tmp.append(response[ind,:].mean())
+                # TODO: TEMPORARY
+                tmp.append(response[ind,:].mean(axis=0)) # average across trials
+            else:
+                tmp.append(response[ind,:])
+
+    if return_avg:
+        return np.array(tmp) # (n_condition, n_time)
+    else:
+        return tmp
 
 
 def smoothing(response, response_time):
@@ -464,10 +525,10 @@ def study_betaweights(analyze_single_units=True, ind_group=None):
     #     print('p value: {:0.7f}'.format(p))
 
 
-class AnalyzeManteData(object):
+class AnalyzeData(object):
 
     def __init__(self, smooth=True, analyze_single_units=True):
-        """Analyzing the Mante dataset.
+        """Analyzing a dataset.
 
         Args:
             smooth: bool, whether to use smoothed data
@@ -477,7 +538,7 @@ class AnalyzeManteData(object):
             print('Loading smooth data')
         else:
             print('Loading original data')
-        data = dataset_preprocess.load_mante_data(smooth=smooth)
+        data = mante_dataset_preprocess.load_mante_data(smooth=smooth)
 
         ind_original = np.arange(len(data))
 
@@ -540,11 +601,13 @@ class AnalyzeManteData(object):
         rate2s = list()
         # Condition average activity
         for i_unit in range(n_unit):
+            response = data[i_unit].response  # (trial, time)
+            task_var = data[i_unit].task_variable.__dict__  # turn into dictionary
             # Get trial-averaged condition-based responses (n_condition, n_time)
-            rate1s.append(dataset_preprocess.get_trial_avg_rate_mante(
-                data[i_unit], context=1, random_shuffle=random_shuffle))
-            rate2s.append(dataset_preprocess.get_trial_avg_rate_mante(
-                data[i_unit], context=-1, random_shuffle=random_shuffle))
+            rate1s.append(get_trial_avg_rate(
+                response, task_var, context=1, random_shuffle=random_shuffle))
+            rate2s.append(get_trial_avg_rate(
+                response, task_var, context=-1, random_shuffle=random_shuffle))
 
         # (n_unit, n_condition, n_time)
         rate1s, rate2s = np.array(rate1s), np.array(rate2s)
@@ -689,7 +752,7 @@ if __name__ == '__main__':
     analyze_single_units = False
     denoise = False
 
-    amd = AnalyzeManteData(analyze_single_units=analyze_single_units)
+    amd = AnalyzeData(analyze_single_units=analyze_single_units)
     amd.compute_var_all(var_method='time_avg_late')
     var_thr, thr_type = 0.0, 'or'
     fracVar, ind_original = amd.compute_denoise_var(
@@ -751,13 +814,13 @@ if __name__ == '__main__':
         ind_group_original[group] = ind_original[ind_group[group]]
 
     # TEMPORARY
-    fname = os.path.join(DATAPATH, 'vBeta.mat')
-
-    mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
-
-    vBeta = mat_dict['vBeta'].__dict__ # as dictionary
-
-    coefs = vBeta['response']
+    # fname = os.path.join(DATAPATH, 'vBeta.mat')
+    #
+    # mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
+    #
+    # vBeta = mat_dict['vBeta'].__dict__ # as dictionary
+    #
+    # coefs = vBeta['response']
 
     # from contextdm_analysis import plot_coefvsfracvar
     #
