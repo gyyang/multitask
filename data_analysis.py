@@ -57,6 +57,122 @@ def generate_data_in_standard_format():
         pickle.dump(Data, f)
 
 
+def expand_task_var(task_var):
+    # little helper function that calculate a few more things
+    task_var['stim_dir_sign'] = (task_var['stim_dir']>0).astype(int)*2-1
+    task_var['stim_col2dir_sign'] = (task_var['stim_col2dir']>0).astype(int)*2-1
+    return task_var
+
+
+def get_trial_avg(data,
+                  var_keys=None,
+                  context=None,
+                  split_traintest=True
+                  ):
+    """Get trial-averaged rate for each condition.
+
+    Args:
+        data: Standard format data.
+        var_keys: the keys for which condition would be looped over
+        context:
+        split_traintest: bool, whether to split training and testing
+
+    Returns:
+        data_train: numpy array, (n_time, n_cond, n_unit)
+        data_test: (optional) numpy array, (n_time, n_cond, n_unit)
+    """
+    # get trial-averaged rate for each condition
+    # For now: 6 * 6 * 2 = 72 conditions in total
+    # Split training and testing as well
+
+    if var_keys is None:
+        # var_keys = ['stim_dir', 'stim_col2dir', 'context']
+        # var_keys = ['targ_dir', 'stim_dir', 'stim_col2dir', 'context']
+        var_keys = ['stim_dir_sign', 'stim_col2dir_sign', 'context']
+        # var_keys = ['targ_dir', 'stim_dir_sign', 'stim_col2dir_sign', 'context']
+
+    if context is not None:
+        # If specifying context, then context should not be in var_keys
+        assert 'context' not in var_keys
+
+    # number of variables
+    n_var = len(var_keys)
+
+    # initialize
+    task_var = data[0].task_variable.__dict__ # turn into dictionary
+    n_time = data[0].response.shape[1]
+    n_unit = len(data)
+
+    task_var = expand_task_var(task_var)
+    n_cond = np.prod([len(np.unique(task_var[k])) for k in var_keys])
+
+    data_shape = (n_time, n_cond, n_unit)
+    if split_traintest:
+        p_train = 0.7 # proportion of training data
+        data_train = np.zeros(data_shape)
+        data_test  = np.zeros(data_shape)
+    else:
+        data_train = np.zeros(data_shape)
+
+    for i_unit in range(n_unit):
+        task_var = data[i_unit].task_variable.__dict__ # turn into dictionary
+        task_var = expand_task_var(task_var)
+
+        # number of trials
+        n_trial = len(task_var[var_keys[0]])
+
+        # dictionary of unique task variable values
+        var_unique = [np.unique(task_var[k]) for k in var_keys]
+
+        # list of number of unique task variable values
+        n_var_unique = [len(v) for v in var_unique]
+
+        # number of condition
+        n_cond = np.prod(n_var_unique)
+
+        # List of indices for each task variable
+        ind_var_conds = np.unravel_index(range(n_cond),n_var_unique)
+
+        # Responses of this unit
+        response = data[i_unit].response # (trial, time)
+
+        for i_cond in range(n_cond):
+            if context is None:
+                ind_cond = np.ones(n_trial, dtype=bool)
+            else:
+                ind_cond = task_var['context']==context # only look at this context
+
+            for i_var in range(n_var):
+                ind_var_cond = ind_var_conds[i_var][i_cond]
+                ind_cond_tmp = task_var[var_keys[i_var]]==var_unique[i_var][ind_var_cond]
+                ind_cond *= ind_cond_tmp
+
+            if split_traintest:
+                # Turn into actual indices
+                ind_cond = np.where(ind_cond)[0]
+                # randomly shuffle
+                np.random.shuffle(ind_cond)
+                # split into training and testing ones
+                n_trial_cond = len(ind_cond)
+                n_trial_cond_train = int(n_trial_cond*p_train)
+
+                ind_cond_train = ind_cond[:n_trial_cond_train]
+                ind_cond_test  = ind_cond[n_trial_cond_train:]
+
+                # if n_trial_cond_train == 0:
+                #     print(i_unit, i_cond, n_trial_cond)
+
+                data_train[:, i_cond, i_unit] = np.mean(response[ind_cond_train, :], axis=0)
+                data_test[:, i_cond, i_unit] = np.mean(response[ind_cond_test, :], axis=0)
+            else:
+                data_train[:, i_cond, i_unit] = np.mean(response[ind_cond, :], axis=0)
+
+    if split_traintest:
+        return data_train, data_test
+    else:
+        return data_train
+
+
 def get_trial_avg_rate(response, task_var, context=1, random_shuffle=False,
                        return_avg=True, only_correct=False):
     """Get trial-averaged rate activity for Mante dataset.
@@ -553,7 +669,6 @@ class AnalyzeData(object):
 
         self.n_unit = len(self.data)
 
-        from dimensionality import get_trial_avg
         self.var_key_list = ['targ_dir', 'stim_dir_sign', 'stim_col2dir_sign']
         self.data_condavg_list = [] # for two contexts
         for context in [1, -1]:
@@ -565,8 +680,8 @@ class AnalyzeData(object):
                 # else:
                 #     context_ = context
 
-                tmp[var_key] = get_trial_avg(analyze_data=True, split_traintest=False,
-                                           var_keys=[var_key], context=context, data=data)
+                tmp[var_key] = get_trial_avg(data=data, split_traintest=False,
+                                           var_keys=[var_key], context=context)
             self.data_condavg_list.append(tmp)
 
 
