@@ -1,6 +1,6 @@
-"""Dataset preprocessing.
+"""Siegel dataset preprocessing.
 
-Standardize several datasets into the same format for task variance analysis.
+Standardize the Siegel dataset
 Run siegel_preprocess.m before for correct results from the Siegel dataset.
 """
 

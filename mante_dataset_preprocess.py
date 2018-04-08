@@ -1,7 +1,6 @@
-"""Dataset preprocessing.
+"""Mante dataset preprocessing.
 
-Standardize several datasets into the same format for task variance analysis.
-Run siegel_preprocess.m before for correct results from the Siegel dataset.
+Standardize the Mante dataset.
 """
 
 from __future__ import division
@@ -14,7 +13,7 @@ import numpy as np
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 
-DATASETPATH = './datasets'
+DATASETPATH = './datasets/mante_dataset'
 
 
 def load_mante_data(smooth=True):
@@ -26,13 +25,12 @@ def load_mante_data(smooth=True):
     Returns:
         data: a list of mat_struct, storing info for each unit
     """
-    datasetpath = os.path.join(DATASETPATH, 'mante_dataset')
     if smooth:
         fname = 'dataT_smooth.mat'
     else:
         fname = 'dataT.mat'
 
-    fname = os.path.join(datasetpath, fname)
+    fname = os.path.join(DATASETPATH, fname)
 
     mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
 
