@@ -67,7 +67,8 @@ def expand_task_var(task_var):
 def get_trial_avg(data,
                   var_keys=None,
                   context=None,
-                  split_traintest=True
+                  split_traintest=False,
+                  random_shuffle=False,
                   ):
     """Get trial-averaged rate for each condition.
 
@@ -76,14 +77,12 @@ def get_trial_avg(data,
         var_keys: the keys for which condition would be looped over
         context:
         split_traintest: bool, whether to split training and testing
+        random_shuffle: bool, if True, randomly shuffle the indices
 
     Returns:
         data_train: numpy array, (n_time, n_cond, n_unit)
         data_test: (optional) numpy array, (n_time, n_cond, n_unit)
     """
-    # get trial-averaged rate for each condition
-    # For now: 6 * 6 * 2 = 72 conditions in total
-    # Split training and testing as well
 
     if var_keys is None:
         # var_keys = ['stim_dir', 'stim_col2dir', 'context']
@@ -147,6 +146,9 @@ def get_trial_avg(data,
                 ind_cond_tmp = task_var[var_keys[i_var]]==var_unique[i_var][ind_var_cond]
                 ind_cond *= ind_cond_tmp
 
+            if random_shuffle:
+                np.random.shuffle(ind_cond)
+
             if split_traintest:
                 # Turn into actual indices
                 ind_cond = np.where(ind_cond)[0]
@@ -173,7 +175,7 @@ def get_trial_avg(data,
         return data_train
 
 
-def get_trial_avg_rate(response, task_var, context=1, random_shuffle=False,
+def get_trial_avg_rate_obsolete(response, task_var, context=1, random_shuffle=False,
                        return_avg=True, only_correct=False):
     """Get trial-averaged rate activity for Mante dataset.
 
@@ -385,40 +387,34 @@ def plot_vars():
     plt.plot([0, 1000], [0, 1000])
 
 
-def compute_var(rate1s, rate2s, var_method):
+def compute_var(rates, var_method):
     """Compute task variance.
 
     Args:
-        Rate1s: numpy array (n_unit, n_condition, n_time),
+        rates: numpy array (n_cond, n_time, n_unit),
             trial-averaged activities for context 1
-        Rate2s: numpy array (n_unit, n_condition, n_time),
-            trial-averaged activities for context 2
         var_method: str, method to compute variance
 
     Return:
-        var1s: numpy array (n_unit,), task variance for context 1
-        var2s: numpy array (n_unit,), task variance for context 2
+        vars: numpy array (n_unit,), task variance
     """
     if var_method == 'time_avg_late':
         # variance across conditions, then average across time
-        var1s = rate1s.var(axis=1).mean(axis=1)
-        var2s = rate2s.var(axis=1).mean(axis=1)
+        vars = rates.var(axis=0).mean(axis=0)
     elif var_method == 'time_avg_none':
         # variance across conditions and time
         # The noise is much stronger in this case
         # Even after shuffling we see trimodal distribution in this case.
         # So we shouldn't use this method
-        var1s = rate1s.reshape((rate1s.shape[0], -1)).var(axis=1)
-        var2s = rate2s.reshape((rate2s.shape[0], -1)).var(axis=1)
+        vars = rates.reshape((-1, rates.shape[-1])).var(axis=0)
     elif var_method == 'time_avg_early':
         # first average across time, then variance across conditions
         # The noise is much weaker in this case
-        var1s = rate1s.mean(axis=2).var(axis=1)
-        var2s = rate2s.mean(axis=2).var(axis=1)
+        vars = rates.mean(axis=1).var(axis=0)
     else:
         raise ValueError('Variance method var_method unrecognized')
 
-    return var1s, var2s
+    return vars
 
 
 def get_shuffle_var(data, **kwargs):
@@ -705,6 +701,8 @@ class AnalyzeData(object):
     def get_trial_avg_var(self, rotation_matrix, var_method, random_shuffle=False):
         """Compute the trial averaged variance.
 
+        For efficiency, fuse the rotation here
+
         Args:
             rotation_matrix: np 2D array, the matrix to rotate the data
             random_shuffle: bool, whether to randomly shuffle the data
@@ -712,31 +710,40 @@ class AnalyzeData(object):
         data = self.data
         n_unit = len(data)
 
-        rate1s = list()
-        rate2s = list()
-        # Condition average activity
-        for i_unit in range(n_unit):
-            response = data[i_unit].response  # (trial, time)
-            task_var = data[i_unit].task_variable.__dict__  # turn into dictionary
-            # Get trial-averaged condition-based responses (n_condition, n_time)
-            rate1s.append(get_trial_avg_rate(
-                response, task_var, context=1, random_shuffle=random_shuffle))
-            rate2s.append(get_trial_avg_rate(
-                response, task_var, context=-1, random_shuffle=random_shuffle))
+        # rate1s = list()
+        # rate2s = list()
+        # # Condition average activity
+        # for i_unit in range(n_unit):
+        #     response = data[i_unit].response  # (trial, time)
+        #     task_var = data[i_unit].task_variable.__dict__  # turn into dictionary
+        #     # Get trial-averaged condition-based responses (n_condition, n_time)
+        #     rate1s.append(get_trial_avg_rate(
+        #         response, task_var, context=1, random_shuffle=random_shuffle))
+        #     rate2s.append(get_trial_avg_rate(
+        #         response, task_var, context=-1, random_shuffle=random_shuffle))
+        #
+        # # (n_unit, n_condition, n_time)
+        # rate1s, rate2s = np.array(rate1s), np.array(rate2s)
+        var_keys = ['stim_dir_sign', 'stim_col2dir_sign']
 
-        # (n_unit, n_condition, n_time)
-        rate1s, rate2s = np.array(rate1s), np.array(rate2s)
+        vars = list()
+        vars_rot = list()
+        for context in [1, -1]:
+            # r has shape (n_time, n_cond, n_unit)
+            r = get_trial_avg(data, var_keys=var_keys, context=context,
+                              random_shuffle=random_shuffle)
+            # transpose to (n_cond, n_time, n_unit)
+            r = np.swapaxes(r, 0, 1)
 
-        # Rotate with random orthogonal matrix
-        rate1s_rot = np.swapaxes(rate1s, 0, 1)
-        rate2s_rot = np.swapaxes(rate2s, 0, 1)
-        rate1s_rot = np.dot(rotation_matrix, rate1s_rot)
-        rate2s_rot = np.dot(rotation_matrix, rate2s_rot)
+            r_rot = np.dot(r, rotation_matrix)
 
-        var1s, var2s = compute_var(rate1s, rate2s, var_method)
-        var1s_rot, var2s_rot = compute_var(rate1s_rot, rate2s_rot, var_method)
+            # input should be (n_cond, n_time, n_unit)
+            v = compute_var(r, var_method)
+            v_rot = compute_var(r_rot, var_method)
+            vars.append(v)
+            vars_rot.append(v_rot)
 
-        return var1s, var2s, var1s_rot, var2s_rot
+        return vars[0], vars[1], vars_rot[0], vars_rot[1]
 
     def get_shuffle_var(self, rotation_matrix, var_method, n_rep=10):
         """Get task variance when data is shuffled."""
