@@ -175,6 +175,63 @@ def get_trial_avg(data,
         return data_train
 
 
+def get_trial_avg_var(data, rotation_matrix, var_method, random_shuffle=False):
+    """Compute the trial averaged variance.
+
+    For efficiency, fuse the rotation here
+
+    Args:
+        data: standard format data
+        rotation_matrix: np 2D array, the matrix to rotate the data
+        var_method: str, method used to compute task variance
+        random_shuffle: bool, whether to randomly shuffle the data
+    """
+    var_keys = ['stim_dir_sign', 'stim_col2dir_sign']
+
+    vars = list()
+    vars_rot = list()
+    for context in [1, -1]:
+        # r has shape (n_time, n_cond, n_unit)
+        r = get_trial_avg(data, var_keys=var_keys, context=context,
+                          random_shuffle=random_shuffle)
+        # transpose to (n_cond, n_time, n_unit)
+        r = np.swapaxes(r, 0, 1)
+
+        r_rot = np.dot(r, rotation_matrix)
+
+        # input should be (n_cond, n_time, n_unit)
+        v = compute_var(r, var_method)
+        v_rot = compute_var(r_rot, var_method)
+        vars.append(v)
+        vars_rot.append(v_rot)
+
+    return vars[0], vars[1], vars_rot[0], vars_rot[1]
+
+
+def get_shuffle_var(data, rotation_matrix, var_method, n_rep=10):
+    """Get task variance when data is shuffled."""
+    start = time.time()
+
+    var1s_shuffle, var2s_shuffle = 0, 0
+    var1s_rot_shuffle, var2s_rot_shuffle = 0, 0
+    for i_rep in range(n_rep):
+        v1, v2, v1_rot, v2_rot = get_trial_avg_var(
+            data, rotation_matrix,var_method, random_shuffle=True)
+        var1s_shuffle += v1
+        var2s_shuffle += v2
+        var1s_rot_shuffle += v1_rot
+        var2s_rot_shuffle += v2_rot
+
+    var1s_shuffle /= n_rep
+    var2s_shuffle /= n_rep
+    var1s_rot_shuffle /= n_rep
+    var2s_rot_shuffle /= n_rep
+
+    print('Time taken {:0.2f}s'.format(time.time()-start))
+
+    return var1s_shuffle, var2s_shuffle, var1s_rot_shuffle, var2s_rot_shuffle
+
+
 def get_trial_avg_rate_obsolete(response, task_var, context=1, random_shuffle=False,
                        return_avg=True, only_correct=False):
     """Get trial-averaged rate activity for Mante dataset.
@@ -320,18 +377,6 @@ def save_smoothed_data():
     savemat(f_savename, mat_dict, do_compression=True)
 
 
-def get_single_units():
-    # get single units
-    fname = os.path.join('mante_dataset', 'metadata.mat')
-    mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
-    metadata = mat_dict['metadata'].unit # as dictionary
-    discriminable = np.array([(m.unitInfo.discriminability in [3,4]) for m in metadata])
-    single_units = np.array([m.unitInfo.type=='s' for m in metadata])
-    single_units = np.logical_and(single_units, discriminable)
-    assert np.sum(single_units)==181
-    return single_units
-
-
 def get_vars(random_shuffle=False):
     var1s = list()
     var2s = list()
@@ -417,24 +462,24 @@ def compute_var(rates, var_method):
     return vars
 
 
-def get_shuffle_var(data, **kwargs):
-    start = time.time()
-    n_rep = 200
-    var1s_shuffle, var2s_shuffle = 0, 0
-    for i_rep in range(n_rep):
-        v1, v2 = get_trial_avg_var(data, random_shuffle=True, **kwargs)
-        var1s_shuffle += v1
-        var2s_shuffle += v2
-
-    var1s_shuffle /= n_rep
-    var2s_shuffle /= n_rep
-
-    print(time.time()-start)
-
-    return var1s_shuffle, var2s_shuffle
-
-    # Threshold should be 3.65
-    # return np.percentile(var1s_shuffle, [95]) + np.percentile(var2s_shuffle, [95])
+# def get_shuffle_var(data, **kwargs):
+#     start = time.time()
+#     n_rep = 200
+#     var1s_shuffle, var2s_shuffle = 0, 0
+#     for i_rep in range(n_rep):
+#         v1, v2 = get_trial_avg_var(data, random_shuffle=True, **kwargs)
+#         var1s_shuffle += v1
+#         var2s_shuffle += v2
+#
+#     var1s_shuffle /= n_rep
+#     var2s_shuffle /= n_rep
+#
+#     print(time.time()-start)
+#
+#     return var1s_shuffle, var2s_shuffle
+#
+#     # Threshold should be 3.65
+#     # return np.percentile(var1s_shuffle, [95]) + np.percentile(var2s_shuffle, [95])
 
 
 def plot_fracVar(data, analyze_units='single', plot_single_units=False):
@@ -639,7 +684,7 @@ def study_betaweights(analyze_single_units=True, ind_group=None):
 
 class AnalyzeData(object):
 
-    def __init__(self, smooth=True, analyze_single_units=True):
+    def __init__(self, dataset='mante', smooth=True, analyze_single_units=True):
         """Analyzing a dataset.
 
         Args:
@@ -650,18 +695,11 @@ class AnalyzeData(object):
             print('Loading smooth data')
         else:
             print('Loading original data')
-        data = mante_dataset_preprocess.load_mante_data(smooth=smooth)
-
-        ind_original = np.arange(len(data))
-
-        if analyze_single_units:
-            single_units = get_single_units()
-            ind_single_units = np.where(single_units)[0]
-            self.data = [data[i] for i in ind_single_units]
-            self.ind_original = ind_original[single_units]
-        else:
-            self.data = data
-            self.ind_original = ind_original
+        if dataset == 'mante':
+            self.data = mante_dataset_preprocess.load_data(
+                smooth=smooth, single_units=analyze_single_units)
+        elif dataset == 'siegel':
+            self.data = siegel_dataset_preprocess.load_data()
 
         self.n_unit = len(self.data)
 
@@ -670,16 +708,9 @@ class AnalyzeData(object):
         for context in [1, -1]:
             tmp = dict()
             for var_key in self.var_key_list:
-                # TEMPORARY TODO
-                # if var_key == 'targ_dir':
-                #     context_ = None
-                # else:
-                #     context_ = context
-
-                tmp[var_key] = get_trial_avg(data=data, split_traintest=False,
+                tmp[var_key] = get_trial_avg(data=self.data, split_traintest=False,
                                            var_keys=[var_key], context=context)
             self.data_condavg_list.append(tmp)
-
 
     def compute_var_all(self, var_method='time_avg_early'):
         """Compute task variance for data and shuffled data.
@@ -693,79 +724,9 @@ class AnalyzeData(object):
         # Generate a random orthogonal matrix for later use
         rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
 
-        self._var1s, self._var2s, self._var1s_rot, self._var2s_rot = self.get_trial_avg_var(rotation_matrix, var_method)
+        self._var1s, self._var2s, self._var1s_rot, self._var2s_rot = get_trial_avg_var(self.data, rotation_matrix, var_method)
         self._var1s_shuffle, self._var2s_shuffle, \
-        self._var1s_rot_shuffle, self._var2s_rot_shuffle = self.get_shuffle_var(rotation_matrix, var_method)
-
-
-    def get_trial_avg_var(self, rotation_matrix, var_method, random_shuffle=False):
-        """Compute the trial averaged variance.
-
-        For efficiency, fuse the rotation here
-
-        Args:
-            rotation_matrix: np 2D array, the matrix to rotate the data
-            random_shuffle: bool, whether to randomly shuffle the data
-        """
-        data = self.data
-        n_unit = len(data)
-
-        # rate1s = list()
-        # rate2s = list()
-        # # Condition average activity
-        # for i_unit in range(n_unit):
-        #     response = data[i_unit].response  # (trial, time)
-        #     task_var = data[i_unit].task_variable.__dict__  # turn into dictionary
-        #     # Get trial-averaged condition-based responses (n_condition, n_time)
-        #     rate1s.append(get_trial_avg_rate(
-        #         response, task_var, context=1, random_shuffle=random_shuffle))
-        #     rate2s.append(get_trial_avg_rate(
-        #         response, task_var, context=-1, random_shuffle=random_shuffle))
-        #
-        # # (n_unit, n_condition, n_time)
-        # rate1s, rate2s = np.array(rate1s), np.array(rate2s)
-        var_keys = ['stim_dir_sign', 'stim_col2dir_sign']
-
-        vars = list()
-        vars_rot = list()
-        for context in [1, -1]:
-            # r has shape (n_time, n_cond, n_unit)
-            r = get_trial_avg(data, var_keys=var_keys, context=context,
-                              random_shuffle=random_shuffle)
-            # transpose to (n_cond, n_time, n_unit)
-            r = np.swapaxes(r, 0, 1)
-
-            r_rot = np.dot(r, rotation_matrix)
-
-            # input should be (n_cond, n_time, n_unit)
-            v = compute_var(r, var_method)
-            v_rot = compute_var(r_rot, var_method)
-            vars.append(v)
-            vars_rot.append(v_rot)
-
-        return vars[0], vars[1], vars_rot[0], vars_rot[1]
-
-    def get_shuffle_var(self, rotation_matrix, var_method, n_rep=10):
-        """Get task variance when data is shuffled."""
-        start = time.time()
-
-        var1s_shuffle, var2s_shuffle = 0, 0
-        var1s_rot_shuffle, var2s_rot_shuffle = 0, 0
-        for i_rep in range(n_rep):
-            v1, v2, v1_rot, v2_rot = self.get_trial_avg_var(rotation_matrix, var_method, random_shuffle=True)
-            var1s_shuffle += v1
-            var2s_shuffle += v2
-            var1s_rot_shuffle += v1_rot
-            var2s_rot_shuffle += v2_rot
-
-        var1s_shuffle /= n_rep
-        var2s_shuffle /= n_rep
-        var1s_rot_shuffle /= n_rep
-        var2s_rot_shuffle /= n_rep
-
-        print('Time taken {:0.2f}s'.format(time.time()-start))
-
-        return var1s_shuffle, var2s_shuffle, var1s_rot_shuffle, var2s_rot_shuffle
+        self._var1s_rot_shuffle, self._var2s_rot_shuffle = get_shuffle_var(self.data, rotation_matrix, var_method)
 
     def compute_denoise_var(self, var_thr=0.0, random_rotation=False,
                             thr_type='sum', denoise=True):
@@ -818,7 +779,7 @@ class AnalyzeData(object):
         
         var1s = var1s[ind]
         var2s = var2s[ind]
-        ind_original = self.ind_original[ind]
+        # ind_original = self.ind_original[ind]
 
         fracVar = (var1s-var2s)/(var1s+var2s)
 
@@ -835,7 +796,7 @@ class AnalyzeData(object):
             save_name = save_name + '_rndrot'
         # plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
 
-        return fracVar, ind_original
+        return fracVar
 
     def plot_single_unit(self, i_unit, save=False):
         context_names = ['motion', 'color']
@@ -877,7 +838,7 @@ if __name__ == '__main__':
     amd = AnalyzeData(analyze_single_units=analyze_single_units)
     amd.compute_var_all(var_method='time_avg_late')
     var_thr, thr_type = 0.0, 'or'
-    fracVar, ind_original = amd.compute_denoise_var(
+    fracVar = amd.compute_denoise_var(
         var_thr=var_thr, thr_type=thr_type, denoise=denoise)
 #==============================================================================
 #     _ = amd.compute_denoise_var(random_rotation=True, var_thr=var_thr,
@@ -931,9 +892,9 @@ if __name__ == '__main__':
         save_name = save_name + '_nodenoise'
     # plt.savefig('figure/'+save_name+'.pdf', transparent=True)
 
-    ind_group_original = dict()
-    for group in ['1', '2', '12']:
-        ind_group_original[group] = ind_original[ind_group[group]]
+    # ind_group_original = dict()
+    # for group in ['1', '2', '12']:
+    #     ind_group_original[group] = ind_original[ind_group[group]]
 
     # TEMPORARY
     # fname = os.path.join(DATAPATH, 'vBeta.mat')

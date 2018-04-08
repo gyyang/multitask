@@ -90,6 +90,9 @@ def _get_valid_trials(trial_infos):
     return new_trial_infos, valid_trials
 
 
+def load_data():
+    pass
+
 # def _spike_to_rate(spikes_unit, times):
 #     """Convert spikes to rate.
 #

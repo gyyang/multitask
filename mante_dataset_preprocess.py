@@ -16,11 +16,12 @@ import matplotlib.pyplot as plt
 DATASETPATH = './datasets/mante_dataset'
 
 
-def load_mante_data(smooth=True):
+def load_data(smooth=True, single_units=False):
     """Load Mante data into raw format.
 
     Args:
         smooth: bool, whether to load smoothed data
+        single_units: bool, if True, only analyze single units
 
     Returns:
         data: a list of mat_struct, storing info for each unit
@@ -39,11 +40,28 @@ def load_mante_data(smooth=True):
     data = dataT['unit']
     # time = dataT['time']
 
+    if single_units:
+        single_units = get_single_units()
+        ind_single_units = np.where(single_units)[0]
+        data = [data[i] for i in ind_single_units]
+
     # Number of units
     # n_unit = len(data)
     # n_cond = 72  # condition
     # n_time = data[0].response.shape[1]
     return data
+
+
+def get_single_units():
+    # get single units
+    fname = os.path.join('mante_dataset', 'metadata.mat')
+    mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
+    metadata = mat_dict['metadata'].unit # as dictionary
+    discriminable = np.array([(m.unitInfo.discriminability in [3,4]) for m in metadata])
+    single_units = np.array([m.unitInfo.type=='s' for m in metadata])
+    single_units = np.logical_and(single_units, discriminable)
+    assert np.sum(single_units)==181
+    return single_units
 
 
 def get_mante_data():
