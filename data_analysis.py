@@ -98,8 +98,8 @@ def get_trial_avg(data,
     n_var = len(var_keys)
 
     # initialize
-    task_var = data[0].task_variable.__dict__ # turn into dictionary
-    n_time = data[0].response.shape[1]
+    task_var = data[0]['task_var']  # turn into dictionary
+    n_time = data[0]['rate'].shape[1]
     n_unit = len(data)
 
     task_var = expand_task_var(task_var)
@@ -114,7 +114,7 @@ def get_trial_avg(data,
         data_train = np.zeros(data_shape)
 
     for i_unit in range(n_unit):
-        task_var = data[i_unit].task_variable.__dict__ # turn into dictionary
+        task_var = data[i_unit]['task_var']
         task_var = expand_task_var(task_var)
 
         # number of trials
@@ -133,7 +133,7 @@ def get_trial_avg(data,
         ind_var_conds = np.unravel_index(range(n_cond),n_var_unique)
 
         # Responses of this unit
-        response = data[i_unit].response # (trial, time)
+        response = data[i_unit]['rate']  # (trial, time)
 
         for i_cond in range(n_cond):
             if context is None:

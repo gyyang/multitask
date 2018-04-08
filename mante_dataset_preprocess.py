@@ -24,7 +24,10 @@ def load_data(smooth=True, single_units=False):
         single_units: bool, if True, only analyze single units
 
     Returns:
-        data: a list of mat_struct, storing info for each unit
+        data: standard format, list of dict of arrays/dict
+            list is over neurons
+            dict is for response array and task variable dict
+
     """
     if smooth:
         fname = 'dataT_smooth.mat'
@@ -45,11 +48,17 @@ def load_data(smooth=True, single_units=False):
         ind_single_units = np.where(single_units)[0]
         data = [data[i] for i in ind_single_units]
 
-    # Number of units
-    # n_unit = len(data)
-    # n_cond = 72  # condition
-    # n_time = data[0].response.shape[1]
-    return data
+    # Convert to standard format
+    new_data = list()
+    n_unit = len(data)
+    for i in range(n_unit):
+        unit_dict = {
+            'task_var': data[i].task_variable.__dict__,  # turn into dictionary
+            'rate': data[i].response  # (n_trial, n_time)
+        }
+        new_data.append(unit_dict)
+
+    return new_data
 
 
 def get_single_units():
