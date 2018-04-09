@@ -16,6 +16,13 @@ import matplotlib.pyplot as plt
 DATASETPATH = './datasets/mante_dataset'
 
 
+def _expand_task_var(task_var):
+    """Little helper function that calculate a few more things."""
+    task_var['stim_dir_sign'] = (task_var['stim_dir']>0).astype(int)*2-1
+    task_var['stim_col2dir_sign'] = (task_var['stim_col2dir']>0).astype(int)*2-1
+    return task_var
+
+
 def load_data(smooth=True, single_units=False):
     """Load Mante data into raw format.
 
@@ -53,8 +60,10 @@ def load_data(smooth=True, single_units=False):
     new_data = list()
     n_unit = len(data)
     for i in range(n_unit):
+        task_var = data[i].task_variable.__dict__
+        task_var = _expand_task_var(task_var)
         unit_dict = {
-            'task_var': data[i].task_variable.__dict__,  # turn into dictionary
+            'task_var': task_var,  # turn into dictionary
             'rate': data[i].response  # (n_trial, n_time)
         }
         new_data.append(unit_dict)

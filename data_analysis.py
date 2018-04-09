@@ -57,13 +57,6 @@ def generate_data_in_standard_format():
         pickle.dump(Data, f)
 
 
-def expand_task_var(task_var):
-    # little helper function that calculate a few more things
-    task_var['stim_dir_sign'] = (task_var['stim_dir']>0).astype(int)*2-1
-    task_var['stim_col2dir_sign'] = (task_var['stim_col2dir']>0).astype(int)*2-1
-    return task_var
-
-
 def get_trial_avg(data,
                   var_keys=None,
                   context=None,
@@ -102,7 +95,6 @@ def get_trial_avg(data,
     n_time = data[0]['rate'].shape[1]
     n_unit = len(data)
 
-    task_var = expand_task_var(task_var)
     n_cond = np.prod([len(np.unique(task_var[k])) for k in var_keys])
 
     data_shape = (n_time, n_cond, n_unit)
@@ -115,7 +107,6 @@ def get_trial_avg(data,
 
     for i_unit in range(n_unit):
         task_var = data[i_unit]['task_var']
-        task_var = expand_task_var(task_var)
 
         # number of trials
         n_trial = len(task_var[var_keys[0]])
