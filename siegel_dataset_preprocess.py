@@ -92,15 +92,16 @@ def _get_valid_trials(trial_infos):
 
 def _expand_task_var(task_var):
     """Little helper function that calculate a few more things."""
-    task_var['context'] = list()
+    tmp = list()
     for r in task_var['rule']:
         if r == 'dir':
-            task_var['context'].append(+1)
+            tmp.append(+1)
         else:
-            task_var['context'].append(-1)
+            tmp.append(-1)
+    task_var['context'] = np.array(tmp)
     # TODO(gryang): Take care of boundary case
-    task_var['stim_dir_sign'] = (np.array(task_var['direction']>0)).astype(int)*2-1
-    task_var['stim_col2dir_sign'] = (np.array(task_var['color']>90)).astype(int)*2-1
+    task_var['stim_dir_sign'] = (np.array(task_var['direction'])>0).astype(int)*2-1
+    task_var['stim_col2dir_sign'] = (np.array(task_var['color'])>90).astype(int)*2-1
     return task_var
 
 

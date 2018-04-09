@@ -121,7 +121,7 @@ def get_trial_avg(data,
         n_cond = np.prod(n_var_unique)
 
         # List of indices for each task variable
-        ind_var_conds = np.unravel_index(range(n_cond),n_var_unique)
+        ind_var_conds = np.unravel_index(range(n_cond), n_var_unique)
 
         # Responses of this unit
         response = data[i_unit]['rate']  # (trial, time)
@@ -130,12 +130,23 @@ def get_trial_avg(data,
             if context is None:
                 ind_cond = np.ones(n_trial, dtype=bool)
             else:
-                ind_cond = task_var['context']==context # only look at this context
+                # only look at this context
+                ind_cond = task_var['context']==context
 
             for i_var in range(n_var):
                 ind_var_cond = ind_var_conds[i_var][i_cond]
-                ind_cond_tmp = task_var[var_keys[i_var]]==var_unique[i_var][ind_var_cond]
+                ind_cond_tmp = (task_var[var_keys[i_var]] ==
+                                var_unique[i_var][ind_var_cond])
+
                 ind_cond *= ind_cond_tmp
+
+            if sum(ind_cond) == 0:
+                print('context')
+                print('i_cond')
+                for i_var in range(n_var):
+                    ind_var_cond = ind_var_conds[i_var][i_cond]
+                    print(var_unique[i_var][ind_var_cond])
+                raise ValueError()
 
             if random_shuffle:
                 np.random.shuffle(ind_cond)
@@ -155,10 +166,13 @@ def get_trial_avg(data,
                 # if n_trial_cond_train == 0:
                 #     print(i_unit, i_cond, n_trial_cond)
 
-                data_train[:, i_cond, i_unit] = np.mean(response[ind_cond_train, :], axis=0)
-                data_test[:, i_cond, i_unit] = np.mean(response[ind_cond_test, :], axis=0)
+                data_train[:, i_cond, i_unit] = np.mean(
+                    response[ind_cond_train, :], axis=0)
+                data_test[:, i_cond, i_unit] = np.mean(
+                    response[ind_cond_test, :], axis=0)
             else:
-                data_train[:, i_cond, i_unit] = np.mean(response[ind_cond, :], axis=0)
+                data_train[:, i_cond, i_unit] = np.mean(
+                    response[ind_cond, :], axis=0)
 
     if split_traintest:
         return data_train, data_test
@@ -694,14 +708,15 @@ class AnalyzeData(object):
 
         self.n_unit = len(self.data)
 
-        self.var_key_list = ['targ_dir', 'stim_dir_sign', 'stim_col2dir_sign']
-        self.data_condavg_list = [] # for two contexts
-        for context in [1, -1]:
-            tmp = dict()
-            for var_key in self.var_key_list:
-                tmp[var_key] = get_trial_avg(data=self.data, split_traintest=False,
-                                           var_keys=[var_key], context=context)
-            self.data_condavg_list.append(tmp)
+        # TODO(gryang): make the following compatible
+        # self.var_key_list = ['targ_dir', 'stim_dir_sign', 'stim_col2dir_sign']
+        # self.data_condavg_list = [] # for two contexts
+        # for context in [1, -1]:
+        #     tmp = dict()
+        #     for var_key in self.var_key_list:
+        #         tmp[var_key] = get_trial_avg(data=self.data, split_traintest=False,
+        #                                    var_keys=[var_key], context=context)
+        #     self.data_condavg_list.append(tmp)
 
     def compute_var_all(self, var_method='time_avg_early'):
         """Compute task variance for data and shuffled data.
@@ -715,9 +730,11 @@ class AnalyzeData(object):
         # Generate a random orthogonal matrix for later use
         rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
 
-        self._var1s, self._var2s, self._var1s_rot, self._var2s_rot = get_trial_avg_var(self.data, rotation_matrix, var_method)
+        self._var1s, self._var2s, self._var1s_rot, self._var2s_rot = \
+            get_trial_avg_var(self.data, rotation_matrix, var_method)
         self._var1s_shuffle, self._var2s_shuffle, \
-        self._var1s_rot_shuffle, self._var2s_rot_shuffle = get_shuffle_var(self.data, rotation_matrix, var_method)
+        self._var1s_rot_shuffle, self._var2s_rot_shuffle = \
+            get_shuffle_var(self.data, rotation_matrix, var_method)
 
     def compute_denoise_var(self, var_thr=0.0, random_rotation=False,
                             thr_type='sum', denoise=True):
@@ -826,7 +843,7 @@ if __name__ == '__main__':
     analyze_single_units = False
     denoise = False
 
-    amd = AnalyzeData(analyze_single_units=analyze_single_units)
+    amd = AnalyzeData(dataset='siegel', analyze_single_units=analyze_single_units)
     amd.compute_var_all(var_method='time_avg_late')
     var_thr, thr_type = 0.0, 'or'
     fracVar = amd.compute_denoise_var(
