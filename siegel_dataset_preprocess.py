@@ -90,6 +90,20 @@ def _get_valid_trials(trial_infos):
     return new_trial_infos, valid_trials
 
 
+def _expand_task_var(task_var):
+    """Little helper function that calculate a few more things."""
+    task_var['context'] = list()
+    for r in task_var['rule']:
+        if r == 'dir':
+            task_var['context'].append(+1)
+        else:
+            task_var['context'].append(-1)
+    # TODO(gryang): Take care of boundary case
+    task_var['stim_dir_sign'] = (np.array(task_var['direction']>0)).astype(int)*2-1
+    task_var['stim_col2dir_sign'] = (np.array(task_var['color']>90)).astype(int)*2-1
+    return task_var
+
+
 def load_data():
     datasetpath = os.path.join(DATASETPATH, 'sorted')
 
@@ -100,6 +114,8 @@ def load_data():
 
     trial_infos = _load_tables(f, 'trialinfo')
     trial_infos, valid_trials = _get_valid_trials(trial_infos)
+    task_var = _expand_task_var(trial_infos)
+
     unit_infos = _load_tables(f, 'unitinfo')
     electrode_infos = _load_tables(f, 'electrodeinfo')
 
@@ -124,7 +140,7 @@ def load_data():
             hist, bin_edges = np.histogram(spikes_unit, bins=bins)
             rates[i_trial, :] = hist / bin_size
         unit_dict = {
-            'task_var': trial_infos,  # TODO(gryang): change keys
+            'task_var': task_var,  # TODO(gryang): change keys
             'rate': rates
         }
         data.append(unit_dict)
