@@ -133,3 +133,25 @@ def mkdir_p(path):
             pass
         else:
             raise
+
+
+def gen_ortho_matrix(dim, rng=None):
+    """Generate random orthogonal matrix
+    Taken from scipy.stats.ortho_group
+    Copied here from compatibilty with older versions of scipy
+    """
+    H = np.eye(dim)
+    for n in range(1, dim):
+        if rng is None:
+            x = np.random.normal(size=(dim-n+1,))
+        else:
+            x = rng.normal(size=(dim-n+1,))
+        # random sign, 50/50, but chosen carefully to avoid roundoff error
+        D = np.sign(x[0])
+        x[0] += D*np.sqrt((x*x).sum())
+        # Householder transformation
+        Hx = -D*(np.eye(dim-n+1) - 2.*np.outer(x, x)/(x*x).sum())
+        mat = np.eye(dim)
+        mat[n-1:, n-1:] = Hx
+        H = np.dot(H, mat)
+    return H

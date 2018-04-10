@@ -19,27 +19,6 @@ from tensorflow.python.ops.rnn_cell_impl import RNNCell
 
 import tools
 
-def gen_ortho_matrix(dim, rng=None):
-    """Generate random orthogonal matrix
-    Taken from scipy.stats.ortho_group
-    Copied here from compatibilty with older versions of scipy
-    """
-    H = np.eye(dim)
-    for n in range(1, dim):
-        if rng is None:
-            x = np.random.normal(size=(dim-n+1,))
-        else:
-            x = rng.normal(size=(dim-n+1,))
-        # random sign, 50/50, but chosen carefully to avoid roundoff error
-        D = np.sign(x[0])
-        x[0] += D*np.sqrt((x*x).sum())
-        # Householder transformation
-        Hx = -D*(np.eye(dim-n+1) - 2.*np.outer(x, x)/(x*x).sum())
-        mat = np.eye(dim)
-        mat[n-1:, n-1:] = Hx
-        H = np.dot(H, mat)
-    return H
-
 
 def popvec(y):
     """Population vector read out.
@@ -185,7 +164,8 @@ class LeakyRNNCell(RNNCell):
         if self._w_rec_init == 'diag':
             w_rec0 = self._w_rec_start*np.eye(n_hidden)
         elif self._w_rec_init == 'randortho':
-            w_rec0 = self._w_rec_start*gen_ortho_matrix(n_hidden, rng=self.rng)
+            w_rec0 = self._w_rec_start*tools.gen_ortho_matrix(n_hidden,
+                                                              rng=self.rng)
         elif self._w_rec_init == 'randgauss':
             w_rec0 = (self._w_rec_start *
                       self.rng.randn(n_hidden, n_hidden)/np.sqrt(n_hidden))
