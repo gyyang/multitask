@@ -143,14 +143,6 @@ def get_trial_avg(data,
 
                 ind_cond *= ind_cond_tmp
 
-            if sum(ind_cond) == 0:
-                print('context')
-                print('i_cond')
-                for i_var in range(n_var):
-                    ind_var_cond = ind_var_conds[i_var][i_cond]
-                    print(var_unique[i_var][ind_var_cond])
-                raise ValueError()
-
             if random_shuffle:
                 np.random.shuffle(ind_cond)
 
