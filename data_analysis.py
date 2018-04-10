@@ -207,30 +207,23 @@ def get_trial_avg_var(data, var_method, rotation_matrix=None,
     return vars
 
 
-def get_shuffle_var(data, rotation_matrix, var_method, n_rep=10):
+def get_shuffle_var(data, var_method, rotation_matrix=None, n_rep=10):
     """Get task variance when data is shuffled."""
     start = time.time()
 
     var1s_shuffle, var2s_shuffle = 0, 0
-    var1s_rot_shuffle, var2s_rot_shuffle = 0, 0
     for i_rep in range(n_rep):
         v1, v2 = get_trial_avg_var(
-            data, var_method, random_shuffle=True)
-        v1_rot, v2_rot = get_trial_avg_var(
             data, var_method, rotation_matrix, random_shuffle=True)
         var1s_shuffle += v1
         var2s_shuffle += v2
-        var1s_rot_shuffle += v1_rot
-        var2s_rot_shuffle += v2_rot
 
     var1s_shuffle /= n_rep
     var2s_shuffle /= n_rep
-    var1s_rot_shuffle /= n_rep
-    var2s_rot_shuffle /= n_rep
 
     print('Time taken {:0.2f}s'.format(time.time()-start))
 
-    return var1s_shuffle, var2s_shuffle, var1s_rot_shuffle, var2s_rot_shuffle
+    return var1s_shuffle, var2s_shuffle
 
 
 def get_trial_avg_rate_obsolete(response, task_var, context=1, random_shuffle=False,
@@ -700,7 +693,7 @@ class AnalyzeData(object):
             self.data = mante_dataset_preprocess.load_data(
                 smooth=smooth, single_units=analyze_single_units)
         elif dataset == 'siegel':
-            self.data = siegel_dataset_preprocess.load_data()
+            self.data = siegel_dataset_preprocess.load_data(single_file=False)
 
         self.n_unit = len(self.data)
 
@@ -728,9 +721,11 @@ class AnalyzeData(object):
 
         self._var1s, self._var2s = \
             get_trial_avg_var(self.data, var_method)
+        self._var1s_shuffle, self._var2s_shuffle = \
+            get_shuffle_var(self.data, var_method)
         # self._var1s_rot, self._var2s_rot = \
         #     get_trial_avg_var(self.data, var_method, rotation_matrix)
-        # self._var1s_shuffle, self._var2s_shuffle, \
+
         # self._var1s_rot_shuffle, self._var2s_rot_shuffle = \
         #     get_shuffle_var(self.data, rotation_matrix, var_method)
 
@@ -745,18 +740,18 @@ class AnalyzeData(object):
         else:
             var1s = self._var1s
             var2s = self._var2s
-            # var1s_shuffle = self._var1s_shuffle
-            # var2s_shuffle = self._var2s_shuffle
+            var1s_shuffle = self._var1s_shuffle
+            var2s_shuffle = self._var2s_shuffle
 
         # Plot vars
-        # plt.figure()
-        # plt.scatter(var1s, var1s_shuffle)
-        # plt.plot([0,500], [0,500])
-        # plt.xlim([0,100])
-        # plt.ylim([0,100])
-        # plt.xlabel('Stimulus variance')
-        # plt.ylabel('Stimulus variance (shuffled data)')
-        # plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
+        plt.figure()
+        plt.scatter(var1s, var1s_shuffle)
+        plt.plot([0,500], [0,500])
+        plt.xlim([0,100])
+        plt.ylim([0,100])
+        plt.xlabel('Stimulus variance')
+        plt.ylabel('Stimulus variance (shuffled data)')
+        plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
         # plt.savefig('figure/stimvarvsshuffle.pdf')
         #
         # plt.figure()
@@ -841,9 +836,9 @@ if __name__ == '__main__':
     analyze_single_units = False
     denoise = False
 
-    amd = AnalyzeData(dataset='mante', analyze_single_units=analyze_single_units)
-    amd.compute_var_all(var_method='time_avg_late')
-    var_thr, thr_type = 0.0, 'or'
+    amd = AnalyzeData(dataset='siegel', analyze_single_units=analyze_single_units)
+    amd.compute_var_all(var_method='time_avg_early')
+    var_thr, thr_type = 4.5, 'or'
     fracVar = amd.compute_denoise_var(
         var_thr=var_thr, thr_type=thr_type, denoise=denoise)
 #==============================================================================

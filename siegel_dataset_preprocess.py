@@ -173,12 +173,15 @@ def _compute_data():
             pickle.dump(data_single_file, f)
 
 
-def load_data():
+def load_data(single_file=False):
     """Load Siegel data into standard format."""
     datasetpath = os.path.join(DATASETPATH, 'standard')
 
     files = os.listdir(datasetpath)
     files = [f for f in files if '1' in f]
+
+    if single_file:
+        files = files[:1]
 
     start_time = time.time()
 
