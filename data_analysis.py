@@ -10,15 +10,18 @@ import time
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 from scipy.io import loadmat, whosmat
-import seaborn as sns
 
 import mante_dataset_preprocess
 import siegel_dataset_preprocess
-from network import gen_ortho_matrix
+from tools import gen_ortho_matrix
 
 
 DATAPATH = './datasets/mante_dataset'
-
+# sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])
+COLORS = [(0.9764705882352941, 0.45098039215686275, 0.023529411764705882),
+ (0.08235294117647059, 0.6901960784313725, 0.10196078431372549),
+ (1.0, 0.5058823529411764, 0.7529411764705882),
+ (0.4588235294117647, 0.7333333333333333, 0.9921568627450981)]
 
 def generate_data_in_standard_format():
     '''Generate data dictionary in standardize form'''
@@ -488,52 +491,54 @@ def compute_var(rates, var_method):
 #     # return np.percentile(var1s_shuffle, [95]) + np.percentile(var2s_shuffle, [95])
 
 
-def plot_fracVar(data, analyze_units='single', plot_single_units=False):
-    print('Analyzing' + analyze_units + 'units')
+def plot_fracVar(fracVar):
+    """Plot distribution of fractional variance."""
+    ind_group = dict()
+    ind_group['1'] = np.where(fracVar > 0.8)[0]
+    ind_group['2'] = np.where(fracVar < -0.8)[0]
+    # ind_group['12']= np.where(np.logical_and(-0.8<fracVar, fracVar<0.8))[0]
+    ind_group['12'] = np.where(np.logical_and(-0.3 < fracVar,
+                                              fracVar < 0.3))[0]
 
-    single_units = get_single_units()
-    multi_units = np.logical_not(single_units)
+    colors = dict(zip([None, '1', '2', '12'], COLORS))
+    fs = 6
+    fig = plt.figure(figsize=(2.0, 1.2))
+    ax = fig.add_axes([0.2, 0.3, 0.5, 0.5])
+    data_plot = fracVar
+    hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1, 1))
+    ax.bar(bins_edge[:-1], hist, width=bins_edge[1] - bins_edge[0],
+           color='gray', edgecolor='none')
+    bs = list()
+    for i, group in enumerate(['1', '2', '12']):
+        data_plot = fracVar[ind_group[group]]
+        hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1, 1))
+        b_tmp = ax.bar(bins_edge[:-1], hist, width=bins_edge[1] - bins_edge[0],
+                       color=colors[group], edgecolor='none', label=group)
+        bs.append(b_tmp)
+    plt.locator_params(nbins=3)
+    xlabel = 'FracVar'
+    ax.set_xlabel(xlabel, fontsize=fs)
+    ax.set_ylabel('Units', fontsize=fs)
+    ax.set_ylim(bottom=-0.02 * hist.max())
+    ax.set_xlim([-1.1, 1.1])
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
+    lg = ax.legend(bs, ['1', '2', '12'], title='Group',
+                   fontsize=fs, ncol=1, bbox_to_anchor=(1.5, 1.0),
+                   loc=1, frameon=False)
+    plt.setp(lg.get_title(), fontsize=fs)
 
-    _var1s, _var2s = get_trial_avg_var(data, random_rotation=random_rotation)
-    _var1s_shuffle, _var2s_shuffle = get_shuffle_var(data, random_rotation=random_rotation)
-
-    var1s, var2s = get_trial_avg_var(data, random_shuffle=False)
-
-    n_unit = len(data)
-
-    ind_orig = np.arange(n_unit)
-
-    # Get units with variance higher than threshold
-    # ind_used = (var1s+var2s)>3.65
-    var_thr = 0.00
-    ind_used = (var1s+var2s)>var_thr
-
-    if analyze_units == 'single':
-        ind_used = np.logical_and(ind_used, single_units)
-    elif analyze_units == 'multi':
-        ind_used = np.logical_and(ind_used, multi_units)
-        # ind_used = single_units
-
-    var1s = var1s[ind_used]
-    var2s = var2s[ind_used]
-    ind_used_orig = ind_orig[ind_used]
-
-    fracVar = (var1s-var2s)/(var1s+var2s)
-    plt.figure()
-    _ = plt.hist(fracVar, bins=10, range=(-1,1))
-
-    if plot_single_units:
-        # ind_sort = np.argsort(fracVar)
-        i_units = np.argsort(fracVar)[:5]
-        i_units = np.concatenate((i_units, np.argsort(fracVar)[-5:]))
-        fracVar_tmp = fracVar[i_units]
-        # print(fracVar_tmp)
-
-        i_units = np.argsort(fracVar)
-
-        i_units = ind_used_orig[i_units]
-        for i_unit in i_units:
-            plot_singleunit(data, i_unit)
+    save_name = 'fracVarcolored_data'
+    if analyze_single_units:
+        save_name = save_name + '_SU'
+    else:
+        save_name = save_name + '_AU'
+    if not denoise:
+        save_name = save_name + '_nodenoise'
+    # plt.savefig('figure/'+save_name+'.pdf', transparent=True)
 
 
 def clustering_tmp():
@@ -566,9 +571,7 @@ def study_betaweights(analyze_single_units=True, ind_group=None):
         print('Analyzing all units')
         coefs_show = coefs
 
-    import seaborn.apionly as sns # If you don't have this, then some colormaps won't work
-    colors = dict(zip([None, '1', '2', '12'],
-                       sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
+    colors = dict(zip([None, '1', '2', '12'], COLORS))
 
     # fig, axarr = plt.subplots(3, 2, figsize=(4,5))
     # pairs = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]
@@ -729,15 +732,15 @@ class AnalyzeData(object):
         self.var_method = var_method
 
         # Generate a random orthogonal matrix for later use
-        rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
+        # rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
 
         self._var1s, self._var2s = \
             get_trial_avg_var(self.data, var_method)
-        self._var1s_rot, self._var2s_rot = \
-            get_trial_avg_var(self.data, var_method, rotation_matrix)
-        self._var1s_shuffle, self._var2s_shuffle, \
-        self._var1s_rot_shuffle, self._var2s_rot_shuffle = \
-            get_shuffle_var(self.data, rotation_matrix, var_method)
+        # self._var1s_rot, self._var2s_rot = \
+        #     get_trial_avg_var(self.data, var_method, rotation_matrix)
+        # self._var1s_shuffle, self._var2s_shuffle, \
+        # self._var1s_rot_shuffle, self._var2s_rot_shuffle = \
+        #     get_shuffle_var(self.data, rotation_matrix, var_method)
 
     def compute_denoise_var(self, var_thr=0.0, random_rotation=False,
                             thr_type='sum', denoise=True):
@@ -750,34 +753,34 @@ class AnalyzeData(object):
         else:
             var1s = self._var1s
             var2s = self._var2s
-            var1s_shuffle = self._var1s_shuffle
-            var2s_shuffle = self._var2s_shuffle
+            # var1s_shuffle = self._var1s_shuffle
+            # var2s_shuffle = self._var2s_shuffle
 
         # Plot vars
-        plt.figure()
-        plt.scatter(var1s, var1s_shuffle)
-        plt.plot([0,500], [0,500])
-        plt.xlim([0,100])
-        plt.ylim([0,100])
-        plt.xlabel('Stimulus variance')
-        plt.ylabel('Stimulus variance (shuffled data)')
-        plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
-        plt.savefig('figure/stimvarvsshuffle.pdf')
-
-        plt.figure()
-        plt.scatter(var1s_shuffle, var2s_shuffle)
-        plt.plot([0,500], [0,500])
-        plt.xlim([0,100])
-        plt.ylim([0,100])
-        plt.xlabel('Shuffled stim. var. contex 1')
-        plt.ylabel('Shuffled stim. var. contex 2')
-        plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
+        # plt.figure()
+        # plt.scatter(var1s, var1s_shuffle)
+        # plt.plot([0,500], [0,500])
+        # plt.xlim([0,100])
+        # plt.ylim([0,100])
+        # plt.xlabel('Stimulus variance')
+        # plt.ylabel('Stimulus variance (shuffled data)')
+        # plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
+        # plt.savefig('figure/stimvarvsshuffle.pdf')
+        #
+        # plt.figure()
+        # plt.scatter(var1s_shuffle, var2s_shuffle)
+        # plt.plot([0,500], [0,500])
+        # plt.xlim([0,100])
+        # plt.ylim([0,100])
+        # plt.xlabel('Shuffled stim. var. contex 1')
+        # plt.ylabel('Shuffled stim. var. contex 2')
+        # plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
 
         # Denoise
-        if denoise:
-            relu = lambda x : x*(x>0.)
-            var1s = relu(var1s - var1s_shuffle)
-            var2s = relu(var2s - var2s_shuffle)
+        # if denoise:
+        #     relu = lambda x : x*(x>0.)
+        #     var1s = relu(var1s - var1s_shuffle)
+        #     var2s = relu(var2s - var2s_shuffle)
 
         if thr_type == 'sum':
             ind = (var1s+var2s)>var_thr
@@ -795,16 +798,16 @@ class AnalyzeData(object):
         fracVar = (var1s-var2s)/(var1s+var2s)
 
         # Plot fracVar distribution
-        fig = plt.figure(figsize=(4.0,3))
-        ax = fig.add_axes([0.2,0.3,0.5,0.5])
-        hist, bins_edge = np.histogram(fracVar, bins=20, range=(-1,1))
-        ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-               color='blue', edgecolor='none')
-        ax.set_title(self.var_method + ' rand. rot. '+str(random_rotation))
-
-        save_name = 'fracVar_data'
-        if random_rotation:
-            save_name = save_name + '_rndrot'
+        # fig = plt.figure(figsize=(4.0,3))
+        # ax = fig.add_axes([0.2,0.3,0.5,0.5])
+        # hist, bins_edge = np.histogram(fracVar, bins=20, range=(-1,1))
+        # ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
+        #        color='blue', edgecolor='none')
+        # ax.set_title(self.var_method + ' rand. rot. '+str(random_rotation))
+        #
+        # save_name = 'fracVar_data'
+        # if random_rotation:
+        #     save_name = save_name + '_rndrot'
         # plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
 
         return fracVar
@@ -855,53 +858,8 @@ if __name__ == '__main__':
 #     _ = amd.compute_denoise_var(random_rotation=True, var_thr=var_thr,
 #                                 thr_type=thr_type)
 #==============================================================================
+    plot_fracVar(fracVar)
 
-    ind_group = dict()
-    ind_group['1'] = np.where(fracVar>0.8)[0]
-    ind_group['2'] = np.where(fracVar<-0.8)[0]
-    # ind_group['12']= np.where(np.logical_and(-0.8<fracVar, fracVar<0.8))[0]
-    ind_group['12']= np.where(np.logical_and(-0.3<fracVar, fracVar<0.3))[0]
-
-    colors = dict(zip([None, '1', '2', '12'],
-                       sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
-    fs = 6
-    fig = plt.figure(figsize=(2.0,1.2))
-    ax = fig.add_axes([0.2,0.3,0.5,0.5])
-    data_plot = fracVar
-    hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1,1))
-    ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-           color='gray', edgecolor='none')
-    bs = list()
-    for i, group in enumerate(['1', '2', '12']):
-        data_plot = fracVar[ind_group[group]]
-        hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1,1))
-        b_tmp = ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-               color=colors[group], edgecolor='none', label=group)
-        bs.append(b_tmp)
-    plt.locator_params(nbins=3)
-    xlabel = 'FracVar'
-    ax.set_xlabel(xlabel, fontsize=fs)
-    ax.set_ylabel('Units', fontsize=fs)
-    ax.set_ylim(bottom=-0.02*hist.max())
-    ax.set_xlim([-1.1,1.1])
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.xaxis.set_ticks_position('bottom')
-    ax.yaxis.set_ticks_position('left')
-    ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
-    lg = ax.legend(bs, ['1','2','12'], title='Group',
-                   fontsize=fs, ncol=1, bbox_to_anchor=(1.5,1.0),
-                   loc=1, frameon=False)
-    plt.setp(lg.get_title(),fontsize=fs)
-
-    save_name = 'fracVarcolored_data'
-    if analyze_single_units:
-        save_name = save_name + '_SU'
-    else:
-        save_name = save_name + '_AU'
-    if not denoise:
-        save_name = save_name + '_nodenoise'
-    # plt.savefig('figure/'+save_name+'.pdf', transparent=True)
 
     # ind_group_original = dict()
     # for group in ['1', '2', '12']:
