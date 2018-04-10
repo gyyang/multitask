@@ -180,21 +180,21 @@ def get_trial_avg(data,
         return data_train
 
 
-def get_trial_avg_var(data, rotation_matrix, var_method, random_shuffle=False):
+def get_trial_avg_var(data, var_method, rotation_matrix=None,
+                      random_shuffle=False):
     """Compute the trial averaged variance.
 
     For efficiency, fuse the rotation here
 
     Args:
         data: standard format data
-        rotation_matrix: np 2D array, the matrix to rotate the data
         var_method: str, method used to compute task variance
+        rotation_matrix: None or np 2D array, the matrix to rotate the data
         random_shuffle: bool, whether to randomly shuffle the data
     """
     var_keys = ['stim_dir_sign', 'stim_col2dir_sign']
 
     vars = list()
-    vars_rot = list()
     for context in [1, -1]:
         # r has shape (n_time, n_cond, n_unit)
         r = get_trial_avg(data, var_keys=var_keys, context=context,
@@ -202,15 +202,14 @@ def get_trial_avg_var(data, rotation_matrix, var_method, random_shuffle=False):
         # transpose to (n_cond, n_time, n_unit)
         r = np.swapaxes(r, 0, 1)
 
-        r_rot = np.dot(r, rotation_matrix)
+        if rotation_matrix is not None:
+            r = np.dot(r, rotation_matrix)
 
         # input should be (n_cond, n_time, n_unit)
         v = compute_var(r, var_method)
-        v_rot = compute_var(r_rot, var_method)
         vars.append(v)
-        vars_rot.append(v_rot)
 
-    return vars[0], vars[1], vars_rot[0], vars_rot[1]
+    return vars
 
 
 def get_shuffle_var(data, rotation_matrix, var_method, n_rep=10):
@@ -220,8 +219,10 @@ def get_shuffle_var(data, rotation_matrix, var_method, n_rep=10):
     var1s_shuffle, var2s_shuffle = 0, 0
     var1s_rot_shuffle, var2s_rot_shuffle = 0, 0
     for i_rep in range(n_rep):
-        v1, v2, v1_rot, v2_rot = get_trial_avg_var(
-            data, rotation_matrix,var_method, random_shuffle=True)
+        v1, v2 = get_trial_avg_var(
+            data, var_method, random_shuffle=True)
+        v1_rot, v2_rot = get_trial_avg_var(
+            data, var_method, rotation_matrix, random_shuffle=True)
         var1s_shuffle += v1
         var2s_shuffle += v2
         var1s_rot_shuffle += v1_rot
@@ -730,8 +731,10 @@ class AnalyzeData(object):
         # Generate a random orthogonal matrix for later use
         rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
 
-        self._var1s, self._var2s, self._var1s_rot, self._var2s_rot = \
-            get_trial_avg_var(self.data, rotation_matrix, var_method)
+        self._var1s, self._var2s = \
+            get_trial_avg_var(self.data, var_method)
+        self._var1s_rot, self._var2s_rot = \
+            get_trial_avg_var(self.data, var_method, rotation_matrix)
         self._var1s_shuffle, self._var2s_shuffle, \
         self._var1s_rot_shuffle, self._var2s_rot_shuffle = \
             get_shuffle_var(self.data, rotation_matrix, var_method)
@@ -843,7 +846,7 @@ if __name__ == '__main__':
     analyze_single_units = False
     denoise = False
 
-    amd = AnalyzeData(dataset='siegel', analyze_single_units=analyze_single_units)
+    amd = AnalyzeData(dataset='mante', analyze_single_units=analyze_single_units)
     amd.compute_var_all(var_method='time_avg_late')
     var_thr, thr_type = 0.0, 'or'
     fracVar = amd.compute_denoise_var(
