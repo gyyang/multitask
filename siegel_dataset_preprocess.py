@@ -10,6 +10,8 @@ import os
 import csv
 from collections import defaultdict
 import math
+import pickle
+import time
 import numpy as np
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
@@ -105,14 +107,15 @@ def _expand_task_var(task_var):
     return task_var
 
 
-def load_data():
-    datasetpath = os.path.join(DATASETPATH, 'sorted')
+def _compute_data_single_file(f):
+    """Compute data for a single file.
 
-    files = os.listdir(datasetpath)
-    files = [f for f in files if '1' in f]
+    Args:
+        f: str, file name
 
-    f = files[0]
-
+    Returns:
+        data: standard format
+    """
     trial_infos = _load_tables(f, 'trialinfo')
     trial_infos, valid_trials = _get_valid_trials(trial_infos)
     task_var = _expand_task_var(trial_infos)
@@ -129,7 +132,7 @@ def load_data():
     assert len(unit_infos.values()[0]) == n_unit
 
     bin_size = 0.05  # unit: second
-    bins = np.arange(-0.05, 0.2, bin_size)
+    bins = np.arange(0, 0.21, bin_size)
     n_time = len(bins) - 1
 
     data = list()
@@ -142,10 +145,53 @@ def load_data():
             rates[i_trial, :] = hist / bin_size
         unit_dict = {
             'task_var': task_var,  # TODO(gryang): change keys
+            'electrode_info': electrode_infos,
+            'unit_infos': unit_infos,
             'rate': rates
         }
         data.append(unit_dict)
     return data
+
+
+def _compute_data():
+    """Compute data for all files."""
+    datasetpath = os.path.join(DATASETPATH, 'sorted')
+
+    files = os.listdir(datasetpath)
+    files = [f for f in files if '1' in f]
+
+    start_time = time.time()
+
+    for file in files:
+        print('Analyzing file: ' + file)
+        print('Time taken {:0.2f}s'.format(time.time()-start_time))
+        data_single_file = _compute_data_single_file(file)
+
+        fname = os.path.join(DATASETPATH, 'standard', 'siegel'+file[:6]+'.pkl')
+        print('File saved at: ' + fname)
+        with open(fname, 'wb') as f:
+            pickle.dump(data_single_file, f)
+
+
+def load_data():
+    """Load Siegel data into standard format."""
+    datasetpath = os.path.join(DATASETPATH, 'standard')
+
+    files = os.listdir(datasetpath)
+    files = [f for f in files if '1' in f]
+
+    start_time = time.time()
+
+    data = list()
+    for file in files:
+        print('Analyzing file: ' + file)
+        print('Time taken {:0.2f}s'.format(time.time() - start_time))
+        fname = os.path.join(datasetpath, file)
+        with open(fname, 'rb') as f:
+            data_single_file = pickle.load(f)
+        data.extend(data_single_file)
+    return data
+
 
 # def _spike_to_rate(spikes_unit, times):
 #     """Convert spikes to rate.
@@ -161,9 +207,7 @@ def load_data():
 
 
 if __name__ == '__main__':
-    # rate1s, rate2s = get_mante_data()
-    data = load_data()
-
+    _compute_data()
 
 
 
