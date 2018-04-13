@@ -184,6 +184,7 @@ def get_trial_avg_var(data, var_method, rotation_matrix=None,
     Args:
         data: standard format data
         var_method: str, method used to compute task variance
+            Can be 'time_avg_late', 'time_avg_none', 'time_avg_early'
         rotation_matrix: None or np 2D array, the matrix to rotate the data
         random_shuffle: bool, whether to randomly shuffle the data
     """
@@ -433,6 +434,7 @@ def compute_var(rates, var_method):
         rates: numpy array (n_cond, n_time, n_unit),
             trial-averaged activities for context 1
         var_method: str, method to compute variance
+            Can be 'time_avg_late', 'time_avg_none', 'time_avg_early'
 
     Return:
         vars: numpy array (n_unit,), task variance
@@ -476,7 +478,7 @@ def compute_var(rates, var_method):
 #     # return np.percentile(var1s_shuffle, [95]) + np.percentile(var2s_shuffle, [95])
 
 
-def plot_fracVar(fracVar):
+def plot_fracVar(fracVar, save_name):
     """Plot distribution of fractional variance."""
     ind_group = dict()
     ind_group['1'] = np.where(fracVar > 0.8)[0]
@@ -516,14 +518,16 @@ def plot_fracVar(fracVar):
                    loc=1, frameon=False)
     plt.setp(lg.get_title(), fontsize=fs)
 
-    save_name = 'fracVarcolored_data'
-    if analyze_single_units:
-        save_name = save_name + '_SU'
-    else:
-        save_name = save_name + '_AU'
-    if not denoise:
-        save_name = save_name + '_nodenoise'
-    # plt.savefig('figure/'+save_name+'.pdf', transparent=True)
+# =============================================================================
+#     save_name = 'fracVarcolored_data'
+#     if analyze_single_units:
+#         save_name = save_name + '_SU'
+#     else:
+#         save_name = save_name + '_AU'
+#     if not denoise:
+#         save_name = save_name + '_nodenoise'
+# =============================================================================
+    plt.savefig('figure/fracVar_data_'+save_name+'.pdf', transparent=True)
 
 
 def clustering_tmp():
@@ -689,6 +693,7 @@ class AnalyzeData(object):
             print('Loading smooth data')
         else:
             print('Loading original data')
+        self.dataset = dataset
         if dataset == 'mante':
             self.data = mante_dataset_preprocess.load_data(
                 smooth=smooth, single_units=analyze_single_units)
@@ -712,6 +717,7 @@ class AnalyzeData(object):
 
         Args:
             var_method: str, method to compute the variance
+                Can be 'time_avg_late', 'time_avg_none', 'time_avg_early'
         """
 
         self.var_method = var_method
@@ -744,15 +750,24 @@ class AnalyzeData(object):
             var2s_shuffle = self._var2s_shuffle
 
         # Plot vars
-        plt.figure()
-        plt.scatter(var1s, var1s_shuffle)
-        plt.plot([0,500], [0,500])
+        fig = plt.figure(figsize=(2, 2))
+        ax = fig.add_axes([0.25, 0.25, 0.65, 0.65])
+        ax.scatter(np.concatenate((var1s, var2s)),
+                    np.concatenate((var1s_shuffle, var2s_shuffle)), s=4)
+        ax.plot([0,500], [0,500])
         plt.xlim([0,100])
         plt.ylim([0,100])
-        plt.xlabel('Stimulus variance')
-        plt.ylabel('Stimulus variance (shuffled data)')
-        plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
-        # plt.savefig('figure/stimvarvsshuffle.pdf')
+        plt.xlabel('Stimulus variance', fontsize=7)
+        plt.ylabel('Stimulus variance (shuffled data)', fontsize=7)
+        title = self.var_method + ' rand. rot. ' + str(random_rotation)
+        plt.title(title, fontsize=7)
+        ax.tick_params(axis='both', which='major', labelsize=7)
+        ax.locator_params(nbins=3)
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+        plt.savefig('figure/stimvarvsshuffle'+self.dataset+'.pdf')
         #
         # plt.figure()
         # plt.scatter(var1s_shuffle, var2s_shuffle)
@@ -826,51 +841,13 @@ class AnalyzeData(object):
 if __name__ == '__main__':
     pass
 
-    # for var_method in ['time_avg_early', 'time_avg_late', 'time_avg_none']:
-    #     amd = AnalyzeManteData(random_rotation=False, var_method=var_method)
-    #     amd.compute_denoise_var()
-    #
-    #     amd = AnalyzeManteData(random_rotation=True, var_method=var_method)
-    #     amd.compute_denoise_var()
-
     analyze_single_units = False
     denoise = False
 
-    amd = AnalyzeData(dataset='siegel', analyze_single_units=analyze_single_units)
-    amd.compute_var_all(var_method='time_avg_early')
-    var_thr, thr_type = 4.5, 'or'
+    dataset = 'siegel'
+    amd = AnalyzeData(dataset=dataset, analyze_single_units=analyze_single_units)
+    amd.compute_var_all(var_method='time_avg_late')
+    var_thr, thr_type = 0., 'or'
     fracVar = amd.compute_denoise_var(
         var_thr=var_thr, thr_type=thr_type, denoise=denoise)
-#==============================================================================
-#     _ = amd.compute_denoise_var(random_rotation=True, var_thr=var_thr,
-#                                 thr_type=thr_type)
-#==============================================================================
-    plot_fracVar(fracVar)
-
-
-    # ind_group_original = dict()
-    # for group in ['1', '2', '12']:
-    #     ind_group_original[group] = ind_original[ind_group[group]]
-
-    # TEMPORARY
-    # fname = os.path.join(DATAPATH, 'vBeta.mat')
-    #
-    # mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
-    #
-    # vBeta = mat_dict['vBeta'].__dict__ # as dictionary
-    #
-    # coefs = vBeta['response']
-
-    # from contextdm_analysis import plot_coefvsfracvar
-    #
-    # plot_coefvsfracvar(coefs[ind_original,:], fracVar)
-
-
-#==============================================================================
-#     study_betaweights(analyze_single_units, ind_group=ind_group_original)
-# 
-#     data = load_mante_data(smooth=True)
-#     for group in ['1']:
-#         for i_unit in ind_group_original[group]:
-#             amd.plot_single_unit(i_unit)
-#==============================================================================
+    plot_fracVar(fracVar, save_name=dataset)
