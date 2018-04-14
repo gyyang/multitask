@@ -89,8 +89,32 @@ def save_hparams(hparams, save_dir):
         json.dump(hparams_copy, f)
 
 
+def find_all_models(root_dir, hp_target):
+    """Find all models that satisfy hyperparameters.
+
+    Args:
+        root_dir: root directory
+        hp_target: dictionary of hyperparameters
+
+    Returns:
+        model_dirs: list of model directories
+        hps: list of model hyperparameters
+    """
+    dirs = valid_model_dirs(root_dir)
+
+    model_dirs = list()
+    hps = list()
+    for d in dirs:
+        hp = load_hparams(d)
+        if all(hp[key] == val for key, val in hp_target.items()):
+            model_dirs.append(d)
+            hps.append(hp)
+
+    return model_dirs, hps
+
+
 def find_model(root_dir, hp_target):
-    """Find model that satisfy hyperparameters.
+    """Find one model that satisfies hyperparameters.
 
     Args:
         root_dir: root directory
@@ -100,18 +124,15 @@ def find_model(root_dir, hp_target):
         d: model directory
         hp: model hyperparameters
     """
-    dirs = valid_model_dirs(root_dir)
+    model_dirs, hps = find_all_models(root_dir, hp_target)
 
-    model_found = False
-    for i, d in enumerate(dirs):
-        hp = load_hparams(d)
-        if all(hp[key] == val for key, val in hp_target.items()):
-            model_found = True
-            break
-
-    if not model_found:
+    if not model_dirs:
+        # If list empty
         print('Model not found')
         return None, None
+
+    d = model_dirs[0]
+    hp = hps[0]
 
     log = load_log(d)
     # check if performance exceeds target
