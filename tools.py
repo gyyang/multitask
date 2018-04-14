@@ -42,9 +42,24 @@ def _contain_model_file(model_dir):
     return False
 
 
-def valid_model_dirs(model_dir):
+def _valid_model_dirs(root_dir):
     """Get valid model directories given a root directory."""
-    return [x[0] for x in os.walk(model_dir) if _contain_model_file(x[0])]
+    return [x[0] for x in os.walk(root_dir) if _contain_model_file(x[0])]
+
+
+def valid_model_dirs(root_dir):
+    """Get valid model directories given a root directory(s).
+
+    Args:
+        root_dir: str or list of strings
+    """
+    if isinstance(root_dir, basestring):  # only works for Python 2
+        return _valid_model_dirs(root_dir)
+    else:
+        model_dirs = list()
+        for d in root_dir:
+            model_dirs.extend(_valid_model_dirs(d))
+        return model_dirs
 
 
 def load_log(train_dir):
