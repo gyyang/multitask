@@ -3,6 +3,7 @@
 from __future__ import division
 
 import os
+from collections import OrderedDict
 import numpy as np
 
 import tools
@@ -12,6 +13,7 @@ import clustering
 
 # TODO: make this flexible
 DATAPATH = os.path.join(os.getcwd(), 'data')
+
 
 def analysis(run_analysis, model_dir):
     # Run a set of standard analysis
@@ -73,11 +75,11 @@ def train_vary_hparams(i):
         i: int, the index of the hyperparameters list
     """
     # Ranges of hyperparameters to loop over
-    hp_ranges = dict()
-    hp_ranges['activation'] = ['softplus','relu', 'tanh', 'retanh', 'power']
+    hp_ranges = OrderedDict()
+    hp_ranges['activation'] = ['softplus', 'relu', 'tanh', 'retanh']
     hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
     hp_ranges['w_rec_init'] = ['diag', 'randortho']
-    hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]
+    hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]  # TODO(gryang): Change this?
     hp_ranges['l2_h'] = [0]
     hp_ranges['l1_weight'] = [0, 1e-5, 1e-4, 1e-3]
 
@@ -88,14 +90,12 @@ def train_vary_hparams(i):
 
     # Set up new hyperparameter
     hparams = dict()
-    hparams['target_perf'] = 0.9#0.8
     for key, index in zip(keys, indices):
         hparams[key] = hp_ranges[key][index]
 
     train_dir = os.path.join(DATAPATH, 'varyhparams', str(i))
-    #train.train(train_dir, hparams, ruleset='mante', max_steps=1e7)
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir, hparams, ruleset='all', rule_prob_map=rule_prob_map, max_steps=1e8)
+    train.train(train_dir, hparams, ruleset='all', rule_prob_map=rule_prob_map)
 
     # Analyses
     variance.compute_variance(train_dir)
@@ -103,6 +103,7 @@ def train_vary_hparams(i):
     analysis = clustering.Analysis(train_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
+    # TODO(gryang): Add more analysis here
 
 
 if __name__ == '__main__':
