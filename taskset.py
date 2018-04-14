@@ -612,26 +612,32 @@ def plot_taskspace(model_dir, setup=1, restore=True, representation='rate'):
     _plot_taskspace(h_trans, save_name, setup=setup)
 
 
-def plot_taskspace_group(model_dir, setup=1, restore=True, representation='rate', flip_sign=True):
+def plot_taskspace_group(root_dir, setup=1, restore=True,
+                         representation='rate', flip_sign=True):
     '''Plot task space for a group of networks.
 
     Args:
-        model_dir : the root directory for all models to analyse
+        root_dir : the root directory for all models to analyse
         setup: int, the combination of rules to use
         restore: bool, whether to restore results
         representation: 'rate' or 'weight'
         flip_sign: bool, whether to flip signs for consistency
     '''
 
-    model_dirs = tools.valid_model_dirs(model_dir)
+    model_dirs = tools.valid_model_dirs(root_dir)
     print('Analyzing models : ')
     print(model_dirs)
 
     h_trans_all = OrderedDict()
     i = 0
     for model_dir in model_dirs:
-        h_trans = compute_taskspace(
-            model_dir, setup, restore=restore, representation=representation)
+        try:
+            h_trans = compute_taskspace(model_dir, setup,
+                                        restore=restore,
+                                        representation=representation)
+        except ValueError:
+            print('Skipping model at ' + model_dir)
+            continue
 
         if flip_sign:
             if setup != 1:
@@ -828,9 +834,12 @@ def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, fig
     plt.show()
 
 
-def plot_replacerule_performance(model_dir, setup, perfs_all=None, fig_name=None, restore=True):
-    perfs, rule, names = compute_replacerule_performance(model_dir, setup, restore)
-    _plot_replacerule_performance(perfs, rule, names, setup, perfs_all, fig_name)
+def plot_replacerule_performance(
+        model_dir,setup, perfs_all=None, fig_name=None, restore=True):
+    perfs, rule, names = compute_replacerule_performance(
+            model_dir, setup, restore)
+    _plot_replacerule_performance(
+            perfs, rule, names, setup, perfs_all, fig_name)
 
 
 def plot_replacerule_performance_group(model_dir, setup=1, restore=True):
@@ -849,7 +858,8 @@ def plot_replacerule_performance_group(model_dir, setup=1, restore=True):
     fig_name = 'taskset{:d}_perf'.format(setup)
 
     print(perfs_median)
-    _plot_replacerule_performance(perfs_median, rule, names, setup, perfs_all=perfs_plot, fig_name=fig_name)
+    _plot_replacerule_performance(perfs_median, rule, names, setup,
+                                  perfs_all=perfs_plot, fig_name=fig_name)
 
 
 if __name__ == '__main__':
