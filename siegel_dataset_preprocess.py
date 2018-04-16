@@ -174,7 +174,14 @@ def _compute_data():
 
 
 def load_data(single_file=False):
-    """Load Siegel data into standard format."""
+    """Load Siegel data into standard format.
+
+    Returns:
+        data: standard format, list of dict of arrays/dict
+            list is over neurons
+            dict is for response array and task variable dict
+            response array has shape (n_trial, n_time)
+    """
     datasetpath = os.path.join(DATASETPATH, 'standard')
 
     files = os.listdir(datasetpath)

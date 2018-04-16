@@ -35,7 +35,6 @@ def load_data(smooth=True, single_units=False):
             list is over neurons
             dict is for response array and task variable dict
             response array has shape (n_trial, n_time)
-
     """
     if smooth:
         fname = 'dataT_smooth.mat'
