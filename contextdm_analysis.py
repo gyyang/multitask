@@ -18,7 +18,7 @@ import tools
 import performance
 from slowpoints import search_slowpoints
 
-save = False # TEMP
+save = True # TEMP
 COLORS = sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])
 
 
@@ -339,7 +339,7 @@ class StateSpaceAnalysis(object):
                 stim1_locs = np.tile(params['stim1_locs'], n_rule)
 
                 x     = list() # Network input
-                y_loc = list() # Network stimget output location
+                y_loc = list() # Network target output location
 
                 # Sstimt computing the neural activity
                 for i, rule in enumerate(rules):
@@ -362,14 +362,14 @@ class StateSpaceAnalysis(object):
             # perfs = get_perf(y_sample, y_loc)
             # y_choice is 1 for choosing stim1_loc, otherwise -1
             y_actual_choice = 2*(get_dist(y_sample_loc[-1]-stim1_locs)<np.pi/2) - 1
-            y_stimget_choice = 2*(get_dist(y_loc[-1]-stim1_locs)<np.pi/2) - 1
+            y_target_choice = 2*(get_dist(y_loc[-1]-stim1_locs)<np.pi/2) - 1
 
             ###################### Processing activity ##################################
 
             # Downsample in time
             dt_new = 50
             every_t = int(dt_new/hparams['dt'])
-            # Only analyze the stimget epoch
+            # Only analyze the target epoch
             epoch = trial.epochs['stim1']
             H = H[epoch[0]:epoch[1],...][int(every_t/2)::every_t,...]
 
@@ -396,13 +396,12 @@ class StateSpaceAnalysis(object):
             if select_group is not None:
                 ind_active = select_group
 
-            H = H.reshape((-1, nh))
-
-            H = H[:, ind_active]
-            nh = len(ind_active)  # new nh
-
+            H = H[:, :, ind_active]
             # TODO: Temporary
-            self.H_orig_active = (H.copy()).reshape((nt, nb, nh))
+            self.H_orig_active = H.copy()
+
+            nh = len(ind_active)  # new nh
+            H = H.reshape((-1, nh))
 
             # Z-scoring response across time and trials (can have a strong impact on results)
             if z_score:
@@ -421,14 +420,14 @@ class StateSpaceAnalysis(object):
             # preferences = (H[:, y_actual_choice== 1, :].mean(axis=(0,1)) >
             #                H[:, y_actual_choice==-1, :].mean(axis=(0,1)))*2-1
 
-            # preferences = (H[:, y_stimget_choice== 1, :].mean(axis=(0,1)) >
-            #                H[:, y_stimget_choice==-1, :].mean(axis=(0,1)))*2-1
+            # preferences = (H[:, y_target_choice== 1, :].mean(axis=(0,1)) >
+            #                H[:, y_target_choice==-1, :].mean(axis=(0,1)))*2-1
 
             # preferences = (H[-1, y_actual_choice== 1, :].mean(axis=0) >
             #                H[-1, y_actual_choice==-1, :].mean(axis=0))*2-1
 
-            preferences = (H[-1, y_stimget_choice== 1, :].mean(axis=0) >
-                           H[-1, y_stimget_choice==-1, :].mean(axis=0))*2-1
+            preferences = (H[-1, y_target_choice== 1, :].mean(axis=0) >
+                           H[-1, y_target_choice==-1, :].mean(axis=0))*2-1
 
             ########################## Define Regressors ##################################
             # Coherences
@@ -437,15 +436,15 @@ class StateSpaceAnalysis(object):
 
             # Get task variables
             task_var = dict()
-            task_var['stimg_dir'] = y_actual_choice
+            task_var['targ_dir'] = y_actual_choice
             task_var['stim_dir']     = np.tile(stim_mod1_cohs/stim_mod1_cohs.max(), n_rule)
             task_var['stim_col2dir'] = np.tile(stim_mod2_cohs/stim_mod2_cohs.max(), n_rule)
             task_var['context']  = np.repeat([1, -1], batch_size) # +1 for Att 1, -1 for Att 2
-            task_var['correct']  = (y_actual_choice==y_stimget_choice).astype(int)
+            task_var['correct']  = (y_actual_choice==y_target_choice).astype(int)
 
             # Regressors (Choice, Mod1 Cohs, Mod2 Cohs, Rule)
             Regrs = np.zeros((n_rule * batch_size, n_regr))
-            Regrs[:, 0] = y_stimget_choice
+            Regrs[:, 0] = y_target_choice
             Regrs[:, 1] = task_var['stim_dir']
             Regrs[:, 2] = task_var['stim_col2dir']
             Regrs[:, 3] = task_var['context']
@@ -669,7 +668,7 @@ class StateSpaceAnalysis(object):
 
         return coefs_dict
 
-    def plot_betaweights(self, coefs_dict, fancy_color=False):
+    def plot_betaweights(self, coefs_dict, fancy_color=False, save_name=None):
         """Plot beta weights.
 
         Args:
@@ -719,10 +718,12 @@ class StateSpaceAnalysis(object):
         plt.tight_layout()
 
         if save:
-            save_name = 'beta_weights_sub'
+            fig_name = 'beta_weights_sub'
             if fancy_color:
-                save_name = save_name + '_color'
-            plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
+                fig_name = fig_name + '_color'
+            if save_name:
+                fig_name += save_name
+            plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
         plt.show()
 
     def get_slowpoints(self):
@@ -1121,15 +1122,17 @@ class StateSpaceAnalysis(object):
         return
 
 
-def _plot_performance_choicetasks(model_dir, lesion_units_list):
+def _plot_performance_choicetasks(model_dir, lesion_units_list,
+                                  legends=None, save_name=None):
     """Plot performance across tasks for different lesioning.
 
     Args:
         model_dir: str, model directory
         lesion_units_list: list of lists of units to lesion
+        legends: list of str
+        save_name: None or str, add to the figure name
     """
     rules_perf = ['contextdm1', 'contextdm2']
-    lesion_group_list = [None, '1', '2', '12']
 
     perf_stores = list()
     for lesion_units in lesion_units_list:
@@ -1147,15 +1150,14 @@ def _plot_performance_choicetasks(model_dir, lesion_units_list):
     width = 0.15
     fig = plt.figure(figsize=(3,1.5))
     ax = fig.add_axes([0.17,0.35,0.8,0.4])
-    for i, lesion_group in enumerate(lesion_group_list):
-        b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width,
-                    perf_stores[i],
+    for i, perf in enumerate(perf_stores):
+        b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width, perf,
                     width=width, color=COLORS[i], edgecolor='none')
     ax.set_xticks(np.arange(len(rules_perf)))
     ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
     ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
     ax.set_ylabel('performance', fontsize=fs)
-    lg = ax.legend(['Intact']+['Lesion group {:s}'.format(l) for l in ['1','2','12']],
+    lg = ax.legend(legends,
                    fontsize=fs, ncol=2, bbox_to_anchor=(1,1.4),
                    labelspacing=0.2, loc=1, frameon=False)
     plt.setp(lg.get_title(),fontsize=fs)
@@ -1167,7 +1169,10 @@ def _plot_performance_choicetasks(model_dir, lesion_units_list):
     ax.yaxis.set_ticks_position('left')
     ax.set_xlim([-0.8, len(rules_perf)-0.2])
     if save:
-        plt.savefig('figure/perf_contextdm_lesion.pdf', transparent=True)
+        fig_name = 'figure/perf_contextdm_lesion'
+        if save_name is not None:
+            fig_name += save_name
+        plt.savefig(fig_name + '.pdf', transparent=True)
     plt.show()
 
 
@@ -1182,7 +1187,10 @@ def plot_performance_choicetasks(model_dir, grouping):
                              redefine_choice=True, sigma_rec=0)
     ind_group, ind_group_orig = ssa.sort_ind_bygroup(grouping=grouping)
     lesion_units_list = [None] + [ind_group_orig[g] for g in ['1', '2', '12']]
-    _plot_performance_choicetasks(model_dir, lesion_units_list)
+    legends = ['Intact']+['Lesion group {:s}'.format(l) for l in ['1','2','12']]
+    save_name = '_bygrouping_' + grouping
+    _plot_performance_choicetasks(model_dir, lesion_units_list,
+                                  legends=legends, save_name=save_name)
 
 
 def plot_performance_2D(model_dir, rule, lesion_units=None,
@@ -1208,6 +1216,37 @@ def plot_performance_2D_all(model_dir, rule):
         plot_performance_2D(
             model_dir, rule, lesion_units=lesion_units,
             title=title, save_name=save_name, ylabel=False, colorbar=False)
+
+
+def plot_performance_lesionbyactivity(root_dir, activation, n_lesion=20):
+    """Plot performance across tasks for different lesioning.
+
+    Args:
+        model_dir: str, model directory
+        activation: str, activation function
+        n_lesion: int, number of units to lesion
+    """
+    hp_target = {'activation': activation,
+                 'rnn_type': 'LeakyGRU',
+                 'w_rec_init': 'randortho',
+                 'l1_h': 0,
+                 'l1_weight': 0}
+    model_dir, _ = tools.find_model(root_dir, hp_target)
+    ssa = StateSpaceAnalysis(model_dir, lesion_units=None,
+                             redefine_choice=True)
+    hh = ssa.H_original
+    hh = hh.mean(axis=(0, 1))
+    ind_sort = np.argsort(hh)
+    
+    # ind_group, ind_group_orig = ssa.sort_ind_bygroup(grouping=grouping)
+    mid = int(len(ind_sort)/2)
+    lesion_units_list = [None, ind_sort[:n_lesion], ind_sort[-n_lesion:],
+                         ind_sort[mid-int(n_lesion/2):mid+int(n_lesion/2)]]
+    legends = ['Intact', 'Most Neg ' + str(n_lesion),
+               'Most Pos ' + str(n_lesion), 'Mid ' + str(n_lesion)]
+    save_name = '_byactivity_' + ssa.hparams['activation']
+    _plot_performance_choicetasks(model_dir, lesion_units_list,
+                                  legends=legends, save_name=save_name)
 
 
 def plot_fullconnectivity(model_dir):
@@ -1402,7 +1441,8 @@ def plot_betaweights(model_dir, grouping):
         coefs_dict = ssa.sort_coefs_bygroup(coefs_dict, grouping)
 
     # ssa.plot_betaweights(coefs_dict, fancy_color=False)
-    ssa.plot_betaweights(coefs_dict, fancy_color=True)
+    save_name = '_groupby' + grouping
+    ssa.plot_betaweights(coefs_dict, fancy_color=True, save_name=save_name)
 
 
 def quick_statespace(model_dir):
@@ -1513,30 +1553,73 @@ def run_all_analyses(model_dir):
     # ua.plot_performance_choicetasks()
 
 
+def _expand_task_var(task_var):
+    """Little helper function that calculate a few more things."""
+    task_var['stim_dir_sign'] = (task_var['stim_dir']>0).astype(int)*2-1
+    task_var['stim_col2dir_sign'] = (task_var['stim_col2dir']>0).astype(int)*2-1
+    return task_var
+
+
+def load_data(model_dir=None):
+    """Generate model data into standard format.
+
+    Returns:
+        data: standard format, list of dict of arrays/dict
+            list is over neurons
+            dict is for response array and task variable dict
+            response array has shape (n_trial, n_time)
+    """
+    if model_dir is None:
+        model_dir = './mantetemp'  # TEMPORARY SETTING
+    ssa = StateSpaceAnalysis(model_dir, lesion_units=None,
+                             redefine_choice=True)
+    task_var = _expand_task_var(ssa.task_var)
+
+    # H = ssa.H_original
+    H = ssa.H_orig_active
+    n_unit = H.shape[-1]
+
+    data = list()
+    for i_unit in range(n_unit):
+        unit_dict = {
+            'rate': (H[:, :, i_unit]).T,  # (n_trial, n_time)
+            'task_var': task_var
+        }
+        data.append(unit_dict)
+    return data
+
+
 if __name__ == '__main__':
     root_dir = './data/varyhparams'
     hp_target = {'activation': 'softplus',
-                 'rnn_type': 'LeakyGRU',
-                 'w_rec_init': 'randortho',
-                 'l1_h': 1e-3,
-                 'l1_weight': 0}
+                 'rnn_type': 'LeakyRNN',
+                 'w_rec_init': 'diag',
+                 'l1_h': 1e-4,
+                 'l1_weight': 1e-3}
     model_dir, _ = tools.find_model(root_dir, hp_target)
+    
+    model_dir  = './mantetemp'
+    # import variance
+    # variance.compute_variance(model_dir)
 
     ######################### Connectivity and Lesioning ######################
-    # ua = UnitAnalysis(model_dir)
+    ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
-    # ua.prettyplot_hist_varprop()
+    ua.prettyplot_hist_varprop()
 
-    plot_performance_choicetasks(model_dir, grouping='var')
-    plot_performance_choicetasks(model_dir, grouping='beta')
+    # plot_performance_choicetasks(model_dir, grouping='var')
+    # plot_performance_choicetasks(model_dir, grouping='beta')
 
     # plot_performance_2D_all(model_dir, 'contextdm1')
 
     # plot_fullconnectivity(model_dir)
     # plot_groupsize('allrule_weaknoise')  # disabled now
+    
+    # plot_performance_lesionbyactivity(root_dir, 'tanh', n_lesion=50)
+    # plot_performance_lesionbyactivity(root_dir, 'softplus', n_lesion=50)
 
     ################### State space ###########################################
     # Plot State space
@@ -1561,4 +1644,8 @@ if __name__ == '__main__':
 
     ################### Frac Var ##############################################
     # plot_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
+
+    data = load_data()
+
+
 
