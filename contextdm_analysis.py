@@ -6,6 +6,7 @@ from __future__ import division
 
 import os
 import pickle
+import copy
 from collections import OrderedDict
 import numpy as np
 import tensorflow as tf
@@ -270,6 +271,34 @@ class UnitAnalysis(object):
         plt.savefig('figure/conn_'+conn_type+'_contextdm.pdf', transparent=True)
 
 
+def _gen_taskparams(stim1_loc, n_rep=1):
+    """Generate parameters for task."""
+    # Do not loop over stim1_loc
+    # Generate task parameterse for state-space analysis
+    n_stim = 6
+    batch_size = n_rep * n_stim**2
+    batch_shape = (n_stim, n_stim, n_rep)
+    ind_stim_mod1, ind_stim_mod2, ind_rep = np.unravel_index(range(batch_size), batch_shape)
+
+    stim1_locs = np.ones(batch_size)*stim1_loc
+
+    stim2_locs = (stim1_locs+np.pi) % (2*np.pi)
+
+    stim_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.5
+    stim_mod1_cohs = np.array([stim_cohs[i] for i in ind_stim_mod1])
+    stim_mod2_cohs = np.array([stim_cohs[i] for i in ind_stim_mod2])
+
+    params = {'stim1_locs' : stim1_locs,
+              'stim2_locs' : stim2_locs,
+              'stim1_mod1_strengths' : 1 + stim_mod1_cohs,
+              'stim2_mod1_strengths' : 1 - stim_mod1_cohs,
+              'stim1_mod2_strengths' : 1 + stim_mod2_cohs,
+              'stim2_mod2_strengths' : 1 - stim_mod2_cohs,
+              'stim_time'    : 800}
+
+    return params, batch_size
+
+
 class StateSpaceAnalysis(object):
 
     def __init__(self,
@@ -299,7 +328,8 @@ class StateSpaceAnalysis(object):
             surrogate_data: bool, if True use surrogate data
             n_rep: int, the number of different stimulus locations used
         """
-
+        # TODO(gryang): rewrite using load_data()
+        raise NotImplementedError()
         # If using surrogate data, create random matrix for later use
         if surrogate_data:
             raise NotImplementedError()
@@ -318,7 +348,6 @@ class StateSpaceAnalysis(object):
         n_regr = len(regr_names)
 
         # stim1_loc_list = np.arange(6)/6.*2*np.pi
-        stim1_loc_list = [0]
         coef_maxt_list = list()
         H_new_list = list()
 
@@ -329,173 +358,181 @@ class StateSpaceAnalysis(object):
             if lesion_units is not None:
                 model.lesion_units(sess, lesion_units)
 
-            for stim1_loc in stim1_loc_list:
-                # Generate task parameters used
-                # Target location
-                # stim1_loc  = 0
-                # stim1_loc  = np.pi/2
-                # stim1_loc  = np.pi/4
-                params, batch_size = self.gen_taskparams(stim1_loc, n_stim=6, n_rep=n_rep)
-                stim1_locs = np.tile(params['stim1_locs'], n_rule)
+            # Generate task parameters used
+            # Target location
 
-                x     = list() # Network input
+            H = list()
+            y_sample = list()
+            y_sample_loc = list()
+            stim1_locs = list()
+            for stim1_loc in stim1_loc_list:
+                params, batch_size = _gen_taskparams(stim1_loc=stim1_loc, n_rep=n_rep)
+                stim1_locs_tmp = np.tile(params['stim1_locs'], n_rule)
+
+                x = list() # Network input
                 y_loc = list() # Network target output location
 
-                # Sstimt computing the neural activity
+                # Start computing the neural activity
                 for i, rule in enumerate(rules):
                     # Generating task information
                     trial = generate_trials(rule, hparams, 'psychometric', params=params, noise_on=True)
                     x.append(trial.x)
                     y_loc.append(trial.y_loc)
 
-                x     = np.concatenate(x    , axis=1)
+                x = np.concatenate(x, axis=1)
                 y_loc = np.concatenate(y_loc, axis=1)
 
                 # Get neural activity
-                fetches = [model.h, model.y_hat, model.y_hat_loc, model.w_rec]
-                H, y_sample, y_sample_loc, w_rec = sess.run(
+                fetches = [model.h, model.y_hat, model.y_hat_loc]
+                H_tmp, y_sample_tmp, y_sample_loc_tmp = sess.run(
                     fetches, feed_dict={model.x: x})
 
-                self.w_rec = w_rec.T
+                H.append(H_tmp)
+                stim1_locs.extend(stim1_locs_tmp)
+                y_sample_loc.append(y_sample_loc_tmp)
 
-            # Get performance and choices
-            # perfs = get_perf(y_sample, y_loc)
-            # y_choice is 1 for choosing stim1_loc, otherwise -1
-            y_actual_choice = 2*(get_dist(y_sample_loc[-1]-stim1_locs)<np.pi/2) - 1
-            y_target_choice = 2*(get_dist(y_loc[-1]-stim1_locs)<np.pi/2) - 1
+        H = np.concatenate(H, axis=2)  # concatenate along the unit axis
+        stim1_locs = np.array(stim1_locs)
+        y_sample_loc
 
-            ###################### Processing activity ##################################
+        # Get performance and choices
+        # perfs = get_perf(y_sample, y_loc)
+        # y_choice is 1 for choosing stim1_loc, otherwise -1
+        y_actual_choice = 2*(get_dist(y_sample_loc[-1]-stim1_locs)<np.pi/2) - 1
+        y_target_choice = 2*(get_dist(y_loc[-1]-stim1_locs)<np.pi/2) - 1
 
-            # Downsample in time
-            dt_new = 50
-            every_t = int(dt_new/hparams['dt'])
-            # Only analyze the target epoch
-            epoch = trial.epochs['stim1']
-            H = H[epoch[0]:epoch[1],...][int(every_t/2)::every_t,...]
+        ###################### Processing activity ##################################
 
-            H_original = H.copy()
+        # Downsample in time
+        dt_new = 50
+        every_t = int(dt_new/hparams['dt'])
+        # Only analyze the target epoch
+        epoch = trial.epochs['stim1']
+        H = H[epoch[0]:epoch[1],...][int(every_t/2)::every_t,...]
 
-            # TODO: Temporary
-            self.x = x[epoch[0]:epoch[1],...][::every_t,...]
+        H_original = H.copy()
 
-            hparams['dt_new'] = dt_new
+        # TODO: Temporary
+        self.x = x[epoch[0]:epoch[1],...][::every_t,...]
 
-            nt, nb, nh = H.shape
+        hparams['dt_new'] = dt_new
 
-            # Analyze all units or only active units
-            if analyze_allunits:
-                ind_active = range(nh)
+        nt, nb, nh = H.shape
+
+        # Analyze all units or only active units
+        if analyze_allunits:
+            ind_active = range(nh)
+        else:
+            # The way to select these units are important
+            ind_active = np.where(H[-1].var(axis=0) > 1e-3)[0] # current setting
+            # ind_active = np.where(H[-1].var(axis=0) > 1e-5)[0] # current setting
+
+            # ind_active = np.where(H.reshape((-1, nh)).var(axis=0) > 1e-10)[0]
+            # ind_active = np.where(H.var(axis=1).mean(axis=0) > 1e-4)[0]
+
+        if select_group is not None:
+            ind_active = select_group
+
+        H = H[:, :, ind_active]
+        # TODO: Temporary
+        self.H_orig_active = H.copy()
+
+        nh = len(ind_active)  # new nh
+        H = H.reshape((-1, nh))
+
+        # Z-scoring response across time and trials (can have a strong impact on results)
+        if z_score:
+            self.meanh = H.mean(axis=0)
+            self.stdh  = H.std(axis=0)
+            H = H - self.meanh
+            H = H/self.stdh
+
+        # Transform back
+        H = H.reshape((nt, nb, nh))
+
+        # Get neuronal preferences (+1 if activity is higher for choice=+1)
+        # preferences = (H[:, (y_actual_choice== 1)*(perfs==1), :].mean(axis=(0,1)) >
+        #                H[:, (y_actual_choice==-1)*(perfs==1), :].mean(axis=(0,1)))*2-1
+
+        # preferences = (H[:, y_actual_choice== 1, :].mean(axis=(0,1)) >
+        #                H[:, y_actual_choice==-1, :].mean(axis=(0,1)))*2-1
+
+        # preferences = (H[:, y_target_choice== 1, :].mean(axis=(0,1)) >
+        #                H[:, y_target_choice==-1, :].mean(axis=(0,1)))*2-1
+
+        # preferences = (H[-1, y_actual_choice== 1, :].mean(axis=0) >
+        #                H[-1, y_actual_choice==-1, :].mean(axis=0))*2-1
+
+        preferences = (H[-1, y_target_choice== 1, :].mean(axis=0) >
+                       H[-1, y_target_choice==-1, :].mean(axis=0))*2-1
+
+        ########################## Define Regressors ##################################
+        # Coherences
+        stim_mod1_cohs = params['stim1_mod1_strengths'] - params['stim2_mod1_strengths']
+        stim_mod2_cohs = params['stim1_mod2_strengths'] - params['stim2_mod2_strengths']
+
+        # Get task variables
+        task_var = dict()
+        task_var['targ_dir'] = y_actual_choice
+        task_var['stim_dir']     = np.tile(stim_mod1_cohs/stim_mod1_cohs.max(), n_rule)
+        task_var['stim_col2dir'] = np.tile(stim_mod2_cohs/stim_mod2_cohs.max(), n_rule)
+        task_var['context']  = np.repeat([1, -1], batch_size) # +1 for Att 1, -1 for Att 2
+        task_var['correct']  = (y_actual_choice==y_target_choice).astype(int)
+
+        # Regressors (Choice, Mod1 Cohs, Mod2 Cohs, Rule)
+        Regrs = np.zeros((n_rule * batch_size, n_regr))
+        Regrs[:, 0] = y_target_choice
+        Regrs[:, 1] = task_var['stim_dir']
+        Regrs[:, 2] = task_var['stim_col2dir']
+        Regrs[:, 3] = task_var['context']
+
+        # Get unique regressors
+        Regrs_new = np.vstack({tuple(row) for row in Regrs})
+        # Sort it
+        ind_sort = np.lexsort(Regrs_new[:, ::-1].T)
+        Regrs_new = Regrs_new[ind_sort, :]
+
+        n_cond = Regrs_new.shape[0]
+
+        H_new = np.zeros((nt, n_cond, nh))
+
+        for i_cond in range(n_cond):
+            regr = Regrs_new[i_cond, :]
+
+            if redefine_choice:
+                for pref in [1, -1]:
+                    batch_ind = ((Regrs[:,0]==pref*regr[0])*(Regrs[:,1]==pref*regr[1])*
+                                 (Regrs[:,2]==pref*regr[2])*(Regrs[:,3]==regr[3]))
+                    H_new[:, i_cond, preferences==pref] = H[:, batch_ind, :][:, :, preferences==pref].mean(axis=1)
+
             else:
-                # The way to select these units are important
-                ind_active = np.where(H[-1].var(axis=0) > 1e-3)[0] # current setting
-                # ind_active = np.where(H[-1].var(axis=0) > 1e-5)[0] # current setting
+                batch_ind = ((Regrs[:,0]==regr[0])*(Regrs[:,1]==regr[1])*
+                             (Regrs[:,2]==regr[2])*(Regrs[:,3]==regr[3]))
+                H_new[:, i_cond, :] = H[:, batch_ind, :].mean(axis=1)
 
-                # ind_active = np.where(H.reshape((-1, nh)).var(axis=0) > 1e-10)[0]
-                # ind_active = np.where(H.var(axis=1).mean(axis=0) > 1e-4)[0]
+        ################################### Regression ################################
+        from sklearn import linear_model
 
-            if select_group is not None:
-                ind_active = select_group
+        # Time-independent coefficient vectors (n_unit, n_regress)
+        coef_maxt = np.zeros((nh, n_regr))
 
-            H = H[:, :, ind_active]
-            # TODO: Temporary
-            self.H_orig_active = H.copy()
+        # Looping over units
+        # Although this is slower, it's still quite fast, and it's clearer and more flexible
+        for i in range(nh):
+            # To satisfy sklearn standard
+            Y = np.swapaxes(H_new[:,:,i], 0, 1)
 
-            nh = len(ind_active)  # new nh
-            H = H.reshape((-1, nh))
+            # Linear regression
+            regr = linear_model.LinearRegression()
+            regr.fit(Regrs_new, Y)
 
-            # Z-scoring response across time and trials (can have a strong impact on results)
-            if z_score:
-                self.meanh = H.mean(axis=0)
-                self.stdh  = H.std(axis=0)
-                H = H - self.meanh
-                H = H/self.stdh
+            # Get time-independent coefficient vector
+            coef = regr.coef_
+            ind = np.argmax(np.sum(coef**2, axis=1))
+            coef_maxt[i, :] = coef[ind,:]
 
-            # Transform back
-            H = H.reshape((nt, nb, nh))
-
-            # Get neuronal preferences (+1 if activity is higher for choice=+1)
-            # preferences = (H[:, (y_actual_choice== 1)*(perfs==1), :].mean(axis=(0,1)) >
-            #                H[:, (y_actual_choice==-1)*(perfs==1), :].mean(axis=(0,1)))*2-1
-
-            # preferences = (H[:, y_actual_choice== 1, :].mean(axis=(0,1)) >
-            #                H[:, y_actual_choice==-1, :].mean(axis=(0,1)))*2-1
-
-            # preferences = (H[:, y_target_choice== 1, :].mean(axis=(0,1)) >
-            #                H[:, y_target_choice==-1, :].mean(axis=(0,1)))*2-1
-
-            # preferences = (H[-1, y_actual_choice== 1, :].mean(axis=0) >
-            #                H[-1, y_actual_choice==-1, :].mean(axis=0))*2-1
-
-            preferences = (H[-1, y_target_choice== 1, :].mean(axis=0) >
-                           H[-1, y_target_choice==-1, :].mean(axis=0))*2-1
-
-            ########################## Define Regressors ##################################
-            # Coherences
-            stim_mod1_cohs = params['stim1_mod1_strengths'] - params['stim2_mod1_strengths']
-            stim_mod2_cohs = params['stim1_mod2_strengths'] - params['stim2_mod2_strengths']
-
-            # Get task variables
-            task_var = dict()
-            task_var['targ_dir'] = y_actual_choice
-            task_var['stim_dir']     = np.tile(stim_mod1_cohs/stim_mod1_cohs.max(), n_rule)
-            task_var['stim_col2dir'] = np.tile(stim_mod2_cohs/stim_mod2_cohs.max(), n_rule)
-            task_var['context']  = np.repeat([1, -1], batch_size) # +1 for Att 1, -1 for Att 2
-            task_var['correct']  = (y_actual_choice==y_target_choice).astype(int)
-
-            # Regressors (Choice, Mod1 Cohs, Mod2 Cohs, Rule)
-            Regrs = np.zeros((n_rule * batch_size, n_regr))
-            Regrs[:, 0] = y_target_choice
-            Regrs[:, 1] = task_var['stim_dir']
-            Regrs[:, 2] = task_var['stim_col2dir']
-            Regrs[:, 3] = task_var['context']
-
-            # Get unique regressors
-            Regrs_new = np.vstack({tuple(row) for row in Regrs})
-            # Sort it
-            ind_sort = np.lexsort(Regrs_new[:, ::-1].T)
-            Regrs_new = Regrs_new[ind_sort, :]
-
-            n_cond = Regrs_new.shape[0]
-
-            H_new = np.zeros((nt, n_cond, nh))
-
-            for i_cond in range(n_cond):
-                regr = Regrs_new[i_cond, :]
-
-                if redefine_choice:
-                    for pref in [1, -1]:
-                        batch_ind = ((Regrs[:,0]==pref*regr[0])*(Regrs[:,1]==pref*regr[1])*
-                                     (Regrs[:,2]==pref*regr[2])*(Regrs[:,3]==regr[3]))
-                        H_new[:, i_cond, preferences==pref] = H[:, batch_ind, :][:, :, preferences==pref].mean(axis=1)
-
-                else:
-                    batch_ind = ((Regrs[:,0]==regr[0])*(Regrs[:,1]==regr[1])*
-                                 (Regrs[:,2]==regr[2])*(Regrs[:,3]==regr[3]))
-                    H_new[:, i_cond, :] = H[:, batch_ind, :].mean(axis=1)
-
-            ################################### Regression ################################
-            from sklearn import linear_model
-
-            # Time-independent coefficient vectors (n_unit, n_regress)
-            coef_maxt = np.zeros((nh, n_regr))
-
-            # Looping over units
-            # Although this is slower, it's still quite fast, and it's clearer and more flexible
-            for i in range(nh):
-                # To satisfy sklearn standard
-                Y = np.swapaxes(H_new[:,:,i], 0, 1)
-
-                # Linear regression
-                regr = linear_model.LinearRegression()
-                regr.fit(Regrs_new, Y)
-
-                # Get time-independent coefficient vector
-                coef = regr.coef_
-                ind = np.argmax(np.sum(coef**2, axis=1))
-                coef_maxt[i, :] = coef[ind,:]
-
-            coef_maxt_list.append(coef_maxt)
-            H_new_list.append(H_new)
+        coef_maxt_list.append(coef_maxt)
+        H_new_list.append(H_new)
 
         H_new = np.concatenate(H_new_list, axis=2) # Concatenate along units
         coef_maxt = np.concatenate(coef_maxt_list, axis=0)
@@ -536,44 +573,6 @@ class StateSpaceAnalysis(object):
         self.model_dir = model_dir
         self.colors = dict(zip([None, '1', '2', '12'],
                            sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
-
-    @staticmethod
-    def gen_taskparams(stim1_loc, n_stim, n_rep=1, n_stimloc=10):
-        """Generate parameters for task."""
-        if stim1_loc is not None:
-            # Do not loop over stim1_loc
-            # Generate task parameterse for state-space analysis
-            batch_size = n_rep * n_stim**2
-            batch_shape = (n_stim, n_stim, n_rep)
-            ind_stim_mod1, ind_stim_mod2, ind_rep = np.unravel_index(range(batch_size),batch_shape)
-
-            stim1_locs = np.ones(batch_size)*stim1_loc
-        else:
-            # Loop over stim1_loc
-            batch_size = n_rep * n_stim**2 * n_stimloc
-            batch_shape = (n_stim, n_stim, n_stimloc, n_rep)
-            ind_stim_mod1, ind_stim_mod2, ind_stimloc, ind_rep = \
-                np.unravel_index(range(batch_size),batch_shape)
-
-            stim1_locs = 2*np.pi*ind_stimloc/n_stimloc
-
-        stim2_locs = (stim1_locs+np.pi) % (2*np.pi)
-
-        # stim_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.3
-        # stim_cohs = np.array([-0.5, -0.3, -0.1, 0.1, 0.3, 0.5])*0.5
-        stim_cohs = np.array([-0.5, -0.15, -0.05, 0.05, 0.15, 0.5])*0.5
-        stim_mod1_cohs = np.array([stim_cohs[i] for i in ind_stim_mod1])
-        stim_mod2_cohs = np.array([stim_cohs[i] for i in ind_stim_mod2])
-
-        params = {'stim1_locs' : stim1_locs,
-                  'stim2_locs' : stim2_locs,
-                  'stim1_mod1_strengths' : 1 + stim_mod1_cohs,
-                  'stim2_mod1_strengths' : 1 - stim_mod1_cohs,
-                  'stim1_mod2_strengths' : 1 + stim_mod2_cohs,
-                  'stim2_mod2_strengths' : 1 - stim_mod2_cohs,
-                  'stim_time'    : 800}
-
-        return params, batch_size
 
     def _sort_ind_byvariance(self):
         """Sort ind into group 1, 2, 12, and others according task variance
@@ -1553,14 +1552,7 @@ def run_all_analyses(model_dir):
     # ua.plot_performance_choicetasks()
 
 
-def _expand_task_var(task_var):
-    """Little helper function that calculate a few more things."""
-    task_var['stim_dir_sign'] = (task_var['stim_dir']>0).astype(int)*2-1
-    task_var['stim_col2dir_sign'] = (task_var['stim_col2dir']>0).astype(int)*2-1
-    return task_var
-
-
-def load_data(model_dir=None):
+def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
     """Generate model data into standard format.
 
     Returns:
@@ -1571,21 +1563,86 @@ def load_data(model_dir=None):
     """
     if model_dir is None:
         model_dir = './mantetemp'  # TEMPORARY SETTING
-    ssa = StateSpaceAnalysis(model_dir, lesion_units=None,
-                             redefine_choice=True)
-    task_var = _expand_task_var(ssa.task_var)
 
-    # H = ssa.H_original
-    H = ssa.H_orig_active
-    n_unit = H.shape[-1]
+    # Get rules and regressors
+    rules = ['contextdm1', 'contextdm2']
+
+    n_rule = len(rules)
 
     data = list()
-    for i_unit in range(n_unit):
-        unit_dict = {
-            'rate': (H[:, :, i_unit]).T,  # (n_trial, n_time)
-            'task_var': task_var
-        }
-        data.append(unit_dict)
+
+    model = Model(model_dir, sigma_rec=sigma_rec)
+    hparams = model.hparams
+    with tf.Session() as sess:
+        model.restore()
+        if lesion_units is not None:
+            model.lesion_units(sess, lesion_units)
+
+        # Generate task parameters used
+        # Target location
+        stim1_loc_list = np.arange(0, 2*np.pi, 2*np.pi/6)
+        for stim1_loc in stim1_loc_list:
+            params, batch_size = _gen_taskparams(stim1_loc=stim1_loc, n_rep=n_rep)
+            stim1_locs_tmp = np.tile(params['stim1_locs'], n_rule)
+
+            x = list() # Network input
+            y_loc = list() # Network target output location
+
+            # Start computing the neural activity
+            for i, rule in enumerate(rules):
+                # Generating task information
+                trial = generate_trials(rule, hparams, 'psychometric',
+                                        params=params, noise_on=True)
+                x.append(trial.x)
+                y_loc.append(trial.y_loc)
+
+            x = np.concatenate(x, axis=1)
+            y_loc = np.concatenate(y_loc, axis=1)
+
+            # Coherences
+            stim_mod1_cohs = params['stim1_mod1_strengths'] - params[
+                'stim2_mod1_strengths']
+            stim_mod2_cohs = params['stim1_mod2_strengths'] - params[
+                'stim2_mod2_strengths']
+            stim_mod1_cohs /= stim_mod1_cohs.max()
+            stim_mod2_cohs /= stim_mod2_cohs.max()
+
+            # Get neural activity
+            fetches = [model.h, model.y_hat, model.y_hat_loc]
+            H, y_sample, y_sample_loc = sess.run(
+                fetches, feed_dict={model.x: x})
+
+            # Downsample in time
+            dt_new = 50
+            every_t = int(dt_new / hparams['dt'])
+            # Only analyze the target epoch
+            epoch = trial.epochs['stim1']
+            H = H[epoch[0]:epoch[1], ...][int(every_t / 2)::every_t, ...]
+
+            # Get performance and choices
+            # perfs = get_perf(y_sample, y_loc)
+            # y_choice is 1 for choosing stim1_loc, otherwise -1
+            y_actual_choice = 2*(get_dist(y_sample_loc[-1]-stim1_loc)<np.pi/2)-1
+            y_target_choice = 2*(get_dist(y_loc[-1]-stim1_loc)<np.pi/2)-1
+
+            # Get task variables
+            task_var = dict()
+            task_var['targ_dir'] = y_actual_choice
+            task_var['stim_dir'] = np.tile(stim_mod1_cohs, n_rule)
+            task_var['stim_col2dir'] = np.tile(stim_mod2_cohs, n_rule)
+            task_var['context'] = np.repeat([1, -1], batch_size)
+            task_var['correct'] = (y_actual_choice == y_target_choice).astype(int)
+            task_var['stim_dir_sign'] = (task_var['stim_dir']>0).astype(int)*2-1
+            task_var['stim_col2dir_sign'] = (task_var['stim_col2dir']>0).astype(int)*2-1
+
+
+            n_unit = H.shape[-1]
+            for i_unit in range(n_unit):
+                unit_dict = {
+                    'rate': H[:, :, i_unit].T,  # standard format (n_trial, n_time)
+                    'task_var': copy.deepcopy(task_var)
+                }
+                data.append(unit_dict)
     return data
 
 
@@ -1603,12 +1660,12 @@ if __name__ == '__main__':
     # variance.compute_variance(model_dir)
 
     ######################### Connectivity and Lesioning ######################
-    ua = UnitAnalysis(model_dir)
+    # ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
-    ua.prettyplot_hist_varprop()
+    # ua.prettyplot_hist_varprop()
 
     # plot_performance_choicetasks(model_dir, grouping='var')
     # plot_performance_choicetasks(model_dir, grouping='beta')
@@ -1646,6 +1703,7 @@ if __name__ == '__main__':
     # plot_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
 
     data = load_data()
+    
 
 
 
