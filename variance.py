@@ -19,45 +19,45 @@ import tools
 
 save = True
 
-def _compute_variance(model_dir, rules=None, random_rotation=False):
+
+def _compute_variance_bymodel(model, sess, rules=None, random_rotation=False):
     """Compute variance for all tasks.
 
-    Args:
-        model_dir: str, the path of the model directory
-        rules: list of rules to compute variance, list of strings
-        random_rotation: boolean. If True, rotate the neural activity.
-    """
-    h_all_byrule  = OrderedDict()
+        Args:
+            model: network.Model instance
+            sess: tensorflow session
+            rules: list of rules to compute variance, list of strings
+            random_rotation: boolean. If True, rotate the neural activity.
+        """
+    h_all_byrule = OrderedDict()
     h_all_byepoch = OrderedDict()
-    model = Model(model_dir, sigma_rec=0)
     hparams = model.hparams
 
     if rules is None:
         rules = hparams['rules']
     print(rules)
-    with tf.Session() as sess:
-        model.restore()
 
-        n_hidden = hparams['n_rnn']
+    n_hidden = hparams['n_rnn']
 
+    if random_rotation:
+        # Generate random orthogonal matrix
+        from scipy.stats import ortho_group
+        random_ortho_matrix = ortho_group.rvs(dim=n_hidden)
+
+    for rule in rules:
+        trial = generate_trials(rule, hparams, 'test', noise_on=False)
+        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+        h = sess.run(model.h, feed_dict=feed_dict)
         if random_rotation:
-            # Generate random orthogonal matrix
-            from scipy.stats import ortho_group
-            random_ortho_matrix = ortho_group.rvs(dim=n_hidden)
+            h = np.dot(h, random_ortho_matrix)  # randomly rotate
 
-        for rule in rules:
-            trial = generate_trials(rule, hparams, 'test', noise_on=False)
-            feed_dict = tools.gen_feed_dict(model, trial, hparams)
-            h = sess.run(model.h, feed_dict=feed_dict)
-            if random_rotation:
-                h = np.dot(h, random_ortho_matrix) # randomly rotate
+        for e_name, e_time in trial.epochs.items():
+            if 'fix' not in e_name:  # Ignore fixation period
+                h_all_byepoch[(rule, e_name)] = h[e_time[0]:e_time[1], :,
+                                                :]
 
-            for e_name, e_time in trial.epochs.items():
-                if 'fix' not in e_name: # Ignore fixation period
-                    h_all_byepoch[(rule, e_name)] = h[e_time[0]:e_time[1],:,:]
-
-            # Ignore fixation period
-            h_all_byrule[rule] = h[trial.epochs['fix1'][1]:, :, :]
+        # Ignore fixation period
+        h_all_byrule[rule] = h[trial.epochs['fix1'][1]:, :, :]
 
     # Reorder h_all_byepoch by epoch-first
     keys = h_all_byepoch.keys()
@@ -66,7 +66,6 @@ def _compute_variance(model_dir, rules=None, random_rotation=False):
     ind_key_sort = np.argsort(zip(*keys)[1], kind='mergesort')
     h_all_byepoch = OrderedDict(
         [(keys[i], h_all_byepoch[keys[i]]) for i in ind_key_sort])
-
 
     for data_type in ['rule', 'epoch']:
         if data_type == 'rule':
@@ -84,15 +83,29 @@ def _compute_variance(model_dir, rules=None, random_rotation=False):
             # Variance acros stimulus, then averaged across time
             h_var_all[:, i] = val.var(axis=1).mean(axis=0)
 
-        result = {'h_var_all' : h_var_all, 'keys' : h_all.keys()}
-        save_name = 'variance_'+data_type
+        result = {'h_var_all': h_var_all, 'keys': h_all.keys()}
+        save_name = 'variance_' + data_type
         if random_rotation:
             save_name += '_rr'
 
-        fname = os.path.join(model_dir, save_name+'.pkl')
+        fname = os.path.join(model.save_dir, save_name + '.pkl')
         print('Variance saved at {:s}'.format(fname))
-        with open(fname,'wb') as f:
+        with open(fname, 'wb') as f:
             pickle.dump(result, f)
+
+
+def _compute_variance(model_dir, rules=None, random_rotation=False):
+    """Compute variance for all tasks.
+
+    Args:
+        model_dir: str, the path of the model directory
+        rules: list of rules to compute variance, list of strings
+        random_rotation: boolean. If True, rotate the neural activity.
+    """
+    model = Model(model_dir, sigma_rec=0)
+    with tf.Session() as sess:
+        model.restore()
+        _compute_variance_bymodel(model, sess, rules, random_rotation)
 
 
 def compute_variance(model_dir, rules=None, random_rotation=False):

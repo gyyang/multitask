@@ -12,6 +12,8 @@ import tensorflow as tf
 import task
 from task import generate_trials
 from network import Model, get_perf
+import variance
+import clustering
 import tools
 
 
@@ -359,6 +361,7 @@ def train(train_dir,
           rule_trains=None,
           rule_prob_map=None,
           seed=0,
+          rich_output=False,
           ):
     '''Train the network
 
@@ -443,6 +446,13 @@ def train(train_dir,
                             hparams['target_perf']))
                         break
 
+                    if rich_output:
+                        variance._compute_variance_bymodel(model, sess)
+                        rule_pair = ['contextdm1', 'contextdm2']
+                        save_name = '_atstep' + str(step)
+                        variance.plot_hist_varprop(
+                            train_dir, rule_pair, figname_extra=save_name)
+
                 # Training
                 rule_train_now = hparams['rng'].choice(hparams['rule_trains'],
                                                        p=hparams['rule_probs'])
@@ -515,9 +525,9 @@ def to_savename(
 if __name__ == '__main__':
     pass
     run_analysis = []
-    hparams = {'rnn_type': 'LeakyGRU', 'n_rnn': 128}
-    train('debug', seed=1, hparams=hparams, ruleset='mante',
-          display_step=500)
+    hparams = {'rnn_type': 'LeakyGRU', 'activation': 'softplus'}
+    train('mantetemp', seed=1, hparams=hparams, ruleset='mante',
+          display_step=500, rich_output=True)
     
     # rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     # hparams = {'rnn_type': 'LeakyGRU', 'n_rnn': 128}

@@ -183,7 +183,7 @@ class Analysis(object):
         plt.ylabel('Silhouette score')
         plt.title('Chosen number of clusters: {:d}'.format(self.n_cluster))
 
-    def plot_variance(self):
+    def plot_variance(self, save_name=None):
         labels = self.labels
         ######################### Plotting Variance ###################################
         # Plot Normalized Variance
@@ -247,7 +247,11 @@ class Analysis(object):
             ax.axis('off')
 
         if save:
-            plt.savefig('figure/feature_map_by'+self.data_type+'_norm'+self.normalization_method+'.pdf', transparent=True)
+            fig_name = ('feature_map_by' + self.data_type +
+                        '_norm' + self.normalization_method)
+            if save_name is not None:
+                fig_name = fig_name + save_name
+            plt.savefig('figure/'+fig_name+'.pdf', transparent=True)
         plt.show()
 
     def plot_similarity_matrix(self):
