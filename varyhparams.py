@@ -188,6 +188,18 @@ def get_n_clusters():
     return n_clusters, hparams_list
 
 
+def _get_hp_ranges():
+    """Get ranges of hparams."""
+    hp_ranges = OrderedDict()
+    hp_ranges['activation'] = ['softplus', 'relu', 'retanh', 'tanh']
+    hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
+    hp_ranges['w_rec_init'] = ['diag', 'randortho']
+    hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]
+    # hp_ranges['l2_h'] = [0, 1e-4]
+    hp_ranges['l1_weight'] = [0, 1e-5, 1e-4, 1e-3]
+    return hp_ranges
+
+
 def plot_n_clusters(n_clusters, hparams_list):
     """Plot the number of clusters.
     
@@ -195,13 +207,7 @@ def plot_n_clusters(n_clusters, hparams_list):
         n_clusters: list of cluster numbers
         hparams_list: list of hparams dictionary
     """
-    hp_ranges = OrderedDict()
-    hp_ranges['activation'] = ['softplus', 'relu', 'tanh', 'retanh', 'power']
-    hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
-    hp_ranges['w_rec_init'] = ['diag', 'randortho']
-    hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]
-    # hp_ranges['l2_h'] = [0, 1e-4]
-    hp_ranges['l1_weight'] = [0, 1e-5, 1e-4, 1e-3]
+    hp_ranges = _get_hp_ranges()
 
     # The hparams to show
     hp_plots = hp_ranges.keys()
@@ -215,7 +221,8 @@ def plot_n_clusters(n_clusters, hparams_list):
     hparams_visualize = np.zeros([len(hp_plots), len(n_clusters)])
     for i, hparams in enumerate(hparams_list_sorted):
         for j, hp in enumerate(hp_plots):
-            ind = hp_ranges[hp].index(hparams[hp])/1.0/len(hp_ranges[hp])
+            ind = hp_ranges[hp].index(hparams[hp])
+            ind /= len(hp_ranges[hp]) - 1.
             hparams_visualize[j, i] = ind
 
     # Plot results
@@ -226,7 +233,7 @@ def plot_n_clusters(n_clusters, hparams_list):
     ax.set_xticks([0, len(n_clusters) - 1])
     ax.set_xticklabels([])
     ax.set_yticks([0, 10, 20, 30])
-    ax.set_ylabel('Number of clusters', fontsize=7)
+    ax.set_ylabel('Num. of clusters', fontsize=7)
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
 
@@ -262,21 +269,14 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     # hp_plot = 'w_rec_init'
 
     n_cluster_dict = OrderedDict()
-    if hp_plot == 'activation':
-        keys = ['tanh', 'retanh', 'relu', 'softplus']
-    elif hp_plot == 'rnn_type':
-        keys = ['LeakyRNN', 'LeakyGRU']
-    elif hp_plot == 'w_rec_init':
-        keys = ['diag', 'randortho']
-    else:
-        keys = np.sort(np.unique([p[hp_plot] for p in hparams_list]))
-    for key in keys:
+    hp_ranges = _get_hp_ranges()
+    for key in hp_ranges[hp_plot]:
         n_cluster_dict[key] = list()
 
     for hp, n_cluster in zip(hparams_list, n_clusters):
-        if hp_plot == 'activation' and hp['rnn_type'] != 'LeakyGRU':
+        # if hp_plot == 'activation' and hp['rnn_type'] != 'LeakyGRU':
             # For activation, only analyze LeakyGRU cells
-            continue
+        #     continue
         if hp_plot == 'rnn_type' and hp['activation'] in ['tanh', 'retanh']:
             # For rnn_type, exclude tanh units
             continue
