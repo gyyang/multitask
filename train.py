@@ -7,6 +7,7 @@ import sys
 import time
 from collections import defaultdict
 import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
 
 import task
@@ -465,6 +466,7 @@ def train(train_dir,
                         variance.plot_hist_varprop(train_dir, rule_pair,
                                                    figname_extra=save_name,
                                                    title=title)
+                        plt.close('all')
 
                 # Training
                 rule_train_now = hparams['rng'].choice(hparams['rule_trains'],
