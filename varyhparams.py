@@ -177,7 +177,7 @@ def get_n_clusters():
     hparams_list = list()
     n_clusters = list()
     for i, model_dir in enumerate(model_dirs):
-        if i % 10 == 0:
+        if i % 50 == 0:
             print('Analyzing model {:d}/{:d}'.format(i, len(model_dirs)))
         hparams = tools.load_hparams(model_dir)
         log = tools.load_log(model_dir)
@@ -261,7 +261,18 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     # hp_plot = 'rnn_type'
     # hp_plot = 'w_rec_init'
 
-    n_cluster_dict = defaultdict(list)
+    n_cluster_dict = OrderedDict()
+    if hp_plot == 'activation':
+        keys = ['tanh', 'retanh', 'relu', 'softplus']
+    elif hp_plot == 'rnn_type':
+        keys = ['LeakyRNN', 'LeakyGRU']
+    elif hp_plot == 'w_rec_init':
+        keys = ['diag', 'randortho']
+    else:
+        keys = np.sort(np.unique([p[hp_plot] for p in hparams_list]))
+    for key in keys:
+        n_cluster_dict[key] = list()
+
     for hp, n_cluster in zip(hparams_list, n_clusters):
         if hp_plot == 'activation' and hp['rnn_type'] != 'LeakyGRU':
             # For activation, only analyze LeakyGRU cells
@@ -362,9 +373,10 @@ def activity_histogram(activation):
 if __name__ == '__main__':
     pass
     # compute_n_cluster()
-    n_clusters, hparams_list = get_n_clusters()
-    # plot_n_clusters(n_clusters, hparams_list)
-    # plot_n_cluster_hist(n_clusters, hparams_list)
+    # n_clusters, hparams_list = get_n_clusters()
+    plot_n_clusters(n_clusters, hparams_list)
+    plot_n_cluster_hist(n_clusters, hparams_list)
     # pretty_singleneuron_plot('tanh')
     # pretty_singleneuron_plot('relu')
     # [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
+
