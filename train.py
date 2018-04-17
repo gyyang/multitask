@@ -490,59 +490,15 @@ def train(train_dir,
 
         print("Optimization Finished!")
 
-# function to create save_name TODO(gryang): move to tools?
-def to_savename(
-        n_hidden=64,
-        seed=None,
-        activation='tanh',
-        rnn_type='LeakyGRU',
-        w_rec_init='diag',
-        l1_h=1.0*0.0001,
-        l2_h=1.0*0,
-        l1_weight=1.0*0.0001,
-        l2_weight=0.0001*0):
-    # add either l1 or l2 reg independently to both activation and weights.
-    # if l1_h + l2_h + l1_weight + l2_weight> 0: #if adding regularization.
-    # TODO(gryang): clean this up
-    if (max(l1_weight, l2_weight) > 0 and max(l1_h, l2_h) > 0):
-        save_name = (
-            'hidden_' + str(n_hidden) + '_seed_' + str(seed) +
-            '_' + activation + '_' +
-            rnn_type + '_' + w_rec_init + '_' +
-            '_regwt_L' + str(int(1 + np.argmax([l1_weight, l2_weight]))) +
-            '_1e_min_' + str(int(-np.log10(max(l1_weight, l2_weight)))) +
-            '_regact_L' + str(int(1+np.argmax([l1_h, l2_h]))) +
-            '_1e_min_' + str(int(-np.log10(max(l1_h, l2_h)))))
-
-    elif (max(l1_weight, l2_weight) == 0 and max(l1_h, l2_h) > 0):
-        save_name = (
-            'hidden_' + str(n_hidden) + '_seed_' + str(seed) +
-            '_' + activation + '_' + rnn_type + '_' + w_rec_init + '_' +
-            '_regwt_None' + '_regact_L' +
-            str(int(1 + np.argmax([l1_h, l2_h]))) +
-            '_1e_min_' + str(int(-np.log10(max(l1_h, l2_h)))))
-
-    elif (max(l1_weight, l2_weight) > 0 and max(l1_h, l2_h) == 0):
-        save_name = (
-                'hidden_' + str(n_hidden) + '_seed_' + str(seed) + '_' +
-                activation + '_' + rnn_type + '_' + w_rec_init + '_' +
-                '_regwt_L' + str(int(1+np.argmax([l1_weight, l2_weight]))) +
-                '_1e_min_' + str(int(-np.log10(max(l1_weight, l2_weight)))) +
-                '_regact_None')
-
-    else:
-        save_name = (
-                'hidden' + str(n_hidden) + '_seed_' + str(seed) + '_' +
-                activation + '_' + rnn_type + '_' + w_rec_init + '_' +
-                '_regu_None')
-    return save_name
-
 
 if __name__ == '__main__':
     pass
     run_analysis = []
-    hparams = {'rnn_type': 'LeakyRNN', 'activation': 'softplus',
-               'l2_weight_init': 1e-4}
+    hparams = {'rnn_type': 'LeakyRNN',
+               'activation': 'softplus',
+               'l2_weight_init': 1e-4,
+               'target_perf': 0.9,
+               'w_rec_init': 'randortho'}
     train('data/mantetemp', seed=1, hparams=hparams, ruleset='mante',
           display_step=500, rich_output=True)
     
