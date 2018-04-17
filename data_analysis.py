@@ -678,174 +678,163 @@ def study_betaweights(analyze_single_units=True, ind_group=None):
     #     print('p value: {:0.7f}'.format(p))
 
 
-class AnalyzeData(object):
+def load_data(dataset='mante', smooth=True, analyze_single_units=True,
+              model_dir=None):
+    """Analyzing a dataset.
 
-    def __init__(self,
-                 dataset='mante',
-                 smooth=True,
-                 analyze_single_units=True,
-                 model_dir=None
-                 ):
-        """Analyzing a dataset.
+    Args:
+        dataset: str, 'mante', 'siegel', or 'model'
+        smooth: bool, whether to use smoothed data
+        analyze_single_units: bool, whether to analyze single units
+    """
+    if smooth:
+        print('Loading smooth data')
+    else:
+        print('Loading original data')
+    if dataset == 'mante':
+        return mante_dataset_preprocess.load_data(
+            smooth=smooth, single_units=analyze_single_units)
+    elif dataset == 'siegel':
+        return siegel_dataset_preprocess.load_data(single_file=False)
+    elif dataset == 'model':
+        if model_dir is None:
+            raise ValueError(
+                'model_dir need to be provided for dataset==model')
+        return contextdm_analysis.load_data(model_dir)
+    else:
+        raise ValueError('Wrong dataset')
 
-        Args:
-            smooth: bool, whether to use smoothed data
-            analyze_single_units: bool, whether to analyze single units
-        """
-        if smooth:
-            print('Loading smooth data')
-        else:
-            print('Loading original data')
-        self.dataset = dataset
-        if dataset == 'mante':
-            self.data = mante_dataset_preprocess.load_data(
-                smooth=smooth, single_units=analyze_single_units)
-        elif dataset == 'siegel':
-            self.data = siegel_dataset_preprocess.load_data(single_file=False)
-        elif dataset == 'model':
-            if model_dir is None:
-                raise ValueError(
-                    'model_dir need to be provided for dataset==model')
-            self.data = contextdm_analysis.load_data(model_dir)
+    # TODO(gryang): make the following compatible
+    # self.var_key_list = ['targ_dir', 'stim_dir_sign', 'stim_col2dir_sign']
+    # self.data_condavg_list = [] # for two contexts
+    # for context in [1, -1]:
+    #     tmp = dict()
+    #     for var_key in self.var_key_list:
+    #         tmp[var_key] = get_trial_avg(data=self.data, split_traintest=False,
+    #                                    var_keys=[var_key], context=context)
+    #     self.data_condavg_list.append(tmp)
 
-        self.n_unit = len(self.data)
 
-        # TODO(gryang): make the following compatible
-        # self.var_key_list = ['targ_dir', 'stim_dir_sign', 'stim_col2dir_sign']
-        # self.data_condavg_list = [] # for two contexts
-        # for context in [1, -1]:
-        #     tmp = dict()
-        #     for var_key in self.var_key_list:
-        #         tmp[var_key] = get_trial_avg(data=self.data, split_traintest=False,
-        #                                    var_keys=[var_key], context=context)
-        #     self.data_condavg_list.append(tmp)
+def compute_var_all(data, var_method='time_avg_early'):
+    """Compute task variance for data and shuffled data.
 
-    def compute_var_all(self, var_method='time_avg_early'):
-        """Compute task variance for data and shuffled data.
+    Args:
+        var_method: str, method to compute the variance
+            Can be 'time_avg_late', 'time_avg_none', 'time_avg_early'
+    """
 
-        Args:
-            var_method: str, method to compute the variance
-                Can be 'time_avg_late', 'time_avg_none', 'time_avg_early'
-        """
+    # Generate a random orthogonal matrix for later use
+    # rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
 
-        self.var_method = var_method
+    var1s, var2s = get_trial_avg_var(data, var_method)
+    var1s_shuffle, var2s_shuffle = get_shuffle_var(data, var_method)
 
-        # Generate a random orthogonal matrix for later use
-        # rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
+    var_dict = {'var1s': var1s, 'var2s': var2s,
+                'var1s_shuffle': var1s_shuffle, 'var2s_shuffle': var2s_shuffle}
+    return var_dict
 
-        self._var1s, self._var2s = \
-            get_trial_avg_var(self.data, var_method)
-        self._var1s_shuffle, self._var2s_shuffle = \
-            get_shuffle_var(self.data, var_method)
-        # self._var1s_rot, self._var2s_rot = \
-        #     get_trial_avg_var(self.data, var_method, rotation_matrix)
 
-        # self._var1s_rot_shuffle, self._var2s_rot_shuffle = \
-        #     get_shuffle_var(self.data, rotation_matrix, var_method)
+def compute_frac_var(var_dict, var_thr=0.0, save_name=None,
+                        thr_type='sum'):
 
-    def compute_denoise_var(self, var_thr=0.0, random_rotation=False,
-                            thr_type='sum', denoise=True):
+    var1s = var_dict['var1s']
+    var2s = var_dict['var2s']
+    var1s_shuffle = var_dict['var1s_shuffle']
+    var2s_shuffle = var_dict['var2s_shuffle']
 
-        if random_rotation:
-            var1s = self._var1s_rot
-            var2s = self._var2s_rot
-            var1s_shuffle = self._var1s_rot_shuffle
-            var2s_shuffle = self._var2s_rot_shuffle
-        else:
-            var1s = self._var1s
-            var2s = self._var2s
-            var1s_shuffle = self._var1s_shuffle
-            var2s_shuffle = self._var2s_shuffle
+    # Plot vars
+    fig = plt.figure(figsize=(2, 2))
+    ax = fig.add_axes([0.25, 0.25, 0.65, 0.65])
+    ax.scatter(np.concatenate((var1s, var2s)),
+                np.concatenate((var1s_shuffle, var2s_shuffle)), s=4)
+    ax.plot([0,500], [0,500])
+    lim = np.max(np.concatenate(
+        (var1s, var2s, var1s_shuffle, var2s_shuffle)))
+    plt.xlim([0,lim*1.1])
+    plt.ylim([0,lim*1.1])
+    plt.xlabel('Stimulus variance', fontsize=7)
+    plt.ylabel('Stimulus variance (shuffled data)', fontsize=7)
+    # title = self.var_method + ' rand. rot. ' + str(random_rotation)
+    # plt.title(title, fontsize=7)
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.locator_params(nbins=3)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
 
-        # Plot vars
-        fig = plt.figure(figsize=(2, 2))
-        ax = fig.add_axes([0.25, 0.25, 0.65, 0.65])
-        ax.scatter(np.concatenate((var1s, var2s)),
-                    np.concatenate((var1s_shuffle, var2s_shuffle)), s=4)
-        ax.plot([0,500], [0,500])
-        lim = np.max(np.concatenate(
-            (var1s, var2s, var1s_shuffle, var2s_shuffle)))
-        plt.xlim([0,lim*1.1])
-        plt.ylim([0,lim*1.1])
-        plt.xlabel('Stimulus variance', fontsize=7)
-        plt.ylabel('Stimulus variance (shuffled data)', fontsize=7)
-        title = self.var_method + ' rand. rot. ' + str(random_rotation)
-        plt.title(title, fontsize=7)
-        ax.tick_params(axis='both', which='major', labelsize=7)
-        ax.locator_params(nbins=3)
-        ax.spines["right"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
-        plt.savefig('figure/stimvarvsshuffle'+self.dataset+'.pdf')
-        #
-        # plt.figure()
-        # plt.scatter(var1s_shuffle, var2s_shuffle)
-        # plt.plot([0,500], [0,500])
-        # plt.xlim([0,100])
-        # plt.ylim([0,100])
-        # plt.xlabel('Shuffled stim. var. contex 1')
-        # plt.ylabel('Shuffled stim. var. contex 2')
-        # plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
+    fig_name = 'figure/stimvarvsshuffle'
+    if save_name is not None:
+        fig_name += save_name
+    plt.savefig(fig_name + '.pdf', transparent=True)
+    #
+    # plt.figure()
+    # plt.scatter(var1s_shuffle, var2s_shuffle)
+    # plt.plot([0,500], [0,500])
+    # plt.xlim([0,100])
+    # plt.ylim([0,100])
+    # plt.xlabel('Shuffled stim. var. contex 1')
+    # plt.ylabel('Shuffled stim. var. contex 2')
+    # plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
 
-        # Denoise
-        # if denoise:
-        #     relu = lambda x : x*(x>0.)
-        #     var1s = relu(var1s - var1s_shuffle)
-        #     var2s = relu(var2s - var2s_shuffle)
+    # Denoise
+    # if denoise:
+    #     relu = lambda x : x*(x>0.)
+    #     var1s = relu(var1s - var1s_shuffle)
+    #     var2s = relu(var2s - var2s_shuffle)
 
-        if thr_type == 'sum':
-            ind = (var1s+var2s)>var_thr
-        elif thr_type == 'and':
-            ind = np.logical_and(var1s>var_thr, var2s>var_thr)
-        elif thr_type == 'or':
-            ind = np.logical_or(var1s>var_thr, var2s>var_thr)
-        else:
-            raise ValueError('Unknown threshold type')
-        
-        var1s = var1s[ind]
-        var2s = var2s[ind]
-        # ind_original = self.ind_original[ind]
+    if thr_type == 'sum':
+        ind = (var1s+var2s)>var_thr
+    elif thr_type == 'and':
+        ind = np.logical_and(var1s>var_thr, var2s>var_thr)
+    elif thr_type == 'or':
+        ind = np.logical_or(var1s>var_thr, var2s>var_thr)
+    else:
+        raise ValueError('Unknown threshold type')
 
-        fracVar = (var1s-var2s)/(var1s+var2s)
+    var1s = var1s[ind]
+    var2s = var2s[ind]
+    # ind_original = self.ind_original[ind]
 
-        # Plot fracVar distribution
-        # fig = plt.figure(figsize=(4.0,3))
-        # ax = fig.add_axes([0.2,0.3,0.5,0.5])
-        # hist, bins_edge = np.histogram(fracVar, bins=20, range=(-1,1))
-        # ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-        #        color='blue', edgecolor='none')
-        # ax.set_title(self.var_method + ' rand. rot. '+str(random_rotation))
-        #
-        # save_name = 'fracVar_data'
-        # if random_rotation:
-        #     save_name = save_name + '_rndrot'
-        # plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
+    fracVar = (var1s-var2s)/(var1s+var2s)
 
-        return fracVar
+    # Plot fracVar distribution
+    # fig = plt.figure(figsize=(4.0,3))
+    # ax = fig.add_axes([0.2,0.3,0.5,0.5])
+    # hist, bins_edge = np.histogram(fracVar, bins=20, range=(-1,1))
+    # ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
+    #        color='blue', edgecolor='none')
+    # ax.set_title(self.var_method + ' rand. rot. '+str(random_rotation))
+    #
+    # save_name = 'fracVar_data'
+    # if random_rotation:
+    #     save_name = save_name + '_rndrot'
+    # plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
 
-    def plot_single_unit(self, i_unit, save=False):
-        context_names = ['motion', 'color']
-        colors = ['red', 'black', 'blue']
-        fig, axarr = plt.subplots(3, 2, figsize=(4,4.0), sharey=True)
-        for i_ax in [0,1]:
-            for i_var_key, var_key in enumerate(self.var_key_list):
-                ax = axarr[i_var_key, i_ax]
+    return fracVar
 
-                data_ = self.data_condavg_list[i_ax][var_key][:,:,i_unit]
-                color=colors[i_var_key]
-                ax.plot(data_[:,0], '--', color=color)
-                ax.plot(data_[:,1], color=color)
-
-                if i_ax == 0:
-                    ax.set_ylabel(var_key)
-
-                if i_var_key == 0:
-                    ax.set_title('context '+context_names[i_ax])
-
-        if save:
-            save_name = 'mante_unit{:d}'.format(i_unit)
-            plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
+# def plot_single_unit(self, i_unit, save=False):
+#     context_names = ['motion', 'color']
+#     colors = ['red', 'black', 'blue']
+#     fig, axarr = plt.subplots(3, 2, figsize=(4,4.0), sharey=True)
+#     for i_ax in [0,1]:
+#         for i_var_key, var_key in enumerate(self.var_key_list):
+#             ax = axarr[i_var_key, i_ax]
+#
+#             data_ = self.data_condavg_list[i_ax][var_key][:,:,i_unit]
+#             color=colors[i_var_key]
+#             ax.plot(data_[:,0], '--', color=color)
+#             ax.plot(data_[:,1], color=color)
+#
+#             if i_ax == 0:
+#                 ax.set_ylabel(var_key)
+#
+#             if i_var_key == 0:
+#                 ax.set_title('context '+context_names[i_ax])
+#
+#     if save:
+#         save_name = 'mante_unit{:d}'.format(i_unit)
+#         plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
 
 
 if __name__ == '__main__':
@@ -854,7 +843,7 @@ if __name__ == '__main__':
     denoise = False
 
     root_dir = './data/varyhparams'
-    hp_target = {'activation': 'tanh',
+    hp_target = {'activation': 'retanh',
                  'rnn_type': 'LeakyGRU',
                  'w_rec_init': 'randortho',
                  'l1_h': 0,
@@ -862,12 +851,11 @@ if __name__ == '__main__':
     model_dir, _ = tools.find_model(root_dir, hp_target)
     dataset = 'model'
 
-    # dataset, model_dir = 'mante', None
-    amd = AnalyzeData(dataset=dataset,
+    dataset, model_dir = 'mante', None
+    data = load_data(dataset=dataset,
                       analyze_single_units=analyze_single_units,
                       model_dir=model_dir)
-    amd.compute_var_all(var_method='time_avg_late')
+    var_dict = compute_var_all(data, var_method='time_avg_late')
     var_thr, thr_type = 0.05, 'or'
-    fracVar = amd.compute_denoise_var(
-        var_thr=var_thr, thr_type=thr_type, denoise=denoise)
+    fracVar = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
     plot_fracVar(fracVar, save_name=dataset)
