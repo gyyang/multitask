@@ -188,9 +188,13 @@ def get_n_clusters():
     return n_clusters, hparams_list
 
 
-def plot_n_clusters():
-    """Plot the number of clusters."""
-    n_clusters, hparams_list = get_n_clusters()
+def plot_n_clusters(n_clusters, hparams_list):
+    """Plot the number of clusters.
+    
+    Args:
+        n_clusters: list of cluster numbers
+        hparams_list: list of hparams dictionary
+    """
     hp_ranges = OrderedDict()
     hp_ranges['activation'] = ['softplus', 'relu', 'tanh', 'retanh', 'power']
     hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
@@ -242,7 +246,13 @@ def plot_n_clusters():
 
 
 def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
-    """Plot histogram for number of clusters."""
+    """Plot histogram for number of clusters, separating by an attribute.
+    
+    Args:
+        hp_plot: str, the attribute to separate histogram by
+        n_clusters: list of cluster numbers
+        hparams_list: list of hparams dictionary
+    """
     if hparams_list is None:
         n_clusters, hparams_list = get_n_clusters()
 
@@ -300,8 +310,13 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     return n_cluster_dict
 
 
-def plot_n_cluster_hist():
-    n_clusters, hparams_list = get_n_clusters()
+def plot_n_cluster_hist(n_clusters, hparams_list):
+    """Plot histogram of number of clusters.
+    
+    Args:
+        n_clusters: list of cluster numbers
+        hparams_list: list of hparams dictionary
+    """
     hp_plots = ['activation', 'rnn_type', 'w_rec_init', 'l1_h', 'l1_weight']
     # hp_plots = ['activation']
     for hp_plot in hp_plots:
@@ -347,8 +362,9 @@ def activity_histogram(activation):
 if __name__ == '__main__':
     pass
     # compute_n_cluster()
-    plot_n_clusters()
-    plot_n_cluster_hist()
-    pretty_singleneuron_plot('tanh')
-    pretty_singleneuron_plot('relu')
-    [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
+    n_clusters, hparams_list = get_n_clusters()
+    # plot_n_clusters(n_clusters, hparams_list)
+    # plot_n_cluster_hist(n_clusters, hparams_list)
+    # pretty_singleneuron_plot('tanh')
+    # pretty_singleneuron_plot('relu')
+    # [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
