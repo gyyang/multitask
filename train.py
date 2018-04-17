@@ -183,9 +183,9 @@ def do_eval(sess, model, log, rule_train):
             creg_tmp.append(c_reg)
             perf_tmp.append(perf_test)
 
-        log['cost_'+rule_test].append(np.mean(clsq_tmp))
-        log['creg_'+rule_test].append(np.mean(creg_tmp))
-        log['perf_'+rule_test].append(np.mean(perf_tmp))
+        log['cost_'+rule_test].append(np.mean(clsq_tmp, dtype=np.float64))
+        log['creg_'+rule_test].append(np.mean(creg_tmp, dtype=np.float64))
+        log['perf_'+rule_test].append(np.mean(perf_tmp, dtype=np.float64))
         print('{:15s}'.format(rule_test) +
               '| cost {:0.6f}'.format(np.mean(clsq_tmp)) +
               '| c_reg {:0.6f}'.format(np.mean(creg_tmp)) +
@@ -495,7 +495,7 @@ if __name__ == '__main__':
     run_analysis = []
     hparams = {'rnn_type': 'LeakyRNN',
                'activation': 'softplus',
-               'l2_weight_init': 1e-4,
+               'l2_weight_init': 0.,
                'target_perf': 0.9,
                'w_rec_init': 'randortho'}
     train('data/mantetemp', seed=1, hparams=hparams, ruleset='mante',

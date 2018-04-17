@@ -64,21 +64,21 @@ def valid_model_dirs(root_dir):
 
 def load_log(train_dir):
     """Load the log file of model save_name"""
-    fname = os.path.join(train_dir,'log.pkl')
+    fname = os.path.join(train_dir, 'log.json')
     if not os.path.isfile(fname):
         return None
 
     with open(fname, 'rb') as f:
-        log = pickle.load(f)
+        log = json.load(f)
     return log
 
 
 def save_log(log): 
     """Save the log file of model."""
     model_dir = log['train_dir']
-    fname = os.path.join(model_dir, 'log.pkl')
-    with open(fname,'wb') as f:
-        pickle.dump(log, f)
+    fname = os.path.join(model_dir, 'log.json')
+    with open(fname, 'wb') as f:
+        json.dump(log, f)
 
 
 def load_hparams(save_dir):
