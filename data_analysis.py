@@ -417,34 +417,133 @@ def compute_var(rates, var_method):
 #     # return np.percentile(var1s_shuffle, [95]) + np.percentile(var2s_shuffle, [95])
 
 
-def plot_fracVar(fracVar, save_name=None, fancy_color=False):
+def compute_var_all(data, var_method='time_avg_early'):
+    """Compute task variance for data and shuffled data.
+
+    Args:
+        var_method: str, method to compute the variance
+            Can be 'time_avg_late', 'time_avg_none', 'time_avg_early'
+    """
+
+    # Generate a random orthogonal matrix for later use
+    # rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
+
+    var1s, var2s = get_trial_avg_var(data, var_method)
+    var1s_shuffle, var2s_shuffle = get_shuffle_var(data, var_method)
+
+    var_dict = {'var1s': var1s, 'var2s': var2s,
+                'var1s_shuffle': var1s_shuffle, 'var2s_shuffle': var2s_shuffle}
+    return var_dict
+
+
+def compute_frac_var(var_dict, var_thr=0.0, save_name=None,
+                        thr_type='sum'):
+
+    var1s = var_dict['var1s']
+    var2s = var_dict['var2s']
+    var1s_shuffle = var_dict['var1s_shuffle']
+    var2s_shuffle = var_dict['var2s_shuffle']
+
+    # Plot vars
+    fig = plt.figure(figsize=(2, 2))
+    ax = fig.add_axes([0.25, 0.25, 0.65, 0.65])
+    ax.scatter(np.concatenate((var1s, var2s)),
+                np.concatenate((var1s_shuffle, var2s_shuffle)), s=4)
+    ax.plot([0,500], [0,500])
+    lim = np.max(np.concatenate(
+        (var1s, var2s, var1s_shuffle, var2s_shuffle)))
+    plt.xlim([0,lim*1.1])
+    plt.ylim([0,lim*1.1])
+    plt.xlabel('Stimulus variance', fontsize=7)
+    plt.ylabel('Stimulus variance (shuffled data)', fontsize=7)
+    # title = self.var_method + ' rand. rot. ' + str(random_rotation)
+    # plt.title(title, fontsize=7)
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.locator_params(nbins=3)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+
+    fig_name = 'figure/stimvarvsshuffle'
+    if save_name is not None:
+        fig_name += save_name
+    plt.savefig(fig_name + '.pdf', transparent=True)
+    #
+    # plt.figure()
+    # plt.scatter(var1s_shuffle, var2s_shuffle)
+    # plt.plot([0,500], [0,500])
+    # plt.xlim([0,100])
+    # plt.ylim([0,100])
+    # plt.xlabel('Shuffled stim. var. contex 1')
+    # plt.ylabel('Shuffled stim. var. contex 2')
+    # plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
+
+    # Denoise
+    # if denoise:
+    #     relu = lambda x : x*(x>0.)
+    #     var1s = relu(var1s - var1s_shuffle)
+    #     var2s = relu(var2s - var2s_shuffle)
+
+    if thr_type == 'sum':
+        ind = (var1s+var2s)>var_thr
+    elif thr_type == 'and':
+        ind = np.logical_and(var1s>var_thr, var2s>var_thr)
+    elif thr_type == 'or':
+        ind = np.logical_or(var1s>var_thr, var2s>var_thr)
+    else:
+        raise ValueError('Unknown threshold type')
+
+    var1s = var1s[ind]
+    var2s = var2s[ind]
+    # ind_original = self.ind_original[ind]
+
+    frac_var = (var1s-var2s)/(var1s+var2s)
+
+    # Plot frac_var distribution
+    # fig = plt.figure(figsize=(4.0,3))
+    # ax = fig.add_axes([0.2,0.3,0.5,0.5])
+    # hist, bins_edge = np.histogram(frac_var, bins=20, range=(-1,1))
+    # ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
+    #        color='blue', edgecolor='none')
+    # ax.set_title(self.var_method + ' rand. rot. '+str(random_rotation))
+    #
+    # save_name = 'frac_var_data'
+    # if random_rotation:
+    #     save_name = save_name + '_rndrot'
+    # plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
+
+    return frac_var
+
+
+def plot_frac_var(frac_var, save_name=None, fancy_color=False):
     """Plot distribution of fractional variance."""
     ind_group = dict()
-    ind_group['1'] = np.where(fracVar > 0.8)[0]
-    ind_group['2'] = np.where(fracVar < -0.8)[0]
-    # ind_group['12']= np.where(np.logical_and(-0.8<fracVar, fracVar<0.8))[0]
-    ind_group['12'] = np.where(np.logical_and(-0.3 < fracVar,
-                                              fracVar < 0.3))[0]
+    ind_group['1'] = np.where(frac_var > 0.8)[0]
+    ind_group['2'] = np.where(frac_var < -0.8)[0]
+    # ind_group['12']= np.where(np.logical_and(-0.8<frac_var, frac_var<0.8))[0]
+    ind_group['12'] = np.where(np.logical_and(-0.3 < frac_var,
+                                              frac_var < 0.3))[0]
 
     colors = dict(zip([None, '1', '2', '12'], COLORS))
     fs = 6
     fig = plt.figure(figsize=(2.0, 1.2))
     ax = fig.add_axes([0.2, 0.3, 0.5, 0.5])
-    data_plot = fracVar
+    data_plot = frac_var
     hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1, 1))
     ax.bar(bins_edge[:-1], hist, width=bins_edge[1] - bins_edge[0],
            color='gray', edgecolor='none')
     if fancy_color:
         bs = list()
         for i, group in enumerate(['1', '2', '12']):
-            data_plot = fracVar[ind_group[group]]
+            data_plot = frac_var[ind_group[group]]
             hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1, 1))
             b_tmp = ax.bar(bins_edge[:-1], hist,
                            width=bins_edge[1] - bins_edge[0],
                            color=colors[group], edgecolor='none', label=group)
             bs.append(b_tmp)
     plt.locator_params(nbins=3)
-    xlabel = 'FracVar'
+    xlabel = 'frac_var'
     ax.set_xlabel(xlabel, fontsize=fs)
     ax.set_ylabel('Units', fontsize=fs)
     ax.set_ylim(bottom=-0.02 * hist.max())
@@ -460,7 +559,7 @@ def plot_fracVar(fracVar, save_name=None, fancy_color=False):
                        loc=1, frameon=False)
         plt.setp(lg.get_title(), fontsize=fs)
 
-    fig_name = 'figure/fracVar_data'
+    fig_name = 'figure/frac_var_data'
     if save_name is not None:
         fig_name += save_name
     plt.savefig(fig_name + '.pdf', transparent=True)
@@ -616,104 +715,6 @@ def study_betaweights(analyze_single_units=True, ind_group=None):
     #     print('p value: {:0.7f}'.format(p))
 
 
-def compute_var_all(data, var_method='time_avg_early'):
-    """Compute task variance for data and shuffled data.
-
-    Args:
-        var_method: str, method to compute the variance
-            Can be 'time_avg_late', 'time_avg_none', 'time_avg_early'
-    """
-
-    # Generate a random orthogonal matrix for later use
-    # rotation_matrix = gen_ortho_matrix(self.n_unit) # has to be the same matrix
-
-    var1s, var2s = get_trial_avg_var(data, var_method)
-    var1s_shuffle, var2s_shuffle = get_shuffle_var(data, var_method)
-
-    var_dict = {'var1s': var1s, 'var2s': var2s,
-                'var1s_shuffle': var1s_shuffle, 'var2s_shuffle': var2s_shuffle}
-    return var_dict
-
-
-def compute_frac_var(var_dict, var_thr=0.0, save_name=None,
-                        thr_type='sum'):
-
-    var1s = var_dict['var1s']
-    var2s = var_dict['var2s']
-    var1s_shuffle = var_dict['var1s_shuffle']
-    var2s_shuffle = var_dict['var2s_shuffle']
-
-    # Plot vars
-    fig = plt.figure(figsize=(2, 2))
-    ax = fig.add_axes([0.25, 0.25, 0.65, 0.65])
-    ax.scatter(np.concatenate((var1s, var2s)),
-                np.concatenate((var1s_shuffle, var2s_shuffle)), s=4)
-    ax.plot([0,500], [0,500])
-    lim = np.max(np.concatenate(
-        (var1s, var2s, var1s_shuffle, var2s_shuffle)))
-    plt.xlim([0,lim*1.1])
-    plt.ylim([0,lim*1.1])
-    plt.xlabel('Stimulus variance', fontsize=7)
-    plt.ylabel('Stimulus variance (shuffled data)', fontsize=7)
-    # title = self.var_method + ' rand. rot. ' + str(random_rotation)
-    # plt.title(title, fontsize=7)
-    ax.tick_params(axis='both', which='major', labelsize=7)
-    ax.locator_params(nbins=3)
-    ax.spines["right"].set_visible(False)
-    ax.spines["top"].set_visible(False)
-    ax.xaxis.set_ticks_position('bottom')
-    ax.yaxis.set_ticks_position('left')
-
-    fig_name = 'figure/stimvarvsshuffle'
-    if save_name is not None:
-        fig_name += save_name
-    plt.savefig(fig_name + '.pdf', transparent=True)
-    #
-    # plt.figure()
-    # plt.scatter(var1s_shuffle, var2s_shuffle)
-    # plt.plot([0,500], [0,500])
-    # plt.xlim([0,100])
-    # plt.ylim([0,100])
-    # plt.xlabel('Shuffled stim. var. contex 1')
-    # plt.ylabel('Shuffled stim. var. contex 2')
-    # plt.title(self.var_method + ' rand. rot. '+str(random_rotation))
-
-    # Denoise
-    # if denoise:
-    #     relu = lambda x : x*(x>0.)
-    #     var1s = relu(var1s - var1s_shuffle)
-    #     var2s = relu(var2s - var2s_shuffle)
-
-    if thr_type == 'sum':
-        ind = (var1s+var2s)>var_thr
-    elif thr_type == 'and':
-        ind = np.logical_and(var1s>var_thr, var2s>var_thr)
-    elif thr_type == 'or':
-        ind = np.logical_or(var1s>var_thr, var2s>var_thr)
-    else:
-        raise ValueError('Unknown threshold type')
-
-    var1s = var1s[ind]
-    var2s = var2s[ind]
-    # ind_original = self.ind_original[ind]
-
-    fracVar = (var1s-var2s)/(var1s+var2s)
-
-    # Plot fracVar distribution
-    # fig = plt.figure(figsize=(4.0,3))
-    # ax = fig.add_axes([0.2,0.3,0.5,0.5])
-    # hist, bins_edge = np.histogram(fracVar, bins=20, range=(-1,1))
-    # ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
-    #        color='blue', edgecolor='none')
-    # ax.set_title(self.var_method + ' rand. rot. '+str(random_rotation))
-    #
-    # save_name = 'fracVar_data'
-    # if random_rotation:
-    #     save_name = save_name + '_rndrot'
-    # plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
-
-    return fracVar
-
 # def plot_single_unit(self, i_unit, save=False):
 #     context_names = ['motion', 'color']
 #     colors = ['red', 'black', 'blue']
@@ -758,5 +759,5 @@ if __name__ == '__main__':
                       model_dir=model_dir)
     var_dict = compute_var_all(data, var_method='time_avg_late')
     var_thr, thr_type = 0.05, 'or'
-    fracVar = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
-    plot_fracVar(fracVar, save_name=dataset)
+    frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
+    plot_frac_var(frac_var, save_name=dataset)
