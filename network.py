@@ -20,6 +20,10 @@ from tensorflow.python.ops.rnn_cell_impl import RNNCell
 import tools
 
 
+def is_weight(v):
+    """Check if Tensorflow variable v is a connection weight."""
+    return ('kernel' in v.name or 'weight' in v.name)
+
 def popvec(y):
     """Population vector read out.
 
@@ -635,6 +639,7 @@ class Model(object):
         self.y_hat_loc = tf_popvec(y_hat_ring)
 
         self.var_list = tf.trainable_variables()
+        self.weight_list = [v for v in self.var_list if is_weight(v)]
 
         # Regularization terms
         self.cost_reg = tf.constant(0.)
@@ -646,11 +651,12 @@ class Model(object):
 
         if hparams['l1_weight'] > 0:
             self.cost_reg += hparams['l1_weight']*tf.reduce_mean(
-                [tf.reduce_mean(tf.abs(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
+                [tf.reduce_mean(tf.abs(v)) for v in self.weight_list])
             #hparams['l1_weight']*tf.add_n([tf.reduce_mean(tf.abs(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
         if hparams['l2_weight'] > 0: #maddy added check
+            # TODO(gryang): Check if this is correct
             self.cost_reg += hparams['l2_weight']*tf.reduce_mean(
-              [tf.sqrt(tf.reduce_mean(tf.square(v))) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])          
+              [tf.sqrt(tf.reduce_mean(tf.square(v))) for v in self.weight_list])
 
         # Create an optimizer.
         self.opt = tf.train.AdamOptimizer(
