@@ -23,41 +23,42 @@ COLORS = [(0.9764705882352941, 0.45098039215686275, 0.023529411764705882),
  (1.0, 0.5058823529411764, 0.7529411764705882),
  (0.4588235294117647, 0.7333333333333333, 0.9921568627450981)]
 
-def generate_data_in_standard_format():
-    '''Generate data dictionary in standardize form'''
 
-    datas = load_mante_data(smooth=True)
+def load_data(dataset='mante', smooth=True, analyze_single_units=True,
+              model_dir=None):
+    """Analyzing a dataset.
 
-    # List of data, each item corresponds to one unit
-    Data = list()
-    for data in datas:
-        task_var = data.task_variable
+    Args:
+        dataset: str, 'mante', 'siegel', or 'model'
+        smooth: bool, whether to use smoothed data
+        analyze_single_units: bool, whether to analyze single units
+    """
+    if smooth:
+        print('Loading smooth data')
+    else:
+        print('Loading original data')
+    if dataset == 'mante':
+        return mante_dataset_preprocess.load_data(
+            smooth=smooth, single_units=analyze_single_units)
+    elif dataset == 'siegel':
+        return siegel_dataset_preprocess.load_data(single_file=False)
+    elif dataset == 'model':
+        if model_dir is None:
+            raise ValueError(
+                'model_dir need to be provided for dataset==model')
+        return contextdm_analysis.load_data(model_dir)
+    else:
+        raise ValueError('Wrong dataset')
 
-        # For computing the coherence ID (integer)
-        unique_mod1coh = np.unique(task_var.stim_dir) # return sorted unique items
-        unique_mod2coh = np.unique(task_var.stim_col2dir)
-        assert len(unique_mod1coh)==len(unique_mod2coh)==6
-
-        # map coherence to their ID
-        coh_ids = [-3, -2, -1, +1, +2, +3]
-        mod1coh_map = dict([(c, i) for c, i in zip(unique_mod1coh, coh_ids)])
-        mod2coh_map = dict([(c, i) for c, i in zip(unique_mod2coh, coh_ids)])
-
-        Data.append({
-            'Activity'          : data.response, # (n_trial, n_timepoint)
-            'Context'           : task_var.context,
-            # Redefine choice, (+1 for the preferred choice)
-            'ActualChoiceRedef' : task_var.targ_dir,
-            'Mod1Coh'           : (task_var.stim_dir/np.max(task_var.stim_dir)).astype(np.float16),
-            'Mod2Coh'           : (task_var.stim_col2dir/np.max(task_var.stim_col2dir)).astype(np.float16),
-            'Mod1CohID'         : np.array([mod1coh_map[c] for c in task_var.stim_dir], dtype=np.int16),
-            'Mod2CohID'         : np.array([mod2coh_map[c] for c in task_var.stim_col2dir], dtype=np.int16),
-            'Correct'           : task_var.correct,
-                })
-
-    import pickle, os
-    with open(os.path.join('data', 'ManteData.pkl'), 'wb') as f:
-        pickle.dump(Data, f)
+    # TODO(gryang): make the following compatible
+    # self.var_key_list = ['targ_dir', 'stim_dir_sign', 'stim_col2dir_sign']
+    # self.data_condavg_list = [] # for two contexts
+    # for context in [1, -1]:
+    #     tmp = dict()
+    #     for var_key in self.var_key_list:
+    #         tmp[var_key] = get_trial_avg(data=self.data, split_traintest=False,
+    #                                    var_keys=[var_key], context=context)
+    #     self.data_condavg_list.append(tmp)
 
 
 def get_trial_avg(data,
@@ -226,69 +227,6 @@ def get_shuffle_var(data, var_method, rotation_matrix=None, n_rep=10):
     print('Time taken {:0.2f}s'.format(time.time()-start))
 
     return var1s_shuffle, var2s_shuffle
-
-
-def get_trial_avg_rate_obsolete(response, task_var, context=1, random_shuffle=False,
-                       return_avg=True, only_correct=False):
-    """Get trial-averaged rate activity for Mante dataset.
-
-    Args:
-        response: numpy array, (n_trial, n_time)
-        task_var: dictionary of numpy array, each array (n_trial, )
-        context: +1 or -1, the context to study
-        random_shuffle: bool, whether to random shuffle trials
-        return_avg: bool, whether to return the average across trials
-        only_correct: bool, if True, only analyze correct trials
-
-    Returns:
-        data_avg: numpy array (n_condition, n_time),
-            the trial-averaged activity
-    """
-    assert len(task_var.values()[0]) == response.shape[0]
-
-    ctx = task_var['context'] == context
-
-    tmp = list()
-    for m in [1, -1]:
-        for c in [1, -1]:
-            # for choice in [1, -1]:
-            if m == 1:
-                m_ind = task_var['stim_dir'] > 0 # motion positive
-            else:
-                m_ind = task_var['stim_dir'] < 0 # motion positive
-
-            if c == 1:
-                c_ind = task_var['stim_col2dir'] > 0 # motion positive
-            else:
-                c_ind = task_var['stim_col2dir'] < 0 # motion positive
-
-            # if choice == 1:
-            #     choice_ind = task_var['targ_dir'] > 0
-            # else:
-            #     choice_ind = task_var['targ_dir'] < 0
-
-            # ind = m_ind*c_ind*ctx*choice_ind
-            ind = m_ind*c_ind*ctx
-
-            if only_correct:
-                ind = ind*task_var['correct']
-
-            if random_shuffle:
-                np.random.shuffle(ind)
-
-            ind = ind.astype(bool)
-
-            if return_avg:
-                # tmp.append(response[ind,:].mean())
-                # TODO: TEMPORARY
-                tmp.append(response[ind,:].mean(axis=0)) # average across trials
-            else:
-                tmp.append(response[ind,:])
-
-    if return_avg:
-        return np.array(tmp) # (n_condition, n_time)
-    else:
-        return tmp
 
 
 def smoothing(response, response_time):
@@ -676,43 +614,6 @@ def study_betaweights(analyze_single_units=True, ind_group=None):
     #     print(regr_names[i_coef], group1, group2)
     #     print('Stronger group: ' + [group1, group2][stronger])
     #     print('p value: {:0.7f}'.format(p))
-
-
-def load_data(dataset='mante', smooth=True, analyze_single_units=True,
-              model_dir=None):
-    """Analyzing a dataset.
-
-    Args:
-        dataset: str, 'mante', 'siegel', or 'model'
-        smooth: bool, whether to use smoothed data
-        analyze_single_units: bool, whether to analyze single units
-    """
-    if smooth:
-        print('Loading smooth data')
-    else:
-        print('Loading original data')
-    if dataset == 'mante':
-        return mante_dataset_preprocess.load_data(
-            smooth=smooth, single_units=analyze_single_units)
-    elif dataset == 'siegel':
-        return siegel_dataset_preprocess.load_data(single_file=False)
-    elif dataset == 'model':
-        if model_dir is None:
-            raise ValueError(
-                'model_dir need to be provided for dataset==model')
-        return contextdm_analysis.load_data(model_dir)
-    else:
-        raise ValueError('Wrong dataset')
-
-    # TODO(gryang): make the following compatible
-    # self.var_key_list = ['targ_dir', 'stim_dir_sign', 'stim_col2dir_sign']
-    # self.data_condavg_list = [] # for two contexts
-    # for context in [1, -1]:
-    #     tmp = dict()
-    #     for var_key in self.var_key_list:
-    #         tmp[var_key] = get_trial_avg(data=self.data, split_traintest=False,
-    #                                    var_keys=[var_key], context=context)
-    #     self.data_condavg_list.append(tmp)
 
 
 def compute_var_all(data, var_method='time_avg_early'):
