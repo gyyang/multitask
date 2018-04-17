@@ -177,11 +177,17 @@ class Analysis(object):
 
     def plot_cluster_score(self):
         """Plot the score by the number of clusters."""
-        plt.figure()
-        plt.plot(self.n_clusters, self.scores, 'o-')
-        plt.xlabel('Number of clusters')
-        plt.ylabel('Silhouette score')
-        plt.title('Chosen number of clusters: {:d}'.format(self.n_cluster))
+        fig = plt.figure(figsize=(1.5, 1.5))
+        ax = fig.add_axes([0.2, 0.2, 0.7, 0.7])
+        ax.plot(self.n_clusters, self.scores, 'o-', ms=3)
+        ax.set_xlabel('Number of clusters', fontsize=7)
+        ax.set_ylabel('Silhouette score', fontsize=7)
+        ax.set_title('Chosen number of clusters: {:d}'.format(self.n_cluster),
+                     fontsize=7)
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
 
     def plot_variance(self, save_name=None):
         labels = self.labels
