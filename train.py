@@ -434,10 +434,7 @@ def train(train_dir,
 
         # penalty on deviation from initial weight
         if hparams['l2_weight_init'] > 0:
-            # TODO: Need checking
             anchor_ws = sess.run(model.weight_list)
-
-            # TODO: only change weights
             for w, w_val in zip(model.weight_list, anchor_ws):
                 model.cost_reg += (hparams['l2_weight_init'] *
                                    tf.nn.l2_loss(w - w_val))
@@ -505,29 +502,3 @@ if __name__ == '__main__':
     # rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     # hparams = {'rnn_type': 'LeakyGRU', 'n_rnn': 128}
     # train('debug',hparams=hparams, ruleset='all',rule_prob_map=rule_prob_map,seed=1)
-
-#==============================================================================
-#     #maddy added - start
-#     n_hidden=64
-#     seed = 2
-#     activation='tanh'
-#     rnn_type='LeakyGRU'
-#     training_iters   = 50000#150000
-#     w_rec_init = 'diag' #maddy added below 5 lines.  
-#     l1_h        = 1.0*0.0001
-#     l2_h        = 1.0*0
-#     l1_weight   = 1.0*0.0001
-#     l2_weight   = 0.0001*0
-#     # continual learning not factored in. neither are batch_train/test size.    
-#     
-#     save_name = to_savename(n_hidden = n_hidden,  seed = seed,
-#                                activation = activation,
-#           rnn_type = rnn_type, w_rec_init    = w_rec_init,  l1_h = l1_h,
-#           l2_h = l2_h, l1_weight   = l1_weight, l2_weight   = l2_weight)
-#     
-#     train(save_name = save_name, n_hidden=n_hidden, seed=seed,
-#           activation=activation, rnn_type=rnn_type, 
-#           w_rec_init = w_rec_init, 
-#           l1_h = l1_h, l2_h = l2_h, l1_weight = l1_weight, l2_weight = l2_weight)
-#     #maddy added - end
-#==============================================================================
