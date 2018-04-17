@@ -13,8 +13,8 @@ from scipy.io import loadmat, whosmat
 
 import mante_dataset_preprocess
 import siegel_dataset_preprocess
-from tools import gen_ortho_matrix
-
+import contextdm_analysis
+import tools
 
 DATAPATH = './datasets/mante_dataset'
 # sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])
@@ -189,6 +189,7 @@ def get_trial_avg_var(data, var_method, rotation_matrix=None,
         random_shuffle: bool, whether to randomly shuffle the data
     """
     var_keys = ['stim_dir_sign', 'stim_col2dir_sign']
+    # var_keys = ['stim_dir', 'stim_col2dir']
 
     vars = list()
     for context in [1, -1]:
@@ -478,7 +479,7 @@ def compute_var(rates, var_method):
 #     # return np.percentile(var1s_shuffle, [95]) + np.percentile(var2s_shuffle, [95])
 
 
-def plot_fracVar(fracVar, save_name):
+def plot_fracVar(fracVar, save_name=None, fancy_color=False):
     """Plot distribution of fractional variance."""
     ind_group = dict()
     ind_group['1'] = np.where(fracVar > 0.8)[0]
@@ -495,13 +496,15 @@ def plot_fracVar(fracVar, save_name):
     hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1, 1))
     ax.bar(bins_edge[:-1], hist, width=bins_edge[1] - bins_edge[0],
            color='gray', edgecolor='none')
-    bs = list()
-    for i, group in enumerate(['1', '2', '12']):
-        data_plot = fracVar[ind_group[group]]
-        hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1, 1))
-        b_tmp = ax.bar(bins_edge[:-1], hist, width=bins_edge[1] - bins_edge[0],
-                       color=colors[group], edgecolor='none', label=group)
-        bs.append(b_tmp)
+    if fancy_color:
+        bs = list()
+        for i, group in enumerate(['1', '2', '12']):
+            data_plot = fracVar[ind_group[group]]
+            hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1, 1))
+            b_tmp = ax.bar(bins_edge[:-1], hist,
+                           width=bins_edge[1] - bins_edge[0],
+                           color=colors[group], edgecolor='none', label=group)
+            bs.append(b_tmp)
     plt.locator_params(nbins=3)
     xlabel = 'FracVar'
     ax.set_xlabel(xlabel, fontsize=fs)
@@ -513,21 +516,16 @@ def plot_fracVar(fracVar, save_name):
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
     ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
-    lg = ax.legend(bs, ['1', '2', '12'], title='Group',
-                   fontsize=fs, ncol=1, bbox_to_anchor=(1.5, 1.0),
-                   loc=1, frameon=False)
-    plt.setp(lg.get_title(), fontsize=fs)
+    if fancy_color:
+        lg = ax.legend(bs, ['1', '2', '12'], title='Group',
+                       fontsize=fs, ncol=1, bbox_to_anchor=(1.5, 1.0),
+                       loc=1, frameon=False)
+        plt.setp(lg.get_title(), fontsize=fs)
 
-# =============================================================================
-#     save_name = 'fracVarcolored_data'
-#     if analyze_single_units:
-#         save_name = save_name + '_SU'
-#     else:
-#         save_name = save_name + '_AU'
-#     if not denoise:
-#         save_name = save_name + '_nodenoise'
-# =============================================================================
-    plt.savefig('figure/fracVar_data_'+save_name+'.pdf', transparent=True)
+    fig_name = 'figure/fracVar_data'
+    if save_name is not None:
+        fig_name += save_name
+    plt.savefig(fig_name + '.pdf', transparent=True)
 
 
 def clustering_tmp():
@@ -682,7 +680,12 @@ def study_betaweights(analyze_single_units=True, ind_group=None):
 
 class AnalyzeData(object):
 
-    def __init__(self, dataset='mante', smooth=True, analyze_single_units=True):
+    def __init__(self,
+                 dataset='mante',
+                 smooth=True,
+                 analyze_single_units=True,
+                 model_dir=None
+                 ):
         """Analyzing a dataset.
 
         Args:
@@ -699,6 +702,11 @@ class AnalyzeData(object):
                 smooth=smooth, single_units=analyze_single_units)
         elif dataset == 'siegel':
             self.data = siegel_dataset_preprocess.load_data(single_file=False)
+        elif dataset == 'model':
+            if model_dir is None:
+                raise ValueError(
+                    'model_dir need to be provided for dataset==model')
+            self.data = contextdm_analysis.load_data(model_dir)
 
         self.n_unit = len(self.data)
 
@@ -755,8 +763,10 @@ class AnalyzeData(object):
         ax.scatter(np.concatenate((var1s, var2s)),
                     np.concatenate((var1s_shuffle, var2s_shuffle)), s=4)
         ax.plot([0,500], [0,500])
-        plt.xlim([0,100])
-        plt.ylim([0,100])
+        lim = np.max(np.concatenate(
+            (var1s, var2s, var1s_shuffle, var2s_shuffle)))
+        plt.xlim([0,lim*1.1])
+        plt.ylim([0,lim*1.1])
         plt.xlabel('Stimulus variance', fontsize=7)
         plt.ylabel('Stimulus variance (shuffled data)', fontsize=7)
         title = self.var_method + ' rand. rot. ' + str(random_rotation)
@@ -840,14 +850,24 @@ class AnalyzeData(object):
 
 if __name__ == '__main__':
     pass
-
     analyze_single_units = False
     denoise = False
 
-    dataset = 'siegel'
-    amd = AnalyzeData(dataset=dataset, analyze_single_units=analyze_single_units)
+    root_dir = './data/varyhparams'
+    hp_target = {'activation': 'tanh',
+                 'rnn_type': 'LeakyGRU',
+                 'w_rec_init': 'randortho',
+                 'l1_h': 0,
+                 'l1_weight': 1e-5}
+    model_dir, _ = tools.find_model(root_dir, hp_target)
+    dataset = 'model'
+
+    # dataset, model_dir = 'mante', None
+    amd = AnalyzeData(dataset=dataset,
+                      analyze_single_units=analyze_single_units,
+                      model_dir=model_dir)
     amd.compute_var_all(var_method='time_avg_late')
-    var_thr, thr_type = 0., 'or'
+    var_thr, thr_type = 0.05, 'or'
     fracVar = amd.compute_denoise_var(
         var_thr=var_thr, thr_type=thr_type, denoise=denoise)
     plot_fracVar(fracVar, save_name=dataset)
