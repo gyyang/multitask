@@ -121,7 +121,7 @@ def _compute_data_single_file(f):
     task_var = _expand_task_var(trial_infos)
 
     unit_infos = _load_tables(f, 'unitinfo')
-    electrode_infos = _load_tables(f, 'electrodeinfo')
+    # electrode_infos = _load_tables(f, 'electrodeinfo')
 
     spikes = _load_spikes(f)
     spikes = spikes[valid_trials, :]
@@ -144,11 +144,11 @@ def _compute_data_single_file(f):
             hist, bin_edges = np.histogram(spikes_unit, bins=bins)
             rates[i_trial, :] = hist / bin_size
         unit_dict = {
-            'task_var': task_var,  # TODO(gryang): change keys
-            'electrode_info': electrode_infos,
-            'unit_infos': unit_infos,
+            'task_var': task_var,
             'rate': rates
         }
+        for key, val in unit_infos.items():
+            unit_dict[key] = val[i_unit]
         data.append(unit_dict)
     return data
 
@@ -162,15 +162,15 @@ def _compute_data():
 
     start_time = time.time()
 
-    for file in files:
-        print('Analyzing file: ' + file)
+    for f in files:
+        print('Analyzing file: ' + f)
         print('Time taken {:0.2f}s'.format(time.time()-start_time))
-        data_single_file = _compute_data_single_file(file)
+        data_single_file = _compute_data_single_file(f)
 
-        fname = os.path.join(DATASETPATH, 'standard', 'siegel'+file[:6]+'.pkl')
+        fname = os.path.join(DATASETPATH, 'standard', 'siegel'+f[:6]+'.pkl')
         print('File saved at: ' + fname)
-        with open(fname, 'wb') as f:
-            pickle.dump(data_single_file, f)
+        with open(fname, 'wb') as f2:
+            pickle.dump(data_single_file, f2)
 
 
 def load_data(single_file=False):
@@ -193,12 +193,12 @@ def load_data(single_file=False):
     start_time = time.time()
 
     data = list()
-    for file in files:
-        print('Analyzing file: ' + file)
+    for f in files:
+        print('Analyzing file: ' + f)
         print('Time taken {:0.2f}s'.format(time.time() - start_time))
-        fname = os.path.join(datasetpath, file)
-        with open(fname, 'rb') as f:
-            data_single_file = pickle.load(f)
+        fname = os.path.join(datasetpath, f)
+        with open(fname, 'rb') as f2:
+            data_single_file = pickle.load(f2)
         data.extend(data_single_file)
     return data
 
@@ -217,7 +217,8 @@ def load_data(single_file=False):
 
 
 if __name__ == '__main__':
-    _compute_data()
+    # _compute_data()
+    data = load_data(single_file=True)
 
 
 
