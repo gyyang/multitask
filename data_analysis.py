@@ -739,13 +739,45 @@ def study_betaweights(analyze_single_units=True, ind_group=None):
 #         plt.savefig(os.path.join('figure',save_name+'.pdf'), transparent=True)
 
 
+def plot_rate_distribution(data):
+    """Plot various distributions based on rate.
+
+    Args:
+        data: standard format data
+    """
+    # Distribution of rate
+    mean_rate = np.array([d['rate'].mean() for d in data])
+    plt.figure()
+    _ = plt.hist(mean_rate, bins=50)
+    plt.xlabel('Rate')
+    plt.ylabel('Number of units')
+
+    # Distribution of log-rate
+    mean_rate_shift = mean_rate - np.min(mean_rate)
+    mean_rate_shift = mean_rate_shift[mean_rate_shift>0]
+    plt.figure()
+    _ = plt.hist(np.log10(mean_rate_shift), bins=50)
+    plt.xlabel('Rate')
+    plt.ylabel('Number of units')
+
+    # Activaty change over time
+    mean_rate_by_time = np.array([d['rate'].mean(axis=0) for d in data])
+    plt.figure()
+    plt.scatter(mean_rate_by_time[:, 0], mean_rate_by_time[:, -1])
+    top = np.max(mean_rate_by_time)
+    bottom = np.min(mean_rate_by_time)
+    plt.plot([bottom, top], [bottom, top], color='black')
+    plt.xlabel('Activity at beginning')
+    plt.ylabel('Activity at end')
+
+
 if __name__ == '__main__':
     pass
     analyze_single_units = False
     denoise = False
 
     root_dir = './data/varyhparams'
-    hp_target = {'activation': 'retanh',
+    hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyGRU',
                  'w_rec_init': 'randortho',
                  'l1_h': 0,
@@ -753,11 +785,16 @@ if __name__ == '__main__':
     model_dir, _ = tools.find_model(root_dir, hp_target)
     dataset = 'model'
 
-    dataset, model_dir = 'mante', None
+    # dataset, model_dir = 'mante', None
+    # dataset, model_dir = 'siegel', None
     data = load_data(dataset=dataset,
                       analyze_single_units=analyze_single_units,
                       model_dir=model_dir)
-    var_dict = compute_var_all(data, var_method='time_avg_late')
-    var_thr, thr_type = 0.05, 'or'
-    frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
-    plot_frac_var(frac_var, save_name=dataset)
+    
+    # var_dict = compute_var_all(data, var_method='time_avg_late')
+    # var_thr, thr_type = 0.05, 'or'
+    # frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
+    # plot_frac_var(frac_var, save_name=dataset)
+    
+
+
