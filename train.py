@@ -58,13 +58,13 @@ def get_default_hparams(ruleset):
             # a default weak regularization prevents instability
             'l1_h': 1.0*0.0001,
             # l2 regularization on activity
-            'l2_h': 1.0*0,
+            'l2_h': 0,
             # l2 regularization on weight
-            'l1_weight': 0.0001*0,
+            'l1_weight': 0,
             # l2 regularization on weight
-            'l2_weight': 0.0001*0,
+            'l2_weight': 0,
             # l2 regularization on deviation from initialization
-            'l2_weight_init': 0.0001*0,
+            'l2_weight_init': 0,
             # Stopping performance
             'target_perf': 1.,
             # number of units each ring
@@ -283,18 +283,19 @@ def train_old(train_dir,
     # Use customized session that launches the graph as well
     with tf.Session() as sess:
         if reuse:
-            model.restore(sess)
+            model.restore()
         else:
             sess.run(tf.global_variables_initializer())
 
         # penalty on deviation from initial weight
         if hparams['l2_weight_init'] > 0:
             # TODO: Need checking
-            anchor_vars = sess.run(model.var_list)
+            anchor_ws = sess.run(model.weight_list)
 
-            for v, v_val in zip(model.var_list, anchor_vars):
+            # TODO: only change weights
+            for w, w_val in zip(model.weight_list, anchor_ws):
                 model.cost_reg += (hparams['l2_weight_init'] *
-                                   tf.reduce_sum(tf.square(v-v_val)))
+                                   tf.nn.l2_loss(w-w_val))
 
             model.set_optimizer()
 
@@ -431,6 +432,18 @@ def train(train_dir,
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
+        # penalty on deviation from initial weight
+        if hparams['l2_weight_init'] > 0:
+            # TODO: Need checking
+            anchor_ws = sess.run(model.weight_list)
+
+            # TODO: only change weights
+            for w, w_val in zip(model.weight_list, anchor_ws):
+                model.cost_reg += (hparams['l2_weight_init'] *
+                                   tf.nn.l2_loss(w - w_val))
+
+            model.set_optimizer()
+
         step = 0
         while step * hparams['batch_size_train'] <= max_steps:
             try:
@@ -450,8 +463,11 @@ def train(train_dir,
                         variance._compute_variance_bymodel(model, sess)
                         rule_pair = ['contextdm1', 'contextdm2']
                         save_name = '_atstep' + str(step)
-                        variance.plot_hist_varprop(
-                            train_dir, rule_pair, figname_extra=save_name)
+                        title = ('Step ' + str(step) +
+                                 ' Perf. {:0.2f}'.format(log['perf_avg'][-1]))
+                        variance.plot_hist_varprop(train_dir, rule_pair,
+                                                   figname_extra=save_name,
+                                                   title=title)
 
                 # Training
                 rule_train_now = hparams['rng'].choice(hparams['rule_trains'],
@@ -525,8 +541,9 @@ def to_savename(
 if __name__ == '__main__':
     pass
     run_analysis = []
-    hparams = {'rnn_type': 'LeakyGRU', 'activation': 'softplus'}
-    train('mantetemp', seed=1, hparams=hparams, ruleset='mante',
+    hparams = {'rnn_type': 'LeakyRNN', 'activation': 'softplus',
+               'l2_weight_init': 1e-4}
+    train('data/mantetemp', seed=1, hparams=hparams, ruleset='mante',
           display_step=500, rich_output=True)
     
     # rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
