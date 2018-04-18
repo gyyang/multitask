@@ -644,19 +644,16 @@ class Model(object):
         # Regularization terms
         self.cost_reg = tf.constant(0.)
         if hparams['l1_h'] > 0:
-            self.cost_reg += tf.reduce_mean(tf.abs(self.h))*hparams['l1_h']
+            self.cost_reg += tf.reduce_sum(tf.abs(self.h))*hparams['l1_h']
         if hparams['l2_h'] > 0:
-            self.cost_reg += tf.sqrt(
-                    tf.reduce_mean(tf.square(self.h)))*hparams['l2_h']
+            self.cost_reg += tf.nn.l2_loss(self.h)*hparams['l2_h']
 
         if hparams['l1_weight'] > 0:
-            self.cost_reg += hparams['l1_weight']*tf.reduce_mean(
-                [tf.reduce_mean(tf.abs(v)) for v in self.weight_list])
-            #hparams['l1_weight']*tf.add_n([tf.reduce_mean(tf.abs(v)) for v in self.var_list if ('kernel' in v.name or 'weight' in v.name) ])
-        if hparams['l2_weight'] > 0: #maddy added check
-            # TODO(gryang): Check if this is correct
-            self.cost_reg += hparams['l2_weight']*tf.reduce_mean(
-              [tf.sqrt(tf.reduce_mean(tf.square(v))) for v in self.weight_list])
+            self.cost_reg += hparams['l1_weight']*tf.add_n(
+                [tf.reduce_sum(tf.abs(v)) for v in self.weight_list])
+        if hparams['l2_weight'] > 0:
+            self.cost_reg += hparams['l2_weight']*tf.add_n(
+                [tf.nn.l2_loss(v) for v in self.weight_list])
 
         # Create an optimizer.
         self.opt = tf.train.AdamOptimizer(
