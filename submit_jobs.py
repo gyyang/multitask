@@ -103,7 +103,7 @@ if args.run == 'all':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=1)
         subprocess.call(['sbatch', jobfile])
 
-if args.run == 'all_varyhp': 
+elif args.run == 'all_varyhp':
     for i in range(0, 320):
         jobname = 'train_varyhp_{:d}'.format(i)
         train_arg = '{:d}'.format(i)
@@ -114,7 +114,7 @@ if args.run == 'all_varyhp':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
-if args.run == 'mante':
+elif args.run == 'mante':
     for seed in range(0, 20):
         jobname = 'train_mante_{:d}'.format(seed)
         train_arg = 'seed={:d}'.format(seed)
@@ -125,8 +125,19 @@ if args.run == 'mante':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
+elif args.run == 'mante_varyhp':
+    for i in range(0, 384):
+        jobname = 'mante_varyhp_{:d}'.format(i)
+        train_arg = '{:d}'.format(i)
+        cmd = r'''python -c "import experiment as e;e.vary_hp_mante('''+\
+              train_arg+''')"'''
+
+        jobfile = write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
 # Current continual learning version
-if args.run == 'cont':
+elif args.run == 'cont':
     s = 1
     n_unit = 256
     for seed in range(0,20):
@@ -151,7 +162,7 @@ if args.run == 'cont':
             subprocess.call(['sbatch', jobfile])
 
 # Grid search
-if args.run == 'grid':
+elif args.run == 'grid':
     raise NotImplementedError()
     s = 1
     n_unit = 256
@@ -168,3 +179,5 @@ if args.run == 'grid':
                 jobfile = write_jobfile(cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
                 subprocess.call(['sbatch', jobfile])
 
+else:
+    raise ValueError('Unknow argument run ' + str(args.run))

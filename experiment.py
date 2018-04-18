@@ -82,6 +82,7 @@ def train_vary_hparams(i):
     hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]  # TODO(gryang): Change this?
     hp_ranges['l2_h'] = [0]
     hp_ranges['l1_weight'] = [0, 1e-5, 1e-4, 1e-3]
+    # TODO(gryang): add the level of overtraining
 
     # Unravel the input index
     keys = hp_ranges.keys()
@@ -104,6 +105,46 @@ def train_vary_hparams(i):
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
     # TODO(gryang): Add more analysis here
+
+
+def vary_hp_mante(i):
+    """Vary the hyperparameters and train on Mante tasks only.
+
+    This experiment loops over a set of hyperparameters.
+
+    Args:
+        i: int, the index of the hyperparameters list
+    """
+    # Ranges of hyperparameters to loop over
+    hp_ranges = OrderedDict()
+    hp_ranges['activation'] = ['softplus', 'relu', 'tanh', 'retanh']
+    hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
+    hp_ranges['w_rec_init'] = ['diag', 'randortho']
+    hp_ranges['l1_h'] = [0, 1e-5]
+    hp_ranges['l2_h'] = [0]
+    hp_ranges['l1_weight'] = [0, 1e-5]
+    hp_ranges['l2_weight_init'] = [0, 1e-5, 1e-4]
+    hp_ranges['target_perf'] = [0.85, 0.95]
+
+    # Unravel the input index
+    keys = hp_ranges.keys()
+    dims = [len(hp_ranges[k]) for k in keys]
+    indices = np.unravel_index(i, dims=dims)
+
+    # Set up new hyperparameter
+    hparams = dict()
+    for key, index in zip(keys, indices):
+        hparams[key] = hp_ranges[key][index]
+
+    train_dir = os.path.join(DATAPATH, 'varyhp_mante', str(i))
+    train.train(train_dir, hparams, ruleset='mante', max_steps=1e6)
+
+    # Analyses
+    variance.compute_variance(train_dir)
+    log = tools.load_log(train_dir)
+    analysis = clustering.Analysis(train_dir, 'rule')
+    log['n_cluster'] = analysis.n_cluster
+    tools.save_log(log)
 
 
 if __name__ == '__main__':
