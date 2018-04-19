@@ -6,6 +6,7 @@ Yang GR et al. 2017 BioRxiv
 """
 from __future__ import absolute_import
 
+import tools
 import performance
 import standard_analysis
 import antitask
@@ -13,6 +14,7 @@ import clustering
 import variance
 import taskset
 import varyhparams
+
 
 def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
     """Sequantial training setup for paper
@@ -73,14 +75,34 @@ def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
 root_dir = './data/train_all'
 model_dir = root_dir + '/0'
 
-variance.compute_variance(root_dir)
+root_dir = './data/varyhparams'
+hp_target = {'activation': 'softplus',
+             'rnn_type': 'LeakyGRU',
+             'w_rec_init': 'diag',
+             'l1_h': 1e-4,
+             'l1_weight': 0}
+model_dir, _ = tools.find_model(root_dir, hp_target)
+
+# =============================================================================
+# root_dir = './data/varyhparams'
+# hp_target = {'activation': 'tanh',
+#              'rnn_type': 'LeakyRNN',
+#              'w_rec_init': 'diag',
+#              'l1_h': 0}
+# root_dir, _ = tools.find_all_models(root_dir, hp_target)
+# =============================================================================
+
+# root_dir = './data/mantetemp'
+# root_dir = model_dir
+
+# variance.compute_variance(root_dir)
 
 # Performance Analysis-----------------------------------------------------
-standard_analysis.schematic_plot(model_dir=model_dir) # Generate schematic
-performance.plot_performanceprogress(model_dir) # Plot performance during training
-performance.psychometric_choice(model_dir) # Psychometric for dm
-performance.psychometric_choiceattend(model_dir, no_ylabel=True)
-performance.psychometric_choiceint(model_dir, no_ylabel=True)
+# standard_analysis.schematic_plot(model_dir=model_dir) # Generate schematic
+# performance.plot_performanceprogress(model_dir) # Plot performance during training
+# performance.psychometric_choice(model_dir) # Psychometric for dm
+# performance.psychometric_choiceattend(model_dir, no_ylabel=True)
+# performance.psychometric_choiceint(model_dir, no_ylabel=True)
 
 # TODO(gryang): the following remains to be fixed
 # model_dirs = t
@@ -92,38 +114,39 @@ performance.psychometric_choiceint(model_dir, no_ylabel=True)
 # performance.psychometric_delaychoice_varytime(model_dir, 'delaydm1')
 
 # Analysis of Anti tasks---------------------------------------------------
-ATA = antitask.Analysis(model_dir)
-ATA.plot_example_unit()
-ATA.plot_lesions()
-ATA.plot_inout_connections()
-ATA.plot_rec_connections()
-ATA.plot_rule_connections()
+# ATA = antitask.Analysis(model_dir)
+# ATA.plot_example_unit()
+# ATA.plot_lesions()
+# ATA.plot_inout_connections()
+# ATA.plot_rec_connections()
+# ATA.plot_rule_connections()
 
 # Clustering Analysis------------------------------------------------------
 
 CA = clustering.Analysis(model_dir, data_type='rule')
-CA.plot_example_unit()
+# CA.plot_example_unit()
+CA.plot_cluster_score()
 CA.plot_variance()
 CA.plot_2Dvisualization()
-CA.plot_lesions()
+# CA.plot_lesions()
 
 
-CA = clustering.Analysis(model_dir, data_type='epoch')
-CA.plot_variance()
-CA.plot_2Dvisualization()
+# CA = clustering.Analysis(model_dir, data_type='epoch')
+# CA.plot_variance()
+# CA.plot_2Dvisualization()
 
 # FTV Analysis-------------------------------------------------------------
-variance.plot_hist_varprop_selection(root_dir)
-variance.plot_hist_varprop_all(root_dir)
+# variance.plot_hist_varprop_selection(root_dir)
+# variance.plot_hist_varprop_all(root_dir)
 
 # Varying hyperparameter analysis------------------------------------------
-varyhparams.plot_n_clusters()
-varyhparams.plot_hist_varprop_tanh()
+# varyhparams.plot_n_clusters()
+# varyhparams.plot_hist_varprop_tanh()
 
 # Task Representation------------------------------------------------------
-tsa = taskset.TaskSetAnalysis(model_dir)
-tsa.compute_and_plot_taskspace(
-        epochs=['stim1'], dim_reduction_type='PCA')
+# tsa = taskset.TaskSetAnalysis(model_dir)
+# tsa.compute_and_plot_taskspace(
+#         epochs=['stim1'], dim_reduction_type='PCA')
 
 # Compositional Representation---------------------------------------------
 # setups = [1] # Go, Anti family
@@ -131,12 +154,14 @@ tsa.compute_and_plot_taskspace(
 setups = [1, 2]
 for setup in setups:
     pass
-    taskset.plot_taskspace_group(root_dir, setup=setup,
-                                 restore=True, representation='rate')
-    taskset.plot_taskspace_group(root_dir, setup=setup,
-                                 restore=True, representation='weight')
-    taskset.plot_replacerule_performance_group(
-            root_dir, setup=setup, restore=True)
+# =============================================================================
+#     taskset.plot_taskspace_group(root_dir, setup=setup,
+#                                  restore=True, representation='rate')
+#     taskset.plot_taskspace_group(root_dir, setup=setup,
+#                                  restore=True, representation='weight')
+#     taskset.plot_replacerule_performance_group(
+#             root_dir, setup=setup, restore=True)
+# =============================================================================
 
 # Continual Learning Analysis----------------------------------------------
 # TODO(gryang): Remains to be fixed
