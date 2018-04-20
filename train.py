@@ -35,7 +35,7 @@ def get_default_hparams(ruleset):
             # batch size for training
             'batch_size_train': 64,
             # batch_size for testing
-            'batch_size_test': 256,
+            'batch_size_test': 512,
             # input type: normal, multi
             'in_type': 'normal',
             # Type of RNNs: LeakyRNN, LeakyGRU, EILeakyGRU, GRU, LSTM
@@ -57,7 +57,7 @@ def get_default_hparams(ruleset):
             # leaky_rec weight initialization, diag, randortho, randgauss
             'w_rec_init': 'diag',
             # a default weak regularization prevents instability
-            'l1_h': 1.0*0.0001,
+            'l1_h': 0,
             # l2 regularization on activity
             'l2_h': 0,
             # l2 regularization on weight
@@ -495,11 +495,15 @@ if __name__ == '__main__':
     run_analysis = []
     hparams = {'rnn_type': 'LeakyRNN',
                'activation': 'softplus',
-               'l2_weight_init': 0.,
+               'l1_h': 1e-5,
+               'l2_h': 1e-5,
+               'l1_weight': 1e-5,
+               'l2_weight': 1e-5,
+               'l2_weight_init': 1e-5,
                'target_perf': 0.9,
                'w_rec_init': 'randortho'}
     train('data/mantetemp', seed=1, hparams=hparams, ruleset='mante',
-          display_step=500, rich_output=True)
+          display_step=100, rich_output=False)
     
     # rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     # hparams = {'rnn_type': 'LeakyGRU', 'n_rnn': 128}
