@@ -157,6 +157,17 @@ def find_model(root_dir, hp_target):
     return d, hp
 
 
+def select_by_perf(model_dirs, perf_min):
+    """Select a list of models by a performance threshold."""
+    new_model_dirs = list()
+    for model_dir in model_dirs:
+        log = load_log(model_dir)
+        # check if performance exceeds target
+        if log['perf_min'][-1] > perf_min:
+            new_model_dirs.append(model_dir)
+    return new_model_dirs
+
+
 def mkdir_p(path):
     """
     Portable mkdir -p
