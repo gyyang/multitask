@@ -107,25 +107,8 @@ def train_vary_hparams(i):
     # TODO(gryang): Add more analysis here
 
 
-def vary_hp_mante(i):
-    """Vary the hyperparameters and train on Mante tasks only.
-
-    This experiment loops over a set of hyperparameters.
-
-    Args:
-        i: int, the index of the hyperparameters list
-    """
-    # Ranges of hyperparameters to loop over
-    hp_ranges = OrderedDict()
-    hp_ranges['activation'] = ['softplus', 'relu', 'tanh', 'retanh']
-    hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
-    hp_ranges['w_rec_init'] = ['diag', 'randortho']
-    hp_ranges['l1_h'] = [0, 1e-5]
-    hp_ranges['l2_h'] = [0]
-    hp_ranges['l1_weight'] = [0, 1e-5]
-    hp_ranges['l2_weight_init'] = [0, 1e-5, 1e-4]
-    hp_ranges['target_perf'] = [0.85, 0.95]
-
+def _base_vary_hp_mante(i, hp_ranges, base_name):
+    """Vary hyperparameters for mante tasks."""
     # Unravel the input index
     keys = hp_ranges.keys()
     dims = [len(hp_ranges[k]) for k in keys]
@@ -136,8 +119,8 @@ def vary_hp_mante(i):
     for key, index in zip(keys, indices):
         hparams[key] = hp_ranges[key][index]
 
-    train_dir = os.path.join(DATAPATH, 'varyhp_mante', str(i))
-    train.train(train_dir, hparams, ruleset='mante', max_steps=1e6)
+    train_dir = os.path.join(DATAPATH, base_name, str(i))
+    train.train(train_dir, hparams, ruleset='mante', max_steps=5 * 1e6)
 
     # Analyses
     variance.compute_variance(train_dir)
@@ -145,6 +128,25 @@ def vary_hp_mante(i):
     analysis = clustering.Analysis(train_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
+
+
+def vary_l2_init_mante(i):
+    """Vary the hyperparameters and train on Mante tasks only.
+
+    This experiment loops over a set of hyperparameters.
+
+    Args:
+        i: int, the index of the hyperparameters list
+    """
+    # Ranges of hyperparameters to loop over
+    hp_ranges = OrderedDict()
+    hp_ranges['activation'] = ['softplus']
+    hp_ranges['rnn_type'] = ['LeakyRNN']
+    hp_ranges['w_rec_init'] = ['diag', 'randortho']
+    hp_ranges['l2_weight_init'] = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4, 1e-3]
+    hp_ranges['target_perf'] = [0.85, 0.9, 0.95]
+
+    _base_vary_hp_mante(i, hp_ranges, base_name='vary_l2init_mante')
 
 
 if __name__ == '__main__':
