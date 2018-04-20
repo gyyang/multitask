@@ -5,6 +5,7 @@ from __future__ import division
 import os
 import sys
 import numpy as np
+import pickle
 import json
 import time
 from collections import OrderedDict
@@ -441,20 +442,20 @@ def _compute_var_all(data, var_method='time_avg_early'):
 def compute_var_all(model_dir, restore=True):
     """Compute task variance."""
     
-    fname = 'mante_taskvar.json'
+    fname = 'mante_taskvar.pkl'
     fname = os.path.join(model_dir, fname)
 
     if restore and os.path.isfile(fname):
-        print('Reloading results from ' + fname)
+        # print('Reloading results from ' + fname)
         with open(fname, 'rb') as f:
-            var_dict = json.load(f)
+            var_dict = pickle.load(f)
         return var_dict
         
     data = load_data(dataset='model', model_dir=model_dir)
-    var_dict = compute_var_all(data, var_method='time_avg_late')
+    var_dict = _compute_var_all(data, var_method='time_avg_late')
     
     with open(fname, 'wb') as f:
-        json.dump(var_dict, f)
+        pickle.dump(var_dict, f)
     print('Results stored at : ' + fname)
 
 
@@ -860,16 +861,16 @@ if __name__ == '__main__':
     analyze_single_units = False
     denoise = False
 
-    # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
 # =============================================================================
-#     root_dir = './data/varyhp_mante2'
+#     # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
+#     root_dir = './data/vary_l2init_mante'
 #     hp_target = {'activation': 'softplus',
 #                  'rnn_type': 'LeakyRNN',
 #                  'w_rec_init': 'randortho',
-#                  'target_perf': 0.85,
+#                  'target_perf': 0.95,
 #                  'l1_h': 0,
 #                  'l1_weight': 0,
-#                  'l2_weight_init': 0}
+#                  'l2_weight_init': 1e-4}
 #     model_dir, _ = tools.find_model(root_dir, hp_target)
 #     # model_dir = 'data/mante_l2init'
 #     dataset = 'model'
@@ -885,7 +886,7 @@ if __name__ == '__main__':
 #     
 #     plot_rate_distribution(data_area)
 #     
-#     var_dict = compute_var_all(data_area, var_method='time_avg_late')
+#     var_dict = compute_var_all(model_dir)
 #     var_thr, thr_type = 0.2, 'or'
 #     frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
 #     plot_frac_var(frac_var, save_name=dataset)
@@ -897,5 +898,62 @@ if __name__ == '__main__':
 #     variance.plot_hist_varprop(model_dir=model_dir,
 #                               rule_pair=('contextdm1', 'contextdm2'))
 # =============================================================================
-
     
+    
+    
+ 
+    root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
+    # root_dir, hp_vary = './data/vary_l2weight_mante', 'l2_weight'
+    
+    hp_target = {'activation': 'softplus',
+                 'rnn_type': 'LeakyRNN',
+                 'w_rec_init': 'randortho',
+                 'target_perf': 0.9}
+    
+    # hp_vary_vals = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4, 1e-3]
+    hp_vary_vals = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4]
+    # hp_vary_vals = [1e-4]
+    
+    hists = list()
+    xs = list()
+    labels = list()
+    for hp_val in hp_vary_vals:        
+        hp_target[hp_vary] = hp_val
+        model_dir, _ = tools.find_all_models(root_dir, hp_target)
+        
+        # Only analyze models that trained
+        model_dir = tools.select_by_perf(model_dir, perf_min=0.8)
+        if not model_dir:
+            continue
+
+        rule_pair = ('contextdm1', 'contextdm2')
+        hist_tmp, bins_edge = variance.compute_hist_varprop(model_dir, rule_pair)
+
+# =============================================================================
+#         hist = list()
+#         for d in model_dir:
+#             var_dict = compute_var_all(d)
+#             frac_var = compute_frac_var(var_dict, var_thr=0.2, thr_type='or')
+#             hist_tmp, bins_edge = np.histogram(frac_var, bins=20, range=(-1, 1))
+#             hist.append(hist_tmp)
+#         hist_tmp = np.array(hist)
+# =============================================================================
+
+        hist = np.sum(hist_tmp, axis=0)
+        hist = hist / np.sum(hist)
+        hists.append(hist)
+        xs.append((bins_edge[1:] + bins_edge[:-1]) / 2)
+        labels.append(hp_val)
+        
+        plt.figure()
+        _ = plt.plot(xs[-1], hist_tmp.T)
+        plt.title(str(hp_val))
+
+    n = len(labels)
+
+    fig = plt.figure()
+    ax = fig.add_axes([.2, .2, .7, .7])
+    for i in range(n):
+        color = mpl.cm.cool(i * 1.0 / n)
+        ax.plot(xs[i], hists[i], color=color, label=labels[i])
+    ax.legend()
