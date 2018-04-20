@@ -112,7 +112,8 @@ def _base_vary_hp_mante(i, hp_ranges, base_name):
     # Unravel the input index
     keys = hp_ranges.keys()
     dims = [len(hp_ranges[k]) for k in keys]
-    indices = np.unravel_index(i, dims=dims)
+    n_max = np.prod(dims)
+    indices = np.unravel_index(i % n_max, dims=dims)
 
     # Set up new hyperparameter
     hparams = dict()
