@@ -9,8 +9,10 @@ import pickle
 import time
 from collections import OrderedDict
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from scipy.io import loadmat, whosmat
 
+import variance
 import mante_dataset_preprocess
 import siegel_dataset_preprocess
 import contextdm_analysis
@@ -167,8 +169,7 @@ def get_trial_avg(data,
                 data_test[:, i_cond, i_unit] = np.mean(
                     response[ind_cond_test, :], axis=0)
             else:
-                data_train[:, i_cond, i_unit] = np.mean(
-                    response[ind_cond, :], axis=0)
+                data_train[:, i_cond, i_unit] = response[ind_cond].mean(axis=0)
 
     if split_traintest:
         return data_train, data_test
@@ -436,9 +437,7 @@ def compute_var_all(data, var_method='time_avg_early'):
     return var_dict
 
 
-def compute_frac_var(var_dict, var_thr=0.0, save_name=None,
-                        thr_type='sum'):
-
+def _plot_var_vs_shuffle(var_dict, save_name=None):
     var1s = var_dict['var1s']
     var2s = var_dict['var2s']
     var1s_shuffle = var_dict['var1s_shuffle']
@@ -448,12 +447,12 @@ def compute_frac_var(var_dict, var_thr=0.0, save_name=None,
     fig = plt.figure(figsize=(2, 2))
     ax = fig.add_axes([0.25, 0.25, 0.65, 0.65])
     ax.scatter(np.concatenate((var1s, var2s)),
-                np.concatenate((var1s_shuffle, var2s_shuffle)), s=4)
-    ax.plot([0,500], [0,500])
+               np.concatenate((var1s_shuffle, var2s_shuffle)), s=4)
+    ax.plot([0, 500], [0, 500])
     lim = np.max(np.concatenate(
-        (var1s, var2s, var1s_shuffle, var2s_shuffle)))
-    plt.xlim([0,lim*1.1])
-    plt.ylim([0,lim*1.1])
+            (var1s, var2s, var1s_shuffle, var2s_shuffle)))
+    plt.xlim([0, lim*1.1])
+    plt.ylim([0, lim*1.1])
     plt.xlabel('Stimulus variance', fontsize=7)
     plt.ylabel('Stimulus variance (shuffled data)', fontsize=7)
     # title = self.var_method + ' rand. rot. ' + str(random_rotation)
@@ -469,6 +468,15 @@ def compute_frac_var(var_dict, var_thr=0.0, save_name=None,
     if save_name is not None:
         fig_name += save_name
     plt.savefig(fig_name + '.pdf', transparent=True)
+
+
+def compute_frac_var(var_dict, var_thr=0.0, thr_type='sum'):
+
+    var1s = var_dict['var1s']
+    var2s = var_dict['var2s']
+    var1s_shuffle = var_dict['var1s_shuffle']
+    var2s_shuffle = var_dict['var2s_shuffle']
+
     #
     # plt.figure()
     # plt.scatter(var1s_shuffle, var2s_shuffle)
@@ -543,7 +551,7 @@ def plot_frac_var(frac_var, save_name=None, fancy_color=False):
                            color=colors[group], edgecolor='none', label=group)
             bs.append(b_tmp)
     plt.locator_params(nbins=3)
-    xlabel = 'frac_var'
+    xlabel = 'FTV(Ctx 1, Ctx 2)'
     ax.set_xlabel(xlabel, fontsize=fs)
     ax.set_ylabel('Units', fontsize=fs)
     ax.set_ylim(bottom=-0.02 * hist.max())
@@ -771,30 +779,85 @@ def plot_rate_distribution(data):
     plt.ylabel('Activity at end')
 
 
+def plot_fracvar_hist_byhp():
+    """Plot how fractional variance distribution depends on hparams."""
+    l2_weight_inits = [0, 1e-5, 1e-4]
+    hists = list()
+    bins_edges = list()
+    for l2_weight_init in l2_weight_inits:
+        root_dir = './data/varyhp_mante2'
+        hp_target = {'activation': 'softplus',
+                     'rnn_type': 'LeakyRNN',
+                     'w_rec_init': 'randortho',
+                     'target_perf': 0.95,
+                     'l2_weight_init': l2_weight_init}
+        model_dir, _ = tools.find_model(root_dir, hp_target)
+
+        rule_pair = ('contextdm1', 'contextdm2')
+        hist, bins_edge = variance.compute_hist_varprop(model_dir, rule_pair)
+
+        # data = load_data(dataset='model', model_dir=model_dir)
+        # var_dict = compute_var_all(data, var_method='time_avg_late')
+        # frac_var = compute_frac_var(var_dict, var_thr=0.2, thr_type='or')
+        # hist, bins_edge = np.histogram(frac_var, bins=10, range=(-1, 1))
+
+        hists.append(hist[0])
+        bins_edges.append(bins_edge)
+
+    n = len(l2_weight_inits)
+
+    fig = plt.figure()
+    ax = fig.add_axes([.2, .2, .7, .7])
+    for i in range(n):
+        color = mpl.cm.coolwarm(i * 1.0 / n)
+        bins_edge = bins_edges[i]
+        hist = hists[i]
+
+        ax.plot((bins_edge[1:] + bins_edge[:-1]) / 2, hist,
+                color=color, label=l2_weight_inits[i])
+    ax.legend()
+
+
 if __name__ == '__main__':
     pass
     analyze_single_units = False
     denoise = False
 
-    root_dir = './data/varyhparams'
+    # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
+    root_dir = './data/varyhp_mante2'
     hp_target = {'activation': 'softplus',
-                 'rnn_type': 'LeakyGRU',
+                 'rnn_type': 'LeakyRNN',
                  'w_rec_init': 'randortho',
+                 'target_perf': 0.85,
                  'l1_h': 0,
-                 'l1_weight': 1e-5}
+                 'l1_weight': 0,
+                 'l2_weight_init': 0}
     model_dir, _ = tools.find_model(root_dir, hp_target)
+    # model_dir = 'data/mante_l2init'
     dataset = 'model'
 
     # dataset, model_dir = 'mante', None
     # dataset, model_dir = 'siegel', None
     data = load_data(dataset=dataset,
-                      analyze_single_units=analyze_single_units,
-                      model_dir=model_dir)
+                     analyze_single_units=analyze_single_units,
+                     model_dir=model_dir)
     
-    # var_dict = compute_var_all(data, var_method='time_avg_late')
-    # var_thr, thr_type = 0.05, 'or'
-    # frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
-    # plot_frac_var(frac_var, save_name=dataset)
+    data_area = data
+    # data_area = [d for d in data if d['area'] == 'PFC']    
     
+    plot_rate_distribution(data_area)
+    
+    var_dict = compute_var_all(data_area, var_method='time_avg_late')
+    var_thr, thr_type = 0.2, 'or'
+    frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
+    plot_frac_var(frac_var, save_name=dataset)
+    
+    import performance
+    performance.plot_performanceprogress(model_dir, save=False)
+    
+    import variance
+    variance.plot_hist_varprop(model_dir=model_dir,
+                              rule_pair=('contextdm1', 'contextdm2'))
+
 
 

@@ -190,7 +190,7 @@ def compute_hist_varprop(model_dir, rule_pair, random_rotation=False):
     return hists, bins_edge
 
 def _plot_hist_varprop(hist_plot, bins_edge, rule_pair, hist_example=None,
-                       plot_legend=False, figname=None):
+                       plot_legend=False, figname=None, title=None):
     '''Plot histogram of fractional variance'''
     # Plot the percentage instead of the total count
     hist_plot = hist_plot/np.sum(hist_plot)
@@ -224,6 +224,8 @@ def _plot_hist_varprop(hist_plot, bins_edge, rule_pair, hist_example=None,
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
     ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
+    if title:
+        ax.set_title(title, fontsize=7)
     if plot_legend:
         lg = plt.legend(legends, labels, ncol=1,bbox_to_anchor=(1.1,1.3),
                         fontsize=fs,labelspacing=0.3,loc=1, frameon=False)
