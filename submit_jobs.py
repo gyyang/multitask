@@ -16,7 +16,7 @@ parser.add_argument('run')
 args = parser.parse_args()
 
 sbatchpath = './sbatch/'
-scratchpath = '/scratch/mj98-share/multitask/'
+scratchpath = '/scratch/gy441/multitask/'
 
 
 def write_jobfile(cmd, jobname, sbatchpath, scratchpath,
@@ -125,11 +125,22 @@ elif args.run == 'mante':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
-elif args.run == 'mante_varyhp':
-    for i in range(0, 384):
-        jobname = 'mante_varyhp_{:d}'.format(i)
+elif args.run == 'mante_vary_l2init':
+    for i in range(0, 72):
+        jobname = 'mante_vary_l2init_{:d}'.format(i)
         train_arg = '{:d}'.format(i)
-        cmd = r'''python -c "import experiment as e;e.vary_hp_mante('''+\
+        cmd = r'''python -c "import experiment as e;e.vary_l2_init_mante('''+\
+              train_arg+''')"'''
+
+        jobfile = write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
+elif args.run == 'mante_vary_l2weight':
+    for i in range(0, 72):
+        jobname = 'mante_vary_l2weight_{:d}'.format(i)
+        train_arg = '{:d}'.format(i)
+        cmd = r'''python -c "import experiment as e;e.vary_l2_weight_mante('''+\
               train_arg+''')"'''
 
         jobfile = write_jobfile(

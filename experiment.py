@@ -150,6 +150,25 @@ def vary_l2_init_mante(i):
     _base_vary_hp_mante(i, hp_ranges, base_name='vary_l2init_mante')
 
 
+def vary_l2_weight_mante(i):
+    """Vary the hyperparameters and train on Mante tasks only.
+
+    This experiment loops over a set of hyperparameters.
+
+    Args:
+        i: int, the index of the hyperparameters list
+    """
+    # Ranges of hyperparameters to loop over
+    hp_ranges = OrderedDict()
+    hp_ranges['activation'] = ['softplus']
+    hp_ranges['rnn_type'] = ['LeakyRNN']
+    hp_ranges['w_rec_init'] = ['diag', 'randortho']
+    hp_ranges['l2_weight'] = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4, 1e-3]
+    hp_ranges['target_perf'] = [0.85, 0.9, 0.95]
+
+    _base_vary_hp_mante(i, hp_ranges, base_name='vary_l2weight_mante')
+
+
 if __name__ == '__main__':
     """ 
     train_mante()
