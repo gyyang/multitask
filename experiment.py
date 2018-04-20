@@ -10,6 +10,7 @@ import tools
 import train
 import variance
 import clustering
+import data_analysis
 
 # TODO: make this flexible
 DATAPATH = os.path.join(os.getcwd(), 'data')
@@ -104,7 +105,7 @@ def train_vary_hparams(i):
     analysis = clustering.Analysis(train_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
-    # TODO(gryang): Add more analysis here
+    data_analysis.compute_var_all(train_dir)
 
 
 def _base_vary_hp_mante(i, hp_ranges, base_name):
@@ -125,6 +126,7 @@ def _base_vary_hp_mante(i, hp_ranges, base_name):
 
     # Analyses
     variance.compute_variance(train_dir)
+    
     log = tools.load_log(train_dir)
     analysis = clustering.Analysis(train_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
