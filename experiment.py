@@ -88,7 +88,8 @@ def train_vary_hparams(i):
     # Unravel the input index
     keys = hp_ranges.keys()
     dims = [len(hp_ranges[k]) for k in keys]
-    indices = np.unravel_index(i, dims=dims)
+    n_max = np.prod(dims)
+    indices = np.unravel_index(i % n_max, dims=dims)
 
     # Set up new hyperparameter
     hparams = dict()
@@ -97,7 +98,8 @@ def train_vary_hparams(i):
 
     train_dir = os.path.join(DATAPATH, 'varyhparams', str(i))
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir, hparams, ruleset='all', rule_prob_map=rule_prob_map)
+    train.train(train_dir, hparams, ruleset='all',
+                rule_prob_map=rule_prob_map, seed=i // n_max)
 
     # Analyses
     variance.compute_variance(train_dir)
@@ -122,7 +124,8 @@ def _base_vary_hp_mante(i, hp_ranges, base_name):
         hparams[key] = hp_ranges[key][index]
 
     train_dir = os.path.join(DATAPATH, base_name, str(i))
-    train.train(train_dir, hparams, ruleset='mante', max_steps=5 * 1e6)
+    train.train(train_dir, hparams, ruleset='mante',
+                max_steps=5 * 1e6, seed=i // n_max)
 
     # Analyses
     variance.compute_variance(train_dir)
@@ -131,6 +134,7 @@ def _base_vary_hp_mante(i, hp_ranges, base_name):
     analysis = clustering.Analysis(train_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
+    data_analysis.compute_var_all(train_dir)
 
 
 def vary_l2_init_mante(i):
