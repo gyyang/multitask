@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections import OrderedDict
 import os
 import numpy as np
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 import tools
@@ -14,7 +14,7 @@ import variance
 import clustering
 import standard_analysis
 
-matplotlib.rcParams.update({'font.size': 7})
+mpl.rcParams.update({'font.size': 7})
 
 DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhparams')
 FIGPATH = os.path.join(os.getcwd(), 'figure')
@@ -26,7 +26,9 @@ hp_name = {'activation': 'Activation Fun.',
            'rnn_type': 'Network type',
            'w_rec_init': 'Initialization',
            'l1_h': 'L1 rate',
-           'l1_weight': 'L1 weight'}
+           'l1_weight': 'L1 weight',
+           'l2_weight_init': 'L2 weight anchor',
+           'target_perf': 'Target perf.'}
 
 #maddy added check tanh fig 4
 #root_dir = './data/debug/8' #0, 33 './data/train_all'
@@ -237,8 +239,14 @@ def plot_n_clusters(n_clusters, hparams_list):
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
 
+    import matplotlib as mpl
+    import seaborn as sns
+    colors = sns.color_palette("hls", 5)
+    cmap = mpl.colors.ListedColormap(colors)
+    cmap.set_over('0')
+    cmap.set_under('1')
     ax = fig.add_axes([0.3, 0.15, 0.65, 0.35])
-    ax.imshow(hparams_visualize, aspect='auto')
+    ax.imshow(hparams_visualize, aspect='auto', cmap='viridis')
     ax.set_xticks([0, len(n_clusters) - 1])
     ax.set_xticklabels([1, len(n_clusters)])
     ax.set_yticks(range(len(hp_plots)))
@@ -282,8 +290,6 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
             continue
         n_cluster_dict[hp[hp_plot]].append(n_cluster)
 
-    import seaborn as sns
-    colors = sns.color_palette("hls", 5)
     label_map = {'softplus': 'softplus',
                  'relu': 'ReLU',
                  'retanh': 'Retanh',
@@ -293,14 +299,16 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     # fig = plt.figure(figsize=(1.5, 1.2))
     # ax = fig.add_axes([0.2, 0.2, 0.7, 0.7])
     f, axs = plt.subplots(len(n_cluster_dict), 1,
-                          sharex=True, figsize=(1.5, 2))
+                          sharex=True, figsize=(1.2, 1.8))
     for i, (key, val) in enumerate(n_cluster_dict.items()):
         ax = axs[i]
         hist, bin_edges = np.histogram(val, density=True, range=(0, 30),
                                        bins=30)
         # plt.bar(bin_edges[:-1], hist, label=key)
+        color_ind = i / (len(hp_ranges[hp_plot]) - 1.)
+        color = mpl.cm.viridis(color_ind)
         ax.hist(val, label=label_map.get(key, str(key)), range=(0, 30),
-                density=True, bins=16, ec=colors[i], facecolor=colors[i],
+                density=True, bins=16, ec=color, facecolor=color,
                 lw=1.5)
         ax.spines["left"].set_visible(False)
         ax.spines["right"].set_visible(False)
@@ -373,7 +381,7 @@ def activity_histogram(activation):
 if __name__ == '__main__':
     pass
     # compute_n_cluster()
-    # n_clusters, hparams_list = get_n_clusters()
+    n_clusters, hparams_list = get_n_clusters()
     plot_n_clusters(n_clusters, hparams_list)
     plot_n_cluster_hist(n_clusters, hparams_list)
     # pretty_singleneuron_plot('tanh')
