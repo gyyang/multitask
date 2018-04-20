@@ -126,7 +126,7 @@ elif args.run == 'mante':
         subprocess.call(['sbatch', jobfile])
 
 elif args.run == 'mante_vary_l2init':
-    for i in range(0, 72):
+    for i in range(0, 180):
         jobname = 'mante_vary_l2init_{:d}'.format(i)
         train_arg = '{:d}'.format(i)
         cmd = r'''python -c "import experiment as e;e.vary_l2_init_mante('''+\
@@ -137,7 +137,7 @@ elif args.run == 'mante_vary_l2init':
         subprocess.call(['sbatch', jobfile])
 
 elif args.run == 'mante_vary_l2weight':
-    for i in range(0, 72):
+    for i in range(0, 180):
         jobname = 'mante_vary_l2weight_{:d}'.format(i)
         train_arg = '{:d}'.format(i)
         cmd = r'''python -c "import experiment as e;e.vary_l2_weight_mante('''+\
