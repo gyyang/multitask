@@ -12,7 +12,9 @@ from collections import OrderedDict
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.io import loadmat
+import scipy.stats as stats
 
+import performance
 import variance
 import mante_dataset_preprocess
 import siegel_dataset_preprocess
@@ -452,7 +454,7 @@ def compute_var_all(model_dir, restore=True):
         return var_dict
         
     data = load_data(dataset='model', model_dir=model_dir)
-    var_dict = _compute_var_all(data, var_method='time_avg_late')
+    c
     
     with open(fname, 'wb') as f:
         pickle.dump(var_dict, f)
@@ -801,159 +803,135 @@ def plot_rate_distribution(data):
     plt.ylabel('Activity at end')
 
 
-def plot_fracvar_hist_byhp():
+def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
     """Plot how fractional variance distribution depends on hparams."""
-    root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
+    # root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
     root_dir, hp_vary = './data/vary_l2weight_mante', 'l2_weight'
-    
+
     hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyRNN',
-                 'w_rec_init': 'randortho'}
-    
-    hp_vary_vals = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4, 1e-3]
-    
-    hists = list()
-    bins_edges = list()
-    labels = list()
-    for hp_val in hp_vary_vals:        
-        hp_target[hp_vary] = hp_val
+                 'w_rec_init': 'randortho',
+                 }
+
+    hp_vary_vals = [0, 1*1e-4, 4*1e-4, 8*1e-4]
+    hp_vary_vals = [8*1e-4]
+
+    hp_targets = [dict(hp_target, **{hp_vary: h}) for h in hp_vary_vals]
+
+    hists, xs, bottoms, tops = list(), list(), list(), list()
+    for hp_target in hp_targets:
         model_dir, _ = tools.find_all_models(root_dir, hp_target)
-        
         # Only analyze models that trained
         model_dir = tools.select_by_perf(model_dir, perf_min=0.8)
         if not model_dir:
             continue
 
         rule_pair = ('contextdm1', 'contextdm2')
-        # hist, bins_edge = variance.compute_hist_varprop(model_dir, rule_pair)
+        if mode == 'all_var':
+            hist_tmp, bins_edge = variance.compute_hist_varprop(model_dir,
+                                                                rule_pair)
+        elif mode == 'mante_var':
+            hist = list()
+            for d in model_dir:
+                var_dict = compute_var_all(d)
+                frac_var = compute_frac_var(var_dict, var_thr=0.5, thr_type='or')
+                hist_tmp, bins_edge = np.histogram(frac_var, bins=20, range=(-1, 1))
+                hist.append(hist_tmp)
+            hist_tmp = np.array(hist)
+        else:
+            raise ValueError('Unknown mode')
 
-        hist = list()
-        for d in model_dir:
-            data = load_data(dataset='model', model_dir=d)
-            var_dict = compute_var_all(data, var_method='time_avg_late')
-            frac_var = compute_frac_var(var_dict, var_thr=0.2, thr_type='or')
-            hist_tmp, bins_edge = np.histogram(frac_var, bins=10, range=(-1, 1))
-            hist.append(hist_tmp)
-        hist = np.array(hist)
+        bin_size = bins_edge[1] - bins_edge[0]
+        hist_tmp = hist_tmp.astype(np.float)
+        hist_density = (hist_tmp.T / hist_tmp.sum(axis=1)).T
 
-        hist = np.sum(hist, axis=0)
-        hist = hist / np.sum(hist)
+        hist = np.mean(hist_density, axis=0)
+        # bottom = np.percentile(hist_density, 10, axis=0)
+        # top = np.percentile(hist_density, 90, axis=0)
+        sem = stats.sem(hist_density, axis=0)
+        bottom = hist - sem
+        top = hist + sem
+
         hists.append(hist)
-        bins_edges.append(bins_edge)
-        labels.append(hp_val)
+        xs.append((bins_edge[1:] + bins_edge[:-1]) / 2)
+        bottoms.append(bottom)
+        tops.append(top)
 
-    n = len(labels)
+# =============================================================================
+#         plt.figure()
+#         _ = plt.plot(xs[-1], hist_tmp.T)
+#         plt.title(str(hp_val))
+# =============================================================================
 
-    fig = plt.figure()
-    ax = fig.add_axes([.2, .2, .7, .7])
+    n = len(hists)
+
+    fig = plt.figure(figsize=(2, 1.5))
+    ax = fig.add_axes([.2, .25, .7, .7])
     for i in range(n):
         color = mpl.cm.cool(i * 1.0 / n)
-        bins_edge = bins_edges[i]
-        hist = hists[i]
+        ax.plot(xs[i], hists[i], color=color, label=hp_vary_vals[i])
+        ax.fill_between(xs[i], bottoms[i], tops[i], alpha=0.2, color=color)
+    lg = ax.legend(title=hp_vary, fontsize=7, frameon=False,
+                   loc=1, bbox_to_anchor=(1.2, 1.0))
+    plt.setp(lg.get_title(), fontsize=7)
+    ax.set_ylim([0, 0.3])
+    ax.tick_params(axis='both', which='major', labelsize=7)
+    ax.locator_params(nbins=3)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
+    ax.set_xlabel('FTV(Ctx DM 1, Ctx DM 2)', fontsize=7)
+    ax.set_ylabel('Proportion', fontsize=7)
 
-        ax.plot((bins_edge[1:] + bins_edge[:-1]) / 2, hist,
-                color=color, label=labels[i])
-    ax.legend()
+    fig_name = 'figure/fracvar_by' + hp_vary
+    if save_name is not None:
+        fig_name += save_name
+    plt.savefig(fig_name + '.pdf', transparent=True)
+
+
+def plot_all(dataset):
+    analyze_single_units = False
+
+    # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
+    if dataset == 'model':
+        root_dir = './data/vary_l2init_mante'
+        hp_target = {'activation': 'softplus',
+                     'rnn_type': 'LeakyRNN',
+                     'w_rec_init': 'randortho',
+                     'l2_weight_init': 0*1e-4}
+        model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
+        # model_dir = 'data/mante_l2init'
+    else:
+        model_dir = None
+
+    data = load_data(dataset=dataset,
+                     analyze_single_units=analyze_single_units,
+                     model_dir=model_dir)
+
+    if dataset == 'siegel':
+        data_area = [d for d in data if d['area'] == 'PFC']
+    else:
+        data_area = data
+
+    plot_rate_distribution(data_area)
+
+    if dataset == 'model':
+        var_dict = compute_var_all(model_dir)
+    else:
+        var_dict = _compute_var_all(data_area, var_method='time_avg_late')
+    var_thr, thr_type = 0.2, 'or'
+    frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
+    plot_frac_var(frac_var, save_name=dataset)
+
+    if dataset == 'model':
+        performance.plot_performanceprogress(model_dir, save=False)
+        variance.plot_hist_varprop(model_dir=model_dir,
+                                   rule_pair=('contextdm1', 'contextdm2'))
 
 
 if __name__ == '__main__':
     pass
-    analyze_single_units = False
-    denoise = False
+    # plot_all('mante')
 
-# =============================================================================
-#     # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
-#     root_dir = './data/vary_l2init_mante'
-#     hp_target = {'activation': 'softplus',
-#                  'rnn_type': 'LeakyRNN',
-#                  'w_rec_init': 'randortho',
-#                  'target_perf': 0.95,
-#                  'l1_h': 0,
-#                  'l1_weight': 0,
-#                  'l2_weight_init': 1e-4}
-#     model_dir, _ = tools.find_model(root_dir, hp_target)
-#     # model_dir = 'data/mante_l2init'
-#     dataset = 'model'
-# 
-#     # dataset, model_dir = 'mante', None
-#     # dataset, model_dir = 'siegel', None
-#     data = load_data(dataset=dataset,
-#                      analyze_single_units=analyze_single_units,
-#                      model_dir=model_dir)
-#     
-#     data_area = data
-#     # data_area = [d for d in data if d['area'] == 'PFC']    
-#     
-#     plot_rate_distribution(data_area)
-#     
-#     var_dict = compute_var_all(model_dir)
-#     var_thr, thr_type = 0.2, 'or'
-#     frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
-#     plot_frac_var(frac_var, save_name=dataset)
-#     
-#     import performance
-#     performance.plot_performanceprogress(model_dir, save=False)
-#     
-#     import variance
-#     variance.plot_hist_varprop(model_dir=model_dir,
-#                               rule_pair=('contextdm1', 'contextdm2'))
-# =============================================================================
-    
-    
-    
- 
-    root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
-    # root_dir, hp_vary = './data/vary_l2weight_mante', 'l2_weight'
-    
-    hp_target = {'activation': 'softplus',
-                 'rnn_type': 'LeakyRNN',
-                 'w_rec_init': 'randortho',
-                 'target_perf': 0.9}
-    
-    # hp_vary_vals = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4, 1e-3]
-    hp_vary_vals = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4]
-    # hp_vary_vals = [1e-4]
-    
-    hists = list()
-    xs = list()
-    labels = list()
-    for hp_val in hp_vary_vals:        
-        hp_target[hp_vary] = hp_val
-        model_dir, _ = tools.find_all_models(root_dir, hp_target)
-        
-        # Only analyze models that trained
-        model_dir = tools.select_by_perf(model_dir, perf_min=0.8)
-        if not model_dir:
-            continue
-
-        rule_pair = ('contextdm1', 'contextdm2')
-        hist_tmp, bins_edge = variance.compute_hist_varprop(model_dir, rule_pair)
-
-# =============================================================================
-#         hist = list()
-#         for d in model_dir:
-#             var_dict = compute_var_all(d)
-#             frac_var = compute_frac_var(var_dict, var_thr=0.2, thr_type='or')
-#             hist_tmp, bins_edge = np.histogram(frac_var, bins=20, range=(-1, 1))
-#             hist.append(hist_tmp)
-#         hist_tmp = np.array(hist)
-# =============================================================================
-
-        hist = np.sum(hist_tmp, axis=0)
-        hist = hist / np.sum(hist)
-        hists.append(hist)
-        xs.append((bins_edge[1:] + bins_edge[:-1]) / 2)
-        labels.append(hp_val)
-        
-        plt.figure()
-        _ = plt.plot(xs[-1], hist_tmp.T)
-        plt.title(str(hp_val))
-
-    n = len(labels)
-
-    fig = plt.figure()
-    ax = fig.add_axes([.2, .2, .7, .7])
-    for i in range(n):
-        color = mpl.cm.cool(i * 1.0 / n)
-        ax.plot(xs[i], hists[i], color=color, label=labels[i])
-    ax.legend()
+    plot_fracvar_hist_byhp(mode='all_var')
