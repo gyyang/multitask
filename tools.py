@@ -128,18 +128,21 @@ def find_all_models(root_dir, hp_target):
     return model_dirs, hps
 
 
-def find_model(root_dir, hp_target):
+def find_model(root_dir, hp_target, perf_min=None):
     """Find one model that satisfies hyperparameters.
 
     Args:
         root_dir: root directory
         hp_target: dictionary of hyperparameters
+        perf_min: float or None. If not None, minimum performance to be chosen
 
     Returns:
         d: model directory
         hp: model hyperparameters
     """
-    model_dirs, hps = find_all_models(root_dir, hp_target)
+    model_dirs, _ = find_all_models(root_dir, hp_target)
+    if perf_min is not None:
+        model_dirs = select_by_perf(model_dirs, perf_min)
 
     if not model_dirs:
         # If list empty
@@ -147,12 +150,14 @@ def find_model(root_dir, hp_target):
         return None, None
 
     d = model_dirs[0]
-    hp = hps[0]
+    hp = load_hparams(d)
 
     log = load_log(d)
     # check if performance exceeds target
     if log['perf_min'][-1] < hp['target_perf']:
-        print('Warning: the network found did not reach target performance.')
+        print("""Warning: this network perform {:0.2f}, not reaching target
+              performance {:0.2f}.""".format(
+              log['perf_min'][-1], hp['target_perf']))
 
     return d, hp
 
