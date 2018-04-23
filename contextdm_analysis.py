@@ -1647,25 +1647,24 @@ def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
 
 
 if __name__ == '__main__':
-    root_dir = './data/varyhparams'
+    root_dir = './data/vary_l2init_mante'
     hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyRNN',
-                 'w_rec_init': 'diag',
-                 'l1_h': 1e-4,
-                 'l1_weight': 1e-3}
-    model_dir, _ = tools.find_model(root_dir, hp_target)
+                 'w_rec_init': 'randortho',
+                 'l2_weight_init': 8*1e-4}
+    model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
     
-    model_dir  = './mantetemp'
+    # model_dir  = './mantetemp'
     # import variance
     # variance.compute_variance(model_dir)
 
     ######################### Connectivity and Lesioning ######################
-    # ua = UnitAnalysis(model_dir)
+    ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
-    # ua.prettyplot_hist_varprop()
+    ua.prettyplot_hist_varprop()
 
     # plot_performance_choicetasks(model_dir, grouping='var')
     # plot_performance_choicetasks(model_dir, grouping='beta')
@@ -1702,7 +1701,7 @@ if __name__ == '__main__':
     ################### Frac Var ##############################################
     # plot_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
 
-    data = load_data()
+    # data = load_data()
     
 
 
