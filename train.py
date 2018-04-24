@@ -66,6 +66,8 @@ def get_default_hparams(ruleset):
             'l2_weight': 0,
             # l2 regularization on deviation from initialization
             'l2_weight_init': 0,
+            # proportion of weights to train, None or float between (0, 1)
+            'p_weight_train': None,
             # Stopping performance
             'target_perf': 1.,
             # number of units each ring
@@ -442,6 +444,21 @@ def train(train_dir,
 
             model.set_optimizer()
 
+        if ('p_weight_train' in hparams and
+            hparams['p_weight_train'] is not None):
+            for w in model.weight_list:
+                w_val = sess.run(w)
+                w_size = sess.run(tf.size(w))
+                w_mask_tmp = np.linspace(0, 1, w_size)
+                hparams['rng'].shuffle(w_mask_tmp)
+                ind_fix = w_mask_tmp > hparams['p_weight_train']
+                w_mask = np.zeros(w_size, dtype=np.float32)
+                w_mask[ind_fix] = 1e-1  # will be squared in l2_loss
+                w_mask = tf.constant(w_mask)
+                w_mask = tf.reshape(w_mask, w.shape)
+                model.cost_reg += tf.nn.l2_loss((w - w_val) * w_mask)
+            model.set_optimizer()
+
         step = 0
         while step * hparams['batch_size_train'] <= max_steps:
             try:
@@ -494,16 +511,18 @@ if __name__ == '__main__':
     pass
     run_analysis = []
     hparams = {'rnn_type': 'LeakyRNN',
+               'n_rnn': 128,
                'activation': 'softplus',
-               'l1_h': 1e-5,
-               'l2_h': 1e-5,
-               'l1_weight': 1e-5,
-               'l2_weight': 1e-5,
-               'l2_weight_init': 1e-5,
+               'l1_h': 0,
+               'l2_h': 0,
+               'l1_weight': 0,
+               'l2_weight': 0,
+               'l2_weight_init': 0,
+               'p_weight_train': 0.5,
                'target_perf': 0.9,
                'w_rec_init': 'randortho'}
     train('data/mantetemp', seed=1, hparams=hparams, ruleset='mante',
-          display_step=100, rich_output=False)
+          display_step=500, rich_output=False)
     
     # rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     # hparams = {'rnn_type': 'LeakyGRU', 'n_rnn': 128}
