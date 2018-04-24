@@ -58,6 +58,14 @@ def train_mante(seed=0, train_dir='train_mante'):
     train.train(train_dir, hparams=hparams, ruleset='mante', seed=seed)
 
 
+def mante_tanh(seed=0, train_dir='mante_tanh'):
+    """Training of only the Mante task."""
+    hparams = {'activation': 'tanh',
+               'target_perf': 0.9}
+    train_dir = os.path.join(DATAPATH, train_dir, str(seed))
+    train.train(train_dir, hparams=hparams, ruleset='mante', seed=seed)
+
+
 def train_all(seed=0, train_dir='train_all'):
     """Training of all tasks."""
     train_dir = os.path.join(DATAPATH, train_dir, str(seed))
@@ -125,7 +133,7 @@ def _base_vary_hp_mante(i, hp_ranges, base_name):
 
     train_dir = os.path.join(DATAPATH, base_name, str(i))
     train.train(train_dir, hparams, ruleset='mante',
-                max_steps=5 * 1e6, seed=i // n_max)
+                max_steps=1e7, seed=i // n_max)
 
     # Analyses
     variance.compute_variance(train_dir)
@@ -149,9 +157,9 @@ def vary_l2_init_mante(i):
     hp_ranges = OrderedDict()
     hp_ranges['activation'] = ['softplus']
     hp_ranges['rnn_type'] = ['LeakyRNN']
-    hp_ranges['w_rec_init'] = ['diag', 'randortho']
-    hp_ranges['l2_weight_init'] = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4, 1e-3]
-    hp_ranges['target_perf'] = [0.85, 0.9, 0.95]
+    hp_ranges['w_rec_init'] = ['randortho']
+    hp_ranges['l2_weight_init'] = [0, 1e-4, 2*1e-4, 4*1e-4, 8*1e-4, 1.6*1e-3]
+    hp_ranges['target_perf'] = [0.9]
 
     _base_vary_hp_mante(i, hp_ranges, base_name='vary_l2init_mante')
 
@@ -168,9 +176,9 @@ def vary_l2_weight_mante(i):
     hp_ranges = OrderedDict()
     hp_ranges['activation'] = ['softplus']
     hp_ranges['rnn_type'] = ['LeakyRNN']
-    hp_ranges['w_rec_init'] = ['diag', 'randortho']
-    hp_ranges['l2_weight'] = [0, 1e-5, 3*1e-5, 1e-4, 3*1e-4, 1e-3]
-    hp_ranges['target_perf'] = [0.85, 0.9, 0.95]
+    hp_ranges['w_rec_init'] = ['randortho']
+    hp_ranges['l2_weight'] = [0, 1e-4, 2*1e-4, 4*1e-4, 8*1e-4, 1.6*1e-3]
+    hp_ranges['target_perf'] = [0.9]
 
     _base_vary_hp_mante(i, hp_ranges, base_name='vary_l2weight_mante')
 
