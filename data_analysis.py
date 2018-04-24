@@ -29,7 +29,7 @@ COLORS = [(0.9764705882352941, 0.45098039215686275, 0.023529411764705882),
  (0.4588235294117647, 0.7333333333333333, 0.9921568627450981)]
 
 
-def load_data(dataset='mante', smooth=True, analyze_single_units=True,
+def load_data(dataset='mante', smooth=True, analyze_single_units=False,
               model_dir=None):
     """Analyzing a dataset.
 
@@ -454,7 +454,7 @@ def compute_var_all(model_dir, restore=True):
         return var_dict
         
     data = load_data(dataset='model', model_dir=model_dir)
-    c
+    var_dict = _compute_var_all(data, var_method='time_avg_late')
     
     with open(fname, 'wb') as f:
         pickle.dump(var_dict, f)
@@ -805,8 +805,8 @@ def plot_rate_distribution(data):
 
 def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
     """Plot how fractional variance distribution depends on hparams."""
-    # root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
-    root_dir, hp_vary = './data/vary_l2weight_mante', 'l2_weight'
+    root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
+    # root_dir, hp_vary = './data/vary_l2weight_mante', 'l2_weight'
 
     hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyRNN',
@@ -814,25 +814,25 @@ def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
                  }
 
     hp_vary_vals = [0, 1*1e-4, 4*1e-4, 8*1e-4]
-    hp_vary_vals = [8*1e-4]
+    # hp_vary_vals = [0, 8*1e-4]
 
     hp_targets = [dict(hp_target, **{hp_vary: h}) for h in hp_vary_vals]
 
     hists, xs, bottoms, tops = list(), list(), list(), list()
     for hp_target in hp_targets:
-        model_dir, _ = tools.find_all_models(root_dir, hp_target)
+        model_dirs, _ = tools.find_all_models(root_dir, hp_target)
         # Only analyze models that trained
-        model_dir = tools.select_by_perf(model_dir, perf_min=0.8)
-        if not model_dir:
+        model_dirs = tools.select_by_perf(model_dirs, perf_min=0.8)
+        if not model_dirs:
             continue
 
         rule_pair = ('contextdm1', 'contextdm2')
         if mode == 'all_var':
-            hist_tmp, bins_edge = variance.compute_hist_varprop(model_dir,
+            hist_tmp, bins_edge = variance.compute_hist_varprop(model_dirs,
                                                                 rule_pair)
         elif mode == 'mante_var':
             hist = list()
-            for d in model_dir:
+            for d in model_dirs:
                 var_dict = compute_var_all(d)
                 frac_var = compute_frac_var(var_dict, var_thr=0.5, thr_type='or')
                 hist_tmp, bins_edge = np.histogram(frac_var, bins=20, range=(-1, 1))
@@ -891,8 +891,6 @@ def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
 
 
 def plot_all(dataset):
-    analyze_single_units = False
-
     # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
     if dataset == 'model':
         root_dir = './data/vary_l2init_mante'
@@ -906,7 +904,6 @@ def plot_all(dataset):
         model_dir = None
 
     data = load_data(dataset=dataset,
-                     analyze_single_units=analyze_single_units,
                      model_dir=model_dir)
 
     if dataset == 'siegel':
@@ -914,14 +911,15 @@ def plot_all(dataset):
     else:
         data_area = data
 
-    plot_rate_distribution(data_area)
-
     if dataset == 'model':
         var_dict = compute_var_all(model_dir)
     else:
         var_dict = _compute_var_all(data_area, var_method='time_avg_late')
     var_thr, thr_type = 0.2, 'or'
     frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
+
+    plot_rate_distribution(data_area)
+
     plot_frac_var(frac_var, save_name=dataset)
 
     if dataset == 'model':
@@ -934,4 +932,5 @@ if __name__ == '__main__':
     pass
     # plot_all('mante')
 
-    plot_fracvar_hist_byhp(mode='all_var')
+    # plot_fracvar_hist_byhp(mode='all_var')
+    
