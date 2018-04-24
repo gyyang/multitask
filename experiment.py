@@ -64,6 +64,14 @@ def mante_tanh(seed=0, train_dir='mante_tanh'):
                'target_perf': 0.9}
     train_dir = os.path.join(DATAPATH, train_dir, str(seed))
     train.train(train_dir, hparams=hparams, ruleset='mante', seed=seed)
+    # Analyses
+    variance.compute_variance(train_dir)
+
+    log = tools.load_log(train_dir)
+    analysis = clustering.Analysis(train_dir, 'rule')
+    log['n_cluster'] = analysis.n_cluster
+    tools.save_log(log)
+    data_analysis.compute_var_all(train_dir)
 
 
 def train_all(seed=0, train_dir='train_all'):
@@ -181,6 +189,25 @@ def vary_l2_weight_mante(i):
     hp_ranges['target_perf'] = [0.9]
 
     _base_vary_hp_mante(i, hp_ranges, base_name='vary_l2weight_mante')
+
+
+def vary_p_weight_train_mante(i):
+    """Vary the hyperparameters and train on Mante tasks only.
+
+    This experiment loops over a set of hyperparameters.
+
+    Args:
+        i: int, the index of the hyperparameters list
+    """
+    # Ranges of hyperparameters to loop over
+    hp_ranges = OrderedDict()
+    hp_ranges['activation'] = ['softplus']
+    hp_ranges['rnn_type'] = ['LeakyRNN']
+    hp_ranges['w_rec_init'] = ['randortho']
+    hp_ranges['p_weight_train'] = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    hp_ranges['target_perf'] = [0.9]
+
+    _base_vary_hp_mante(i, hp_ranges, base_name='vary_pweighttrain_mante')
 
 
 if __name__ == '__main__':

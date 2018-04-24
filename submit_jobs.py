@@ -158,6 +158,17 @@ elif args.run == 'mante_vary_l2weight':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
+elif args.run == 'mante_vary_pweighttrain':
+    for i in range(0, 60):
+        jobname = 'mante_vary_pweighttrain_{:d}'.format(i)
+        train_arg = '{:d}'.format(i)
+        cmd = r'''python -c "import experiment as e;e.vary_p_weight_train_mante('''+\
+              train_arg+''')"'''
+
+        jobfile = write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
 # Current continual learning version
 elif args.run == 'cont':
     s = 1
