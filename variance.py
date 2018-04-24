@@ -436,19 +436,29 @@ def compute_ntasks_selective():
                color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
 
 
+def plot_var_random():
+    dist = 'beta'
+    n = 10000
+    if dist == 'uniform':
+        var = np.random.rand(2 * n)
+    elif dist == 'beta':
+        var = np.random.beta(4, 3, size=(2 * n,))
+    elif dist == 'gamma':
+        var = np.random.gamma(1, 2, size=(2 * n,))
+    elif dist == 'lognormal':
+        var = np.random.randn(2 * n) * 1.9 + 0.75
+        var = var * (var < 6) + 6.0 * (var >= 6)
+        var = np.exp(var)
+
+    frac_var = (var[:n] - var[n:]) / (var[:n] + var[n:])
+
+    plt.figure(figsize=(2, 2))
+    plt.hist(var)
+
+    plt.figure(figsize=(2, 2))
+    plt.hist(frac_var)
+
+
 if __name__ == '__main__':
-    ############################# Compute Variance ############################
-    save_name = '0_256migrate'
-    data_type = 'rule'
-    # compute_variance(save_name, data_type)
-
-    ############################# Fractional Variance #########################
-    # rule_pair = ['dm1', 'fdanti']
-    # hist, bins_edge_ = _compute_hist_varprop(save_name, rules)
-    # _plot_hist_varprop(hist, bins_edge_, rule_pair=rule_pair)
-
-
-    save_pattern='*256migrate'
-    # plot_hist_varprop_selection(save_pattern)
-    # plot_hist_varprop_all(save_pattern)
+    pass
 
