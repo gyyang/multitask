@@ -1654,11 +1654,16 @@ def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
 
 
 if __name__ == '__main__':
-    root_dir = './data/vary_l2weight_mante'
-    hp_target = {'activation': 'softplus',
-                 'rnn_type': 'LeakyRNN',
-                 'w_rec_init': 'randortho',
-                 'l2_weight': 4*1e-4}
+# =============================================================================
+#     root_dir = './data/vary_l2weight_mante'
+#     hp_target = {'activation': 'softplus',
+#                  'rnn_type': 'LeakyRNN',
+#                  'w_rec_init': 'randortho',
+#                  'l2_weight': 4*1e-4}
+# =============================================================================
+    root_dir = './data/mante_tanh'
+    hp_target = {}
+    
     model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
     
     # model_dir  = './mantetemp'
@@ -1666,12 +1671,12 @@ if __name__ == '__main__':
     # variance.compute_variance(model_dir)
 
     ######################### Connectivity and Lesioning ######################
-    # ua = UnitAnalysis(model_dir)
+    ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
-    # ua.prettyplot_hist_varprop()
+    ua.prettyplot_hist_varprop()
 
     # plot_performance_choicetasks(model_dir, grouping='var')
     # plot_performance_choicetasks(model_dir, grouping='beta')

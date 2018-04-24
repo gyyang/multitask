@@ -779,7 +779,7 @@ def plot_rate_distribution(data):
     """
     # Distribution of rate
     mean_rate = np.array([d['rate'].mean() for d in data])
-    plt.figure()
+    plt.figure(figsize=(2, 2))
     _ = plt.hist(mean_rate, bins=50)
     plt.xlabel('Rate')
     plt.ylabel('Number of units')
@@ -787,15 +787,15 @@ def plot_rate_distribution(data):
     # Distribution of log-rate
     mean_rate_shift = mean_rate - np.min(mean_rate)
     mean_rate_shift = mean_rate_shift[mean_rate_shift>0]
-    plt.figure()
+    plt.figure(figsize=(2, 2))
     _ = plt.hist(np.log10(mean_rate_shift), bins=50)
     plt.xlabel('Rate')
     plt.ylabel('Number of units')
 
     # Activaty change over time
     mean_rate_by_time = np.array([d['rate'].mean(axis=0) for d in data])
-    plt.figure()
-    plt.scatter(mean_rate_by_time[:, 0], mean_rate_by_time[:, -1])
+    plt.figure(figsize=(2, 2))
+    plt.scatter(mean_rate_by_time[:, 0], mean_rate_by_time[:, -1], s=2)
     top = np.max(mean_rate_by_time)
     bottom = np.min(mean_rate_by_time)
     plt.plot([bottom, top], [bottom, top], color='black')
@@ -893,12 +893,21 @@ def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
 def plot_all(dataset):
     # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
     if dataset == 'model':
-        root_dir = './data/vary_l2init_mante'
-        hp_target = {'activation': 'softplus',
-                     'rnn_type': 'LeakyRNN',
-                     'w_rec_init': 'randortho',
-                     'l2_weight_init': 0*1e-4}
-        model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
+# =============================================================================
+#         root_dir = './data/vary_l2init_mante'
+#         hp_target = {'activation': 'softplus',
+#                      'rnn_type': 'LeakyRNN',
+#                      'w_rec_init': 'randortho',
+#                      'l2_weight_init': 0*1e-4}
+# =============================================================================
+        root_dir = './data/mante_tanh'
+        hp_target = {'activation': 'tanh',
+                     'rnn_type': 'LeakyRNN'}
+        # model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
+        model_dirs, _ = tools.find_all_models(root_dir, hp_target)
+        model_dirs = tools.select_by_perf(model_dirs, perf_min=0.8)
+        print(len(model_dirs))
+        model_dir = model_dirs[1]
         # model_dir = 'data/mante_l2init'
     else:
         model_dir = None
@@ -930,6 +939,6 @@ def plot_all(dataset):
 
 if __name__ == '__main__':
     pass
-    # plot_all('mante')
+    plot_all('model')
 
     # plot_fracvar_hist_byhp(mode='all_var')
