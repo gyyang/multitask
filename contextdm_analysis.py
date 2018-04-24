@@ -299,6 +299,78 @@ def _gen_taskparams(stim1_loc, n_rep=1):
     return params, batch_size
 
 
+def _sort_ind_byvariance(**kwargs):
+    """Sort ind into group 1, 2, 12, and others according task variance
+
+    Returns:
+        ind_group: indices for the current matrix, not original
+        ind_active_group: indices for original matrix
+    """
+    ua = UnitAnalysis(kwargs['model_dir'])
+    
+    ind_active = ua.ind_active  # TODO(gryang): check if correct
+
+    ind_group = dict()
+    ind_active_group = dict()
+
+    for group in ['1', '2', '12', None]:
+        if group is not None:
+            # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
+            ind_group[group] = [k for k, ind in enumerate(ind_active)
+                                if ind in ua.group_ind_orig[group]]
+        else:
+            ind_othergroup = np.concatenate(ua.group_ind_orig.values())
+            ind_group[group] = [k for k, ind in enumerate(ind_active)
+                                if ind not in ind_othergroup]
+
+        # Transform to original matrix indices
+        ind_active_group[group] = [ind_active[k] for k in ind_group[group]]
+
+    return ind_group, ind_active_group
+
+
+def _sort_ind_bybeta(self):
+    """Sort ind into group 1, 2, 12, and others according beta weights
+
+    Returns:
+        ind_group: indices for the current matrix, not original
+        ind_active_group: indices for original matrix
+    """
+    theta = 0
+
+    ind_group = dict()
+    ind_active_group = dict()
+
+    for group in ['1', '2', '12', None]:
+        if group == '1':
+            ind = (coef[:, 1] > theta) * (coef[:, 2] < theta)
+        elif group == '2':
+            ind = (coef[:, 1] < theta) * (coef[:, 2] > theta)
+        elif group == '12':
+            ind = (coef[:, 1] > theta) * (coef[:, 2] > theta)
+        elif group is None:
+            ind = (coef[:, 1] < theta) * (coef[:, 2] < theta)
+        else:
+            raise ValueError()
+        ind = np.arange(len(ind))[ind]
+        ind_group[group] = ind
+
+        # Transform to original matrix indices
+        ind_active_group[group] = [ind_active[k] for k in ind]
+
+    return ind_group, ind_active_group
+
+
+def sort_ind_bygroup(grouping, **kwargs):
+    """Sort indices by group."""
+    if grouping == 'var':
+        return _sort_ind_byvariance(**kwargs)
+    elif grouping == 'beta':
+        return _sort_ind_bybeta(**kwargs)
+    else:
+        raise ValueError()
+
+
 class StateSpaceAnalysis(object):
 
     def __init__(self,
@@ -574,72 +646,6 @@ class StateSpaceAnalysis(object):
         self.colors = dict(zip([None, '1', '2', '12'],
                            sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
 
-    def _sort_ind_byvariance(self):
-        """Sort ind into group 1, 2, 12, and others according task variance
-
-        Returns:
-            ind_group: indices for the current matrix, not original
-            ind_active_group: indices for original matrix
-        """
-        ua = UnitAnalysis(self.model_dir)
-
-        ind_group = dict()
-        ind_active_group = dict()
-
-        for group in ['1', '2', '12', None]:
-            if group is not None:
-                # Find all units here that belong to group 1, 2, or 12 as defined in UnitAnalysis
-                ind_group[group] = [k for k, ind in enumerate(self.ind_active)
-                                    if ind in ua.group_ind_orig[group]]
-            else:
-                ind_othergroup = np.concatenate(ua.group_ind_orig.values())
-                ind_group[group] = [k for k, ind in enumerate(self.ind_active)
-                                    if ind not in ind_othergroup]
-
-            # Transform to original matrix indices
-            ind_active_group[group] = [self.ind_active[k] for k in ind_group[group]]
-
-        return ind_group, ind_active_group
-
-    def _sort_ind_bybeta(self):
-        """Sort ind into group 1, 2, 12, and others according beta weights
-
-        Returns:
-            ind_group: indices for the current matrix, not original
-            ind_active_group: indices for original matrix
-        """
-        theta = 0
-
-        ind_group = dict()
-        ind_active_group = dict()
-
-        for group in ['1', '2', '12', None]:
-            if group == '1':
-                ind = (self.coef[:, 1] > theta) * (self.coef[:, 2] < theta)
-            elif group == '2':
-                ind = (self.coef[:, 1] < theta) * (self.coef[:, 2] > theta)
-            elif group == '12':
-                ind = (self.coef[:, 1] > theta) * (self.coef[:, 2] > theta)
-            elif group is None:
-                ind = (self.coef[:, 1] < theta) * (self.coef[:, 2] < theta)
-            else:
-                raise ValueError()
-            ind = np.arange(len(ind))[ind]
-            ind_group[group] = ind
-
-            # Transform to original matrix indices
-            ind_active_group[group] = [self.ind_active[k] for k in ind]
-
-        return ind_group, ind_active_group
-
-    def sort_ind_bygroup(self, grouping):
-        """Sort indices by group."""
-        if grouping == 'var':
-            return self._sort_ind_byvariance()
-        elif grouping == 'beta':
-            return self._sort_ind_bybeta()
-        else:
-            raise ValueError()
 
     def sort_coefs_bygroup(self, coefs_dict, grouping):
         """Sort coefs by group 1, 2, 12, and others.
@@ -1182,12 +1188,13 @@ def plot_performance_choicetasks(model_dir, grouping):
         model_dir: str, model directory
         grouping: str, how to group different populations
     """
-    ssa = StateSpaceAnalysis(model_dir, lesion_units=None,
-                             redefine_choice=True, sigma_rec=0)
-    ind_group, ind_group_orig = ssa.sort_ind_bygroup(grouping=grouping)
-    lesion_units_list = [None] + [ind_group_orig[g] for g in ['1', '2', '12']]
-    legends = ['Intact']+['Lesion group {:s}'.format(l) for l in ['1','2','12']]
+    ind_group, ind_group_orig = sort_ind_bygroup(grouping=grouping,
+                                                 model_dir=model_dir)
+    groups = ['1', '2', '12']
+    lesion_units_list = [None] + [ind_group_orig[g] for g in groups]
+    legends = ['Intact']+['Lesion group {:s}'.format(l) for l in groups]
     save_name = '_bygrouping_' + grouping
+    print(lesion_units_list)
     _plot_performance_choicetasks(model_dir, lesion_units_list,
                                   legends=legends, save_name=save_name)
 
@@ -1580,7 +1587,7 @@ def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
 
         # Generate task parameters used
         # Target location
-        stim1_loc_list = np.arange(0, 2*np.pi, 2*np.pi/6)
+        stim1_loc_list = np.arange(0, 2*np.pi, 2*np.pi/12)
         for stim1_loc in stim1_loc_list:
             params, batch_size = _gen_taskparams(stim1_loc=stim1_loc, n_rep=n_rep)
             stim1_locs_tmp = np.tile(params['stim1_locs'], n_rule)
@@ -1647,11 +1654,11 @@ def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
 
 
 if __name__ == '__main__':
-    root_dir = './data/vary_l2init_mante'
+    root_dir = './data/vary_l2weight_mante'
     hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyRNN',
                  'w_rec_init': 'randortho',
-                 'l2_weight_init': 8*1e-4}
+                 'l2_weight': 4*1e-4}
     model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
     
     # model_dir  = './mantetemp'
@@ -1659,12 +1666,12 @@ if __name__ == '__main__':
     # variance.compute_variance(model_dir)
 
     ######################### Connectivity and Lesioning ######################
-    ua = UnitAnalysis(model_dir)
+    # ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
     # ua.plot_connectivity(conn_type='rule')
     # ua.plot_connectivity(conn_type='input')
     # ua.plot_connectivity(conn_type='output')
-    ua.prettyplot_hist_varprop()
+    # ua.prettyplot_hist_varprop()
 
     # plot_performance_choicetasks(model_dir, grouping='var')
     # plot_performance_choicetasks(model_dir, grouping='beta')

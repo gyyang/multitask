@@ -933,4 +933,3 @@ if __name__ == '__main__':
     # plot_all('mante')
 
     # plot_fracvar_hist_byhp(mode='all_var')
-    
