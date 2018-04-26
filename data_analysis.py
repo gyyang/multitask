@@ -805,22 +805,25 @@ def plot_rate_distribution(data):
 
 def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
     """Plot how fractional variance distribution depends on hparams."""
-    root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
+    # root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
     # root_dir, hp_vary = './data/vary_l2weight_mante', 'l2_weight'
+    root_dir, hp_vary = './data/vary_pweighttrain_mante', 'p_weight_train'
 
     hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyRNN',
                  'w_rec_init': 'randortho',
                  }
 
-    hp_vary_vals = [0, 1*1e-4, 4*1e-4, 8*1e-4]
+    # hp_vary_vals = [0, 1*1e-4, 4*1e-4, 8*1e-4]
     # hp_vary_vals = [0, 8*1e-4]
+    hp_vary_vals = [1.0, 0.1]
 
     hp_targets = [dict(hp_target, **{hp_vary: h}) for h in hp_vary_vals]
 
-    hists, xs, bottoms, tops = list(), list(), list(), list()
+    hists, xs, bottoms, tops, labels = list(), list(), list(), list(), list()
     for hp_target in hp_targets:
         model_dirs, _ = tools.find_all_models(root_dir, hp_target)
+        print([tools.load_log(d)['perf_min'][-1] for d in model_dirs])
         # Only analyze models that trained
         model_dirs = tools.select_by_perf(model_dirs, perf_min=0.8)
         if not model_dirs:
@@ -845,23 +848,29 @@ def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
         hist_tmp = hist_tmp.astype(np.float)
         hist_density = (hist_tmp.T / hist_tmp.sum(axis=1)).T
 
-        hist = np.mean(hist_density, axis=0)
-        # bottom = np.percentile(hist_density, 10, axis=0)
-        # top = np.percentile(hist_density, 90, axis=0)
-        sem = stats.sem(hist_density, axis=0)
-        bottom = hist - sem
-        top = hist + sem
+        hist = np.median(hist_density, axis=0)
+
+        # Get the confidence interval with bootstrapping
+        bottom, top = list(), list()
+        n_model, n_point = hist_density.shape
+        for i in range(n_point):
+            medians = list()
+            for j in range(400):
+                h_sample = np.random.choice(hist_density[:, i], size=n_model)
+                medians.append(np.median(h_sample))
+            bottom_tmp, top_tmp = np.percentile(medians, (2.5, 97.5))
+            bottom.append(bottom_tmp)
+            top.append(top_tmp)
 
         hists.append(hist)
         xs.append((bins_edge[1:] + bins_edge[:-1]) / 2)
         bottoms.append(bottom)
         tops.append(top)
+        labels.append(hp_target[hp_vary])
 
-# =============================================================================
-#         plt.figure()
-#         _ = plt.plot(xs[-1], hist_tmp.T)
-#         plt.title(str(hp_val))
-# =============================================================================
+        plt.figure(figsize=(3, 3))
+        _ = plt.plot(xs[-1], hist_tmp.T)
+        plt.title(str(hp_target[hp_vary]))
 
     n = len(hists)
 
@@ -869,12 +878,12 @@ def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
     ax = fig.add_axes([.2, .25, .7, .7])
     for i in range(n):
         color = mpl.cm.cool(i * 1.0 / n)
-        ax.plot(xs[i], hists[i], color=color, label=hp_vary_vals[i])
+        ax.plot(xs[i], hists[i], color=color, label=labels[i])
         ax.fill_between(xs[i], bottoms[i], tops[i], alpha=0.2, color=color)
     lg = ax.legend(title=hp_vary, fontsize=7, frameon=False,
                    loc=1, bbox_to_anchor=(1.2, 1.0))
     plt.setp(lg.get_title(), fontsize=7)
-    ax.set_ylim([0, 0.3])
+    ax.set_ylim([0, 0.2])
     ax.tick_params(axis='both', which='major', labelsize=7)
     ax.locator_params(nbins=3)
     ax.spines["right"].set_visible(False)
@@ -889,6 +898,7 @@ def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
         fig_name += save_name
     plt.savefig(fig_name + '.pdf', transparent=True)
 
+    return hists
 
 def plot_all(dataset):
     # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
@@ -900,9 +910,14 @@ def plot_all(dataset):
 #                      'w_rec_init': 'randortho',
 #                      'l2_weight_init': 0*1e-4}
 # =============================================================================
-        root_dir = './data/mante_tanh'
-        hp_target = {'activation': 'tanh',
-                     'rnn_type': 'LeakyRNN'}
+        root_dir = './data/vary_pweighttrain_mante'
+        hp_target = {'activation': 'softplus',
+                     'rnn_type': 'LeakyRNN',
+                     'p_weight_train': 0.1}
+# =============================================================================
+#         root_dir = './data/mante_tanh'
+#         hp_target = {}
+# =============================================================================
         # model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
         model_dirs, _ = tools.find_all_models(root_dir, hp_target)
         model_dirs = tools.select_by_perf(model_dirs, perf_min=0.8)
@@ -924,7 +939,7 @@ def plot_all(dataset):
         var_dict = compute_var_all(model_dir)
     else:
         var_dict = _compute_var_all(data_area, var_method='time_avg_late')
-    var_thr, thr_type = 0.2, 'or'
+    var_thr, thr_type = 0.0, 'or'
     frac_var = compute_frac_var(var_dict, var_thr=var_thr, thr_type=thr_type)
 
     plot_rate_distribution(data_area)
@@ -939,6 +954,6 @@ def plot_all(dataset):
 
 if __name__ == '__main__':
     pass
-    plot_all('model')
+    # plot_all('mante')
 
-    # plot_fracvar_hist_byhp(mode='all_var')
+    hists = plot_fracvar_hist_byhp(mode='all_var')
