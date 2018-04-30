@@ -479,17 +479,57 @@ def schematic_plot(model_dir, rule=None):
 
     plt.savefig('figure/schematic_outputs.pdf',transparent=True)
     plt.show()
+    
+
+def networkx_illustration(model_dir):
+    import networkx as nx
+    import matplotlib as mpl
+
+    model = Model(model_dir)
+    with tf.Session() as sess:
+        model.restore()
+        # get all connection weights and biases as tensorflow variables
+        w_rec = sess.run(model.w_rec)
+        
+    w_rec_flat = w_rec.flatten()
+    ind_sort = np.argsort(abs(w_rec_flat - np.mean(w_rec_flat)))
+    n_show = int(0.01*len(w_rec_flat))
+    ind_gone = ind_sort[:-n_show]
+    ind_keep = ind_sort[-n_show:]
+    w_rec_flat[ind_gone] = 0
+    w_rec2 = np.reshape(w_rec_flat, w_rec.shape)
+    w_rec_keep = w_rec_flat[ind_keep]
+    G=nx.from_numpy_array(abs(w_rec2), create_using=nx.DiGraph())
+
+    color = w_rec_keep
+    fig = plt.figure(figsize=(4, 4))
+    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+    nx.draw(G,
+            linewidths=0,
+            width=0.1,
+            alpha=1.0,
+            edge_vmin=-3,
+            edge_vmax=3,
+            arrows=False,
+            pos=nx.circular_layout(G),
+            node_color=np.array([99./255]*3),
+            node_size=10,
+            edge_color=color,
+            edge_cmap=plt.cm.RdBu_r,
+            ax=ax)
+    plt.savefig('figure/illustration_networkx.pdf', transparent=True)
 
 
 if __name__ == "__main__":
-    model_dir = 'debug'
+    root_dir = './data/train_all'
+    model_dir = root_dir + '/0'
 
     # Rules to analyze
     # rule = 'dm1'
     # rule = ['dmsgo','dmsnogo','dmcgo','dmcnogo']
 
     # Easy activity plot, see this function to begin your analysis
-    rule = 'contextdm1'
+    # rule = 'contextdm1'
     # easy_activity_plot(model_dir, rule)
 
     # Easy connectivity plot
@@ -508,4 +548,8 @@ if __name__ == "__main__":
 
     # Plot schematic
     # schematic_plot(model_dir, rule)
+    
+    # Plot networkx illustration
+    # networkx_illustration(model_dir)
 
+    
