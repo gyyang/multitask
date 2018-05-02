@@ -114,7 +114,7 @@ class UnitAnalysis(object):
         bs = list()
         for i, group in enumerate(['1', '2', '12']):
             data_plot = self.h_normvar_all[self.group_ind[group], 0]
-            hist, bins_edge = np.histogram(data_plot, bins=30, range=(0,1))
+            hist, bins_edge = np.histogram(data_plot, bins=20, range=(0,1))
             b_tmp = ax.bar(bins_edge[:-1], hist, width=bins_edge[1]-bins_edge[0],
                    color=self.colors[group], edgecolor='none', label=group)
             bs.append(b_tmp)
@@ -138,7 +138,11 @@ class UnitAnalysis(object):
                 rule_name[rules[1]].replace(' ','')+
                 '.pdf', transparent=True)
 
-    def plot_connectivity(self, conn_type='input'):
+    def plot_inout_connections(self):
+        self._plot_inout_connections('input')
+        self._plot_inout_connections('output')
+
+    def _plot_inout_connections(self, conn_type):
         """Plot connectivity while sorting by group.
 
         Args:
@@ -150,87 +154,18 @@ class UnitAnalysis(object):
         hparams = model.hparams
         with tf.Session() as sess:
             model.restore()
-            w_in, w_out, w_rec = sess.run(
-                [model.w_in, model.w_out, model.w_rec])
-        w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
+            w_in, w_out = sess.run([model.w_in, model.w_out])
 
         n_ring = hparams['n_eachring']
         groups = ['1', '2', '12']
 
-        if conn_type == 'rec':
-            # Plot recurrent connectivity
-            w_rec_group = np.zeros((len(groups), len(groups)))
-            for i1, group1 in enumerate(groups):
-                for i2, group2 in enumerate(groups):
-                    ind1 = self.group_ind_orig[group1]
-                    ind2 = self.group_ind_orig[group2]
-                    w_rec_group[i2, i1] = w_rec[:, ind1][ind2, :].mean()
-
-            fs = 6
-            cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
-            fig = plt.figure(figsize=(2,2))
-            ax = fig.add_axes([.2, .2, .6, .6])
-            im = ax.imshow(w_rec_group, interpolation='nearest', cmap=cmap, aspect='auto')
-            ax.axis('off')
-
-            ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
-            cb = plt.colorbar(im, cax=ax)
-            cb.outline.set_linewidth(0.5)
-            cb.set_label('Prop. of choice 1', fontsize=fs, labelpad=2)
-            plt.tick_params(axis='both', which='major', labelsize=fs)
-
-            return
-
-        elif conn_type == 'rule':
-            # Plot input rule connectivity
-            rules = ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']
-
-            w_stores = OrderedDict()
-
-            for group in groups:
-                w_store_tmp = list()
-                ind = self.group_ind_orig[group]
-                for rule in rules:
-                    ind_rule = get_rule_index(rule, hparams)
-                    w_conn = w_in[ind, ind_rule].mean(axis=0)
-                    w_store_tmp.append(w_conn)
-
-                w_stores[group] = w_store_tmp
-
-            fs = 6
-            width = 0.15
-            fig = plt.figure(figsize=(3,1.5))
-            ax = fig.add_axes([0.17,0.35,0.8,0.4])
-            for i, group in enumerate(groups):
-                b0 = ax.bar(np.arange(len(rules))+(i-1.5)*width, w_stores[group],
-                       width=width, color=self.colors[group], edgecolor='none')
-            ax.set_xticks(np.arange(len(rules)))
-            ax.set_xticklabels([rule_name[r] for r in rules], rotation=25)
-            ax.set_xlabel('From rule input', fontsize=fs, labelpad=3)
-            ax.set_ylabel('conn. weight', fontsize=fs)
-            lg = ax.legend(groups, fontsize=fs, ncol=3, bbox_to_anchor=(1,1.4),
-                           labelspacing=0.2, loc=1, frameon=False, title='To group')
-            plt.setp(lg.get_title(),fontsize=fs)
-            ax.tick_params(axis='both', which='major', labelsize=fs)
-            plt.locator_params(axis='y',nbins=2)
-            ax.spines["right"].set_visible(False)
-            ax.spines["top"].set_visible(False)
-            ax.xaxis.set_ticks_position('bottom')
-            ax.yaxis.set_ticks_position('left')
-            ax.set_xlim([-0.8, len(rules)-0.2])
-            ax.plot([-0.5, len(rules)-0.5], [0, 0], color='gray', linewidth=0.5)
-            plt.savefig('figure/conn_'+conn_type+'_contextdm.eps', transparent=True)
-            plt.show()
-
-            return
-
         # Plot input from stim or output to loc
-        elif conn_type == 'input':
-            w_conn = w_in[:, 1:n_ring+1]
+        if conn_type == 'input':
+            w_conn = w_in[1:n_ring+1, :].T
             xlabel = 'From stim mod 1'
             lgtitle = 'To group'
         elif conn_type == 'output':
-            w_conn = w_out[1:, :].T
+            w_conn = w_out[:, 1:]
             xlabel = 'To output'
             lgtitle = 'From group'
         else:
@@ -269,6 +204,113 @@ class UnitAnalysis(object):
         ax.xaxis.set_ticks_position('bottom')
         ax.yaxis.set_ticks_position('left')
         plt.savefig('figure/conn_'+conn_type+'_contextdm.pdf', transparent=True)
+
+    def plot_rule_connections(self):
+        """Plot connectivity while sorting by group.
+
+        Args:
+            conn_type: str, type of connectivity to plot.
+        """
+
+        # Sort data by labels and by input connectivity
+        model = Model(model_dir)
+        hparams = model.hparams
+        with tf.Session() as sess:
+            model.restore()
+            w_in, w_out, w_rec = sess.run(
+                [model.w_in, model.w_out, model.w_rec])
+        w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
+
+        n_ring = hparams['n_eachring']
+        groups = ['1', '2', '12']
+
+        # Plot input rule connectivity
+        rules = ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']
+
+        w_stores = OrderedDict()
+
+        for group in groups:
+            w_store_tmp = list()
+            ind = self.group_ind_orig[group]
+            for rule in rules:
+                ind_rule = get_rule_index(rule, hparams)
+                w_conn = w_in[ind, ind_rule].mean(axis=0)
+                w_store_tmp.append(w_conn)
+
+            w_stores[group] = w_store_tmp
+
+        fs = 6
+        width = 0.15
+        fig = plt.figure(figsize=(3,1.5))
+        ax = fig.add_axes([0.17,0.35,0.8,0.4])
+        for i, group in enumerate(groups):
+            b0 = ax.bar(np.arange(len(rules))+(i-1.5)*width, w_stores[group],
+                   width=width, color=self.colors[group], edgecolor='none')
+        ax.set_xticks(np.arange(len(rules)))
+        ax.set_xticklabels([rule_name[r] for r in rules], rotation=25)
+        ax.set_xlabel('From rule input', fontsize=fs, labelpad=3)
+        ax.set_ylabel('conn. weight', fontsize=fs)
+        lg = ax.legend(groups, fontsize=fs, ncol=3, bbox_to_anchor=(1,1.4),
+                       labelspacing=0.2, loc=1, frameon=False, title='To group')
+        plt.setp(lg.get_title(),fontsize=fs)
+        ax.tick_params(axis='both', which='major', labelsize=fs)
+        plt.locator_params(axis='y',nbins=2)
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_ticks_position('left')
+        ax.set_xlim([-0.8, len(rules)-0.2])
+        ax.plot([-0.5, len(rules)-0.5], [0, 0], color='gray', linewidth=0.5)
+        plt.savefig('figure/conn_rule_contextdm.pdf', transparent=True)
+        plt.show()
+
+    def plot_rec_connections(self):
+        """Plot connectivity while sorting by group.
+
+        Args:
+            conn_type: str, type of connectivity to plot.
+        """
+
+        # Sort data by labels and by input connectivity
+        model = Model(model_dir)
+        hparams = model.hparams
+        with tf.Session() as sess:
+            model.restore()
+            w_in, w_out, w_rec = sess.run(
+                [model.w_in, model.w_out, model.w_rec])
+        w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
+
+        n_ring = hparams['n_eachring']
+        groups = ['1', '2', '12']
+
+        # Plot recurrent connectivity
+        w_rec_group = np.zeros((len(groups), len(groups)))
+        for i1, group1 in enumerate(groups):
+            for i2, group2 in enumerate(groups):
+                ind1 = self.group_ind_orig[group1]
+                ind2 = self.group_ind_orig[group2]
+                w_rec_group[i2, i1] = w_rec[:, ind1][ind2, :].mean()
+
+        # w_rec_group -= np.median(w_rec_group)
+
+        fs = 6
+        cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
+        fig = plt.figure(figsize=(2,2))
+        ax = fig.add_axes([.2, .2, .6, .6])
+        im = ax.imshow(w_rec_group.T, interpolation='nearest',
+                       cmap=cmap, aspect='auto')
+        # ax.axis('off')
+        plt.xticks([0, 1, 2], groups, fontsize=6)
+        plt.yticks([0, 1, 2], groups, fontsize=6)
+        for s in ['right', 'left', 'top', 'bottom']:
+            ax.spines[s].set_visible(False)
+
+        ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
+        cb = plt.colorbar(im, cax=ax)
+        cb.outline.set_linewidth(0.5)
+        cb.set_label(r'$\Delta$ Rec. weight', fontsize=fs, labelpad=2)
+        plt.tick_params(axis='both', which='major', labelsize=fs)
+        plt.locator_params(nbins=3)
 
 
 def _gen_taskparams(stim1_loc, n_rep=1):
@@ -1281,14 +1323,14 @@ def plot_fullconnectivity(model_dir):
         elif h_normvar_all[i,0]<0.15:
             labels.append(1)
         elif (h_normvar_all[i,0]>0.15) and (h_normvar_all[i,0]<0.85):
-            # labels.append(2)
+            labels.append(2)
 
             # Further divide
             # This condition works especially for networks trained only for contextdm
-            if np.max(w_in[ind_active[i],1:2*n_ring+1]) > 1.0:
-                labels.append(2)
-            else:
-                labels.append(3)
+            # if np.max(w_in[ind_active[i],1:2*n_ring+1]) > 1.0:
+            #     labels.append(2)
+            # else:
+            #     labels.append(3)
 
                 # if np.var(w_out[1:, ind_active[i]])>0.005:
                 #     labels.append(3)
@@ -1654,29 +1696,24 @@ def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
 
 
 if __name__ == '__main__':
-# =============================================================================
-#     root_dir = './data/vary_l2weight_mante'
-#     hp_target = {'activation': 'softplus',
-#                  'rnn_type': 'LeakyRNN',
-#                  'w_rec_init': 'randortho',
-#                  'l2_weight': 4*1e-4}
-# =============================================================================
-    root_dir = './data/mante_tanh'
-    hp_target = {}
+    root_dir = './data/vary_pweighttrain_mante'
+    hp_target = {'activation': 'softplus',
+                 'rnn_type': 'LeakyRNN',
+                 'w_rec_init': 'randortho',
+                 'p_weight_train': 0.1}
     
     model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
-    
-    # model_dir  = './mantetemp'
-    # import variance
-    # variance.compute_variance(model_dir)
+
+    root_dir = './data/train_all'
+    model_dir = root_dir + '/0'
 
     ######################### Connectivity and Lesioning ######################
     ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
-    # ua.plot_connectivity(conn_type='rule')
-    # ua.plot_connectivity(conn_type='input')
-    # ua.plot_connectivity(conn_type='output')
-    ua.prettyplot_hist_varprop()
+    ua.plot_inout_connections()
+    ua.plot_rec_connections()
+    ua.plot_rule_connections()
+    # ua.prettyplot_hist_varprop()
 
     # plot_performance_choicetasks(model_dir, grouping='var')
     # plot_performance_choicetasks(model_dir, grouping='beta')
