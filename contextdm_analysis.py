@@ -168,7 +168,7 @@ class UnitAnalysis(object):
         elif conn_type == 'output':
             w_conn = w_out[:, 1:]
             xlabel = 'Preferred output dir.'
-            ylabel = 'Conn. weight\n to output'
+            ylabel = 'Conn. weight to output'
             lgtitle = 'From group'
         else:
             raise ValueError('Unknown conn type')
@@ -189,7 +189,7 @@ class UnitAnalysis(object):
 
         fs = 6
         fig = plt.figure(figsize=(1.5, 1.0))
-        ax = fig.add_axes([.3, .3, .6, .6])
+        ax = fig.add_axes([.35, .25, .55, .6])
         for group in groups:
             ax.plot(w_aves[group], color=self.colors[group], label=group, lw=1)
         ax.set_xticks([int(n_ring/2)])
@@ -219,11 +219,9 @@ class UnitAnalysis(object):
         hparams = model.hparams
         with tf.Session() as sess:
             model.restore()
-            w_in, w_out, w_rec = sess.run(
-                [model.w_in, model.w_out, model.w_rec])
-        w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
+            w_in = sess.run(model.w_in)
+        w_in = w_in.T
 
-        n_ring = hparams['n_eachring']
         groups = ['1', '2', '12']
 
         # Plot input rule connectivity
@@ -243,16 +241,17 @@ class UnitAnalysis(object):
 
         fs = 6
         width = 0.15
-        fig = plt.figure(figsize=(3,1.5))
-        ax = fig.add_axes([0.17,0.35,0.8,0.4])
+        fig = plt.figure(figsize=(2.5, 1.2))
+        ax = fig.add_axes([0.17,0.45,0.8,0.4])
         for i, group in enumerate(groups):
-            b0 = ax.bar(np.arange(len(rules))+(i-1.5)*width, w_stores[group],
-                   width=width, color=self.colors[group], edgecolor='none')
+            x = np.arange(len(rules))+(i-1.5)*width
+            b0 = ax.bar(x, w_stores[group],
+                        width=width, color=self.colors[group], edgecolor='none')
         ax.set_xticks(np.arange(len(rules)))
         ax.set_xticklabels([rule_name[r] for r in rules], rotation=25)
-        ax.set_xlabel('From rule input', fontsize=fs, labelpad=3)
-        ax.set_ylabel('conn. weight', fontsize=fs)
-        lg = ax.legend(groups, fontsize=fs, ncol=3, bbox_to_anchor=(1,1.4),
+        ax.set_xlabel('Input from rule units', fontsize=fs, labelpad=3)
+        ax.set_ylabel('Conn. weight', fontsize=fs)
+        lg = ax.legend(groups, fontsize=fs, ncol=3, bbox_to_anchor=(1,1.5),
                        labelspacing=0.2, loc=1, frameon=False, title='To group')
         plt.setp(lg.get_title(),fontsize=fs)
         ax.tick_params(axis='both', which='major', labelsize=fs)
@@ -278,41 +277,87 @@ class UnitAnalysis(object):
         hparams = model.hparams
         with tf.Session() as sess:
             model.restore()
-            w_in, w_out, w_rec = sess.run(
-                [model.w_in, model.w_out, model.w_rec])
-        w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
+            w_in, w_rec = sess.run([model.w_in, model.w_rec])
+        w_in, w_rec = w_in.T, w_rec.T
 
         n_ring = hparams['n_eachring']
         groups = ['1', '2', '12']
 
-        # Plot recurrent connectivity
-        w_rec_group = np.zeros((len(groups), len(groups)))
-        for i1, group1 in enumerate(groups):
-            for i2, group2 in enumerate(groups):
-                ind1 = self.group_ind_orig[group1]
-                ind2 = self.group_ind_orig[group2]
-                w_rec_group[i2, i1] = w_rec[:, ind1][ind2, :].mean()
+        w_in_ = (w_in[:, 1:n_ring + 1] + w_in[:, 1+n_ring:2*n_ring+1]) / 2.
 
-        # w_rec_group -= np.median(w_rec_group)
+        # Plot recurrent connectivity
+        # w_rec_group = np.zeros((len(groups), len(groups)))
+        # for i1, group1 in enumerate(groups):
+        #     for i2, group2 in enumerate(groups):
+        #         ind1 = self.group_ind_orig[group1]
+        #         ind2 = self.group_ind_orig[group2]
+        #         w_rec_group[i2, i1] = w_rec[:, ind1][ind2, :].mean()
+
+        i_pairs = list()
+        for i1 in range(len(groups)):
+            for i2 in range(len(groups)):
+                i_pairs.append((i1, i2))
+
+        pref_diffs_list = list()
+        w_recs_list = list()
+
+        w_rec_bygroup = np.zeros((len(groups), len(groups)))
+
+        inds = [self.group_ind_orig[g] for g in groups]
+        for i_pair in i_pairs:
+            ind1, ind2 = inds[i_pair[0]], inds[i_pair[1]]
+            # For each neuron get the preference based on input weight
+            # sort by weights
+            w_sortby = w_in_
+            # w_sortby = w_out_
+            prefs1 = np.argmax(w_sortby[ind1, :], axis=1)*2.*np.pi/n_ring
+            prefs2 = np.argmax(w_sortby[ind2, :], axis=1)*2.*np.pi/n_ring
+
+            # Compute the pairwise distance based on preference
+            # Then get the connection weight between pairs
+            pref_diffs = list()
+            w_recs = list()
+            for i, ind_i in enumerate(ind1):
+                for j, ind_j in enumerate(ind2):
+                    if ind_j == ind_i:
+                        # Excluding self connections, which tend to be positive
+                        continue
+                    pref_diffs.append(get_dist(prefs1[i]-prefs2[j]))
+                    # pref_diffs.append(prefs1[i]-prefs2[j])
+                    w_recs.append(w_rec[ind_j, ind_i])
+            pref_diffs, w_recs = np.array(pref_diffs), np.array(w_recs)
+            pref_diffs_list.append(pref_diffs)
+            w_recs_list.append(w_recs)
+
+            w_rec_bygroup[i_pair[1], i_pair[0]] = np.mean(w_recs[pref_diffs<np.pi/6.])
 
         fs = 6
+        vmax = np.ceil(np.max(w_rec_bygroup) * 100) / 100.
+        vmin = np.floor(np.min(w_rec_bygroup) * 100) / 100.
         cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
-        fig = plt.figure(figsize=(2,2))
-        ax = fig.add_axes([.2, .2, .6, .6])
-        im = ax.imshow(w_rec_group.T, interpolation='nearest',
-                       cmap=cmap, aspect='auto')
+        fig = plt.figure(figsize=(1.5, 1.5))
+        ax = fig.add_axes([0.2, 0.1, 0.5, 0.5])
+        im = ax.imshow(w_rec_bygroup, interpolation='nearest',
+                       cmap='coolwarm', aspect='auto', vmin=vmin, vmax=vmax)
         # ax.axis('off')
+        ax.xaxis.set_label_position("top")
+        ax.xaxis.set_ticks_position("top")
         plt.xticks([0, 1, 2], groups, fontsize=6)
         plt.yticks([0, 1, 2], groups, fontsize=6)
+        ax.tick_params('both', length=0)
+        ax.set_xlabel('From', fontsize=fs, labelpad=2)
+        ax.set_ylabel('To', fontsize=fs, labelpad=2)
         for s in ['right', 'left', 'top', 'bottom']:
             ax.spines[s].set_visible(False)
 
-        ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
-        cb = plt.colorbar(im, cax=ax)
+        ax = fig.add_axes([0.72, 0.1, 0.03, 0.5])
+        cb = plt.colorbar(im, cax=ax, ticks=[vmin,vmax])
         cb.outline.set_linewidth(0.5)
-        cb.set_label(r'$\Delta$ Rec. weight', fontsize=fs, labelpad=2)
+        cb.set_label(r'Rec. weight', fontsize=fs, labelpad=-7)
         plt.tick_params(axis='both', which='major', labelsize=fs)
         plt.locator_params(nbins=3)
+
+        plt.savefig('figure/conn_rec_contextdm.pdf', transparent=True)
 
 
 def _gen_taskparams(stim1_loc, n_rep=1):
@@ -1171,17 +1216,19 @@ class StateSpaceAnalysis(object):
         return
 
 
-def _plot_performance_choicetasks(model_dir, lesion_units_list,
+def _plot_performance_choicetasks(model_dir, lesion_units_list, rules_perf=None,
                                   legends=None, save_name=None):
     """Plot performance across tasks for different lesioning.
 
     Args:
         model_dir: str, model directory
         lesion_units_list: list of lists of units to lesion
+        rules_perf: list of rules to perform
         legends: list of str
         save_name: None or str, add to the figure name
     """
-    rules_perf = ['contextdm1', 'contextdm2']
+    if rules_perf is None:
+        rules_perf = ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']
 
     perf_stores = list()
     for lesion_units in lesion_units_list:
@@ -1197,7 +1244,7 @@ def _plot_performance_choicetasks(model_dir, lesion_units_list,
 
     fs = 6
     width = 0.15
-    fig = plt.figure(figsize=(3,1.5))
+    fig = plt.figure(figsize=(2.5, 1.2))
     ax = fig.add_axes([0.17,0.35,0.8,0.4])
     for i, perf in enumerate(perf_stores):
         b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width, perf,
@@ -1205,7 +1252,7 @@ def _plot_performance_choicetasks(model_dir, lesion_units_list,
     ax.set_xticks(np.arange(len(rules_perf)))
     ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
     ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
-    ax.set_ylabel('performance', fontsize=fs)
+    ax.set_ylabel('Performance', fontsize=fs)
     lg = ax.legend(legends,
                    fontsize=fs, ncol=2, bbox_to_anchor=(1,1.4),
                    labelspacing=0.2, loc=1, frameon=False)
@@ -1217,6 +1264,8 @@ def _plot_performance_choicetasks(model_dir, lesion_units_list,
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
     ax.set_xlim([-0.8, len(rules_perf)-0.2])
+    ax.set_ylim([0, 1])
+    ax.set_yticks([0, 1])
     if save:
         fig_name = 'figure/perf_contextdm_lesion'
         if save_name is not None:
@@ -1710,14 +1759,14 @@ if __name__ == '__main__':
     model_dir = root_dir + '/0'
 
     ######################### Connectivity and Lesioning ######################
-    ua = UnitAnalysis(model_dir)
+    # ua = UnitAnalysis(model_dir)
     # ua.plot_connectivity(conn_type='rec')
-    ua.plot_inout_connections()
-    ua.plot_rec_connections()
-    ua.plot_rule_connections()
+    # ua.plot_inout_connections()
+    # ua.plot_rec_connections()
+    # ua.plot_rule_connections()
     # ua.prettyplot_hist_varprop()
 
-    # plot_performance_choicetasks(model_dir, grouping='var')
+    plot_performance_choicetasks(model_dir, grouping='var')
     # plot_performance_choicetasks(model_dir, grouping='beta')
 
     # plot_performance_2D_all(model_dir, 'contextdm1')
@@ -1753,7 +1802,3 @@ if __name__ == '__main__':
     # plot_frac_var(model_dir, analyze_allunits=False, sigma_rec=0.5)
 
     # data = load_data()
-    
-
-
-
