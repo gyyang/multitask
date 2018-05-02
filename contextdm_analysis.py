@@ -162,14 +162,16 @@ class UnitAnalysis(object):
         # Plot input from stim or output to loc
         if conn_type == 'input':
             w_conn = w_in[1:n_ring+1, :].T
-            xlabel = 'From stim mod 1'
+            xlabel = 'Preferred mod 1 input dir.'
+            ylabel = 'Conn. weight\n from mod 1'
             lgtitle = 'To group'
         elif conn_type == 'output':
             w_conn = w_out[:, 1:]
-            xlabel = 'To output'
+            xlabel = 'Preferred output dir.'
+            ylabel = 'Conn. weight\n to output'
             lgtitle = 'From group'
         else:
-            ValueError('Unknown conn type')
+            raise ValueError('Unknown conn type')
 
         w_aves = dict()
 
@@ -179,8 +181,8 @@ class UnitAnalysis(object):
             w_group = np.zeros((n_group, n_ring))
 
             for i, ind in enumerate(ind_group):
-                tmp           = w_conn[ind, :]
-                ind_max       = np.argmax(tmp)
+                tmp = w_conn[ind, :]
+                ind_max = np.argmax(tmp)
                 w_group[i, :] = np.roll(tmp, int(n_ring/2)-ind_max)
 
             w_aves[group] = w_group.mean(axis=0)
@@ -189,11 +191,11 @@ class UnitAnalysis(object):
         fig = plt.figure(figsize=(1.5, 1.0))
         ax = fig.add_axes([.3, .3, .6, .6])
         for group in groups:
-            ax.plot(w_aves[group], color=self.colors[group], label=group)
+            ax.plot(w_aves[group], color=self.colors[group], label=group, lw=1)
         ax.set_xticks([int(n_ring/2)])
-        ax.set_xticklabels(['preferred loc.'])
-        ax.set_xlabel(xlabel, fontsize=fs, labelpad=3)
-        ax.set_ylabel('conn. weight', fontsize=fs)
+        ax.set_xticklabels([xlabel])
+        # ax.set_xlabel(xlabel, fontsize=fs, labelpad=3)
+        ax.set_ylabel(ylabel, fontsize=fs)
         lg = ax.legend(title=lgtitle, fontsize=fs, bbox_to_anchor=(1.2,1.2),
                        labelspacing=0.2, loc=1, frameon=False)
         plt.setp(lg.get_title(),fontsize=fs)
