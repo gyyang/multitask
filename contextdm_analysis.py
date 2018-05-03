@@ -94,11 +94,11 @@ class UnitAnalysis(object):
         self.ind_active = ind_active
         self.colors = dict(zip([None, '1', '2', '12'],
                                sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])))
-        self.lesion_group_names = {None : 'intact',
-                                   '1'  : 'lesion groups 1',
-                                   '2'  : 'lesion groups 2',
-                                   '12' : 'lesion groups 12',
-                                   '1+2': 'lesion groups 1 & 2'}
+        self.lesion_group_names = {None : 'Intact',
+                                   '1'  : 'Lesion group 1',
+                                   '2'  : 'Lesion group 2',
+                                   '12' : 'Lesion group 12',
+                                   '1+2': 'Lesion group 1 & 2'}
 
     def prettyplot_hist_varprop(self):
         """Pretty version of variance.plot_hist_varprop."""
@@ -1311,7 +1311,7 @@ def plot_performance_2D_all(model_dir, rule):
     plot_performance_2D(model_dir, rule, title=title, save_name=save_name)
     for lesion_group in ['1', '2', '12', '1+2']:
         lesion_units = ua.group_ind_orig[lesion_group]
-        title = rule_name[rule] + '\n' + ua.lesion_group_names[lesion_group]
+        title = ua.lesion_group_names[lesion_group]
         save_name = rule_name[rule].replace(' ', '') + \
                     '_perf2D_lesion' + str(lesion_group) + '.pdf'
         plot_performance_2D(
