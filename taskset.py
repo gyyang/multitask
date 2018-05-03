@@ -640,12 +640,7 @@ def plot_taskspace_group(root_dir, setup=1, restore=True,
             continue
 
         if flip_sign:
-            if setup != 1:
-                # # The first data point should have all positive coordinate values
-                signs = ((h_trans.values()[0]>0)*2.-1)
-                for key, val in h_trans.items():
-                    h_trans[key] = val*signs
-            else:
+            if setup in [1, 3]:
                 # When PC1 and PC2 capture similar variances, allow for a rotation
                 # rotation_matrix, clock wise
                 get_angle = lambda vec : np.arctan2(vec[1], vec[0])
@@ -660,6 +655,11 @@ def plot_taskspace_group(root_dir, setup=1, restore=True,
                 if get_angle(h_trans.values()[1][0]) < 0:
                     for key, val in h_trans.items():
                         h_trans[key] = val*np.array([1, -1])
+            else:
+                # # The first data point should have all positive coordinate values
+                signs = ((h_trans.values()[0]>0)*2.-1)
+                for key, val in h_trans.items():
+                    h_trans[key] = val*signs
 
         if i == 0:
             for key, val in h_trans.items():
@@ -863,4 +863,14 @@ def plot_replacerule_performance_group(model_dir, setup=1, restore=True):
 
 
 if __name__ == '__main__':
-    pass
+    root_dir = './data/train_all'
+    model_dir = root_dir + '/0'
+    setups = [3]
+    for setup in setups:
+        pass
+        plot_taskspace_group(root_dir, setup=setup,
+                                     restore=True, representation='rate')
+        plot_taskspace_group(root_dir, setup=setup,
+                                     restore=True, representation='weight')
+        plot_replacerule_performance_group(
+                root_dir, setup=setup, restore=True)
