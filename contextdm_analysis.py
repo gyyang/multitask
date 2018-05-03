@@ -1245,16 +1245,16 @@ def _plot_performance_choicetasks(model_dir, lesion_units_list, rules_perf=None,
     fs = 6
     width = 0.15
     fig = plt.figure(figsize=(2.5, 1.2))
-    ax = fig.add_axes([0.17,0.35,0.8,0.4])
+    ax = fig.add_axes([0.17, 0.35, 0.8, 0.4])
     for i, perf in enumerate(perf_stores):
         b0 = ax.bar(np.arange(len(rules_perf))+(i-2)*width, perf,
                     width=width, color=COLORS[i], edgecolor='none')
     ax.set_xticks(np.arange(len(rules_perf)))
     ax.set_xticklabels([rule_name[r] for r in rules_perf], rotation=25)
-    ax.set_xlabel('Tasks', fontsize=fs, labelpad=3)
+    ax.set_xlabel('Tasks', fontsize=fs, labelpad=-2)
     ax.set_ylabel('Performance', fontsize=fs)
     lg = ax.legend(legends,
-                   fontsize=fs, ncol=2, bbox_to_anchor=(1,1.4),
+                   fontsize=fs, ncol=2, bbox_to_anchor=(1,1.6),
                    labelspacing=0.2, loc=1, frameon=False)
     plt.setp(lg.get_title(),fontsize=fs)
     ax.tick_params(axis='both', which='major', labelsize=fs)
