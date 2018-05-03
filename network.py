@@ -154,7 +154,7 @@ class LeakyRNNCell(RNNCell):
         else:
             raise ValueError('Unknown activation')
         self._alpha = alpha
-        self._sigma = np.sqrt(2*alpha) * sigma_rec
+        self._sigma = np.sqrt(2 / alpha) * sigma_rec
         if rng is None:
             self.rng = np.random.RandomState()
         else:
@@ -261,7 +261,7 @@ class LeakyGRUCell(RNNCell):
     self._bias_initializer = bias_initializer
 
     self._alpha = alpha
-    self._sigma = np.sqrt(2 * alpha) * sigma_rec
+    self._sigma = np.sqrt(2 / alpha) * sigma_rec
 
   @property
   def state_size(self):
