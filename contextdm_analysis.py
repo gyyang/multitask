@@ -1306,7 +1306,9 @@ def plot_performance_2D(model_dir, rule, lesion_units=None,
 def plot_performance_2D_all(model_dir, rule):
     """Plot performance of both modality coherence for all groups."""
     ua = UnitAnalysis(model_dir)
-    plot_performance_2D(model_dir, rule)
+    title = 'Intact'
+    save_name = rule_name[rule].replace(' ', '') + '_perf2D_intact.pdf'
+    plot_performance_2D(model_dir, rule, title=title, save_name=save_name)
     for lesion_group in ['1', '2', '12', '1+2']:
         lesion_units = ua.group_ind_orig[lesion_group]
         title = rule_name[rule] + '\n' + ua.lesion_group_names[lesion_group]
@@ -1766,10 +1768,10 @@ if __name__ == '__main__':
     # ua.plot_rule_connections()
     # ua.prettyplot_hist_varprop()
 
-    plot_performance_choicetasks(model_dir, grouping='var')
+    # plot_performance_choicetasks(model_dir, grouping='var')
     # plot_performance_choicetasks(model_dir, grouping='beta')
 
-    # plot_performance_2D_all(model_dir, 'contextdm1')
+    plot_performance_2D_all(model_dir, 'contextdm1')
 
     # plot_fullconnectivity(model_dir)
     # plot_groupsize('allrule_weaknoise')  # disabled now
