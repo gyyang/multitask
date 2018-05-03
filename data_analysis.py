@@ -560,7 +560,7 @@ def plot_frac_var(frac_var, save_name=None, fancy_color=False):
     colors = dict(zip([None, '1', '2', '12'], COLORS))
     fs = 6
     fig = plt.figure(figsize=(2.0, 1.2))
-    ax = fig.add_axes([0.2, 0.3, 0.5, 0.5])
+    ax = fig.add_axes([0.3, 0.3, 0.5, 0.5])
     data_plot = frac_var
     hist, bins_edge = np.histogram(data_plot, bins=20, range=(-1, 1))
     ax.bar(bins_edge[:-1], hist, width=bins_edge[1] - bins_edge[0],
@@ -575,7 +575,7 @@ def plot_frac_var(frac_var, save_name=None, fancy_color=False):
                            color=colors[group], edgecolor='none', label=group)
             bs.append(b_tmp)
     plt.locator_params(nbins=3)
-    xlabel = 'FTV(Ctx 1, Ctx 2)'
+    xlabel = 'FTV(Ctx DM 1, Ctx DM 2)'
     ax.set_xlabel(xlabel, fontsize=fs)
     ax.set_ylabel('Units', fontsize=fs)
     ax.set_ylim(bottom=-0.02 * hist.max())
@@ -803,20 +803,28 @@ def plot_rate_distribution(data):
     plt.ylabel('Activity at end')
 
 
-def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
+def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var'):
     """Plot how fractional variance distribution depends on hparams."""
-    # root_dir, hp_vary = './data/vary_l2init_mante', 'l2_weight_init'
-    # root_dir, hp_vary = './data/vary_l2weight_mante', 'l2_weight'
-    root_dir, hp_vary = './data/vary_pweighttrain_mante', 'p_weight_train'
+    if hp_vary == 'l2_weight_init':
+        root_dir = './data/vary_l2init_mante'
+        title = r'$L_2$ initial weight'
+        hp_vary_vals = [0, 8*1e-4]
+        ylim = [0, 0.3]
+    elif hp_vary == 'l2_weight':
+        root_dir = './data/vary_l2weight_mante'
+        title = r'$L_2$ weight'
+        hp_vary_vals = [0, 8 * 1e-4]
+        ylim = [0, 0.3]
+    elif hp_vary == 'p_weight_train':
+        root_dir = './data/vary_pweighttrain_mante'
+        title = r'$P_{\mathrm{train}}$'
+        hp_vary_vals = [1, 0.1]
+        ylim = [0, 0.15]
 
     hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyRNN',
                  'w_rec_init': 'randortho',
                  }
-
-    # hp_vary_vals = [0, 1*1e-4, 4*1e-4, 8*1e-4]
-    # hp_vary_vals = [0, 8*1e-4]
-    hp_vary_vals = [1.0, 0.1]
 
     hp_targets = [dict(hp_target, **{hp_vary: h}) for h in hp_vary_vals]
 
@@ -874,24 +882,25 @@ def plot_fracvar_hist_byhp(save_name=None, mode='all_var'):
 
     n = len(hists)
 
-    fig = plt.figure(figsize=(2, 1.5))
-    ax = fig.add_axes([.2, .25, .7, .7])
+    fs = 6
+    fig = plt.figure(figsize=(2.0, 1.2))
+    ax = fig.add_axes([0.3, 0.3, 0.5, 0.5])
     for i in range(n):
         color = mpl.cm.cool(i * 1.0 / n)
         ax.plot(xs[i], hists[i], color=color, label=labels[i])
         ax.fill_between(xs[i], bottoms[i], tops[i], alpha=0.2, color=color)
-    lg = ax.legend(title=hp_vary, fontsize=7, frameon=False,
-                   loc=1, bbox_to_anchor=(1.2, 1.0))
-    plt.setp(lg.get_title(), fontsize=7)
-    ax.set_ylim([0, 0.2])
-    ax.tick_params(axis='both', which='major', labelsize=7)
+    lg = ax.legend(title=title, fontsize=fs, frameon=False,
+                   loc=1, bbox_to_anchor=(1.2, 1.2))
+    plt.setp(lg.get_title(), fontsize=fs)
+    ax.set_ylim(ylim)
+    ax.tick_params(axis='both', which='major', labelsize=fs)
     ax.locator_params(nbins=3)
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-    ax.set_xlabel('FTV(Ctx DM 1, Ctx DM 2)', fontsize=7)
-    ax.set_ylabel('Proportion', fontsize=7)
+    ax.set_xlabel('FTV(Ctx DM 1, Ctx DM 2)', fontsize=fs)
+    ax.set_ylabel('Proportion', fontsize=fs)
 
     fig_name = 'figure/fracvar_by' + hp_vary
     if save_name is not None:
@@ -956,4 +965,4 @@ if __name__ == '__main__':
     pass
     # plot_all('mante')
 
-    hists = plot_fracvar_hist_byhp(mode='all_var')
+    hists = plot_fracvar_hist_byhp(hp_vary='l2_weight', mode='all_var')
