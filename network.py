@@ -317,11 +317,12 @@ class LeakyGRUCell(RNNCell):
       candidate = math_ops.matmul(
           array_ops.concat([inputs, r_state], 1), self._candidate_kernel)
       candidate = nn_ops.bias_add(candidate, self._candidate_bias)
+      candidate += tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma)
 
       c = self._activation(candidate)
       # new_h = u * state + (1 - u) * c  # original GRU
       new_h = (1 - self._alpha * u) * state + (self._alpha * u) * c
-      new_h += tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma)
+
       return new_h, new_h
 
 
