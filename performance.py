@@ -957,11 +957,11 @@ def _plot_psychometric_choicefamily_2D(prop1s, cohs, rule, title=None, **kwargs)
         plt.tick_params(axis='both', which='major', labelsize=fs)
 
     if save:
-        if 'model_dir' not in kwargs:
-            model_dir = rule_name[rule].replace(' ','')+'_perf2D.pdf'
+        if 'save_name' not in kwargs:
+            save_name = rule_name[rule].replace(' ','')+'_perf2D.pdf'
         else:
-            model_dir = kwargs['model_dir']
-        plt.savefig(os.path.join('figure', model_dir), transparent=True)
+            save_name = kwargs['save_name']
+        plt.savefig(os.path.join('figure', save_name), transparent=True)
 
     plt.show()
 
