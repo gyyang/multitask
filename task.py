@@ -1640,22 +1640,3 @@ def generate_trials(rule, hparams, mode, noise_on=True, **kwargs):
         trial.add_x_noise()
 
     return trial
-
-def get_valid_saveaddons(save_type, save_type_end=None):
-    '''NOT USED RIGHT NOW. helper function to get all valid save_addons'''
-    save_addons = list()
-
-    _vars = range(0,1000)
-    vars = list()
-
-    for var in _vars:
-        save_addon = save_type+'_'+str(var)
-        if save_type_end is not None:
-            save_addon = save_addon + save_type_end
-        fname = 'data/config'+save_addon+'.pkl'
-        if os.path.isfile(fname):
-            save_addons.append(save_addon)
-            vars.append(var)
-
-    return save_addons, vars
-
