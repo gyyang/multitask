@@ -333,81 +333,81 @@ class Model(object):
 
     def __init__(self,
                  save_dir,
-                 hparams=None,
+                 hp=None,
                  sigma_rec=None,
                  dt=None):
         """
-        Initializing the model with information from hparams
+        Initializing the model with information from hp
 
         Args:
             save_dir: string, directory of the model
-            hparams: a dictionary or None
-            sigma_rec: if not None, overwrite the sigma_rec passed by hparams
+            hp: a dictionary or None
+            sigma_rec: if not None, overwrite the sigma_rec passed by hp
         """
 
         # Reset tensorflow graphs
         tf.reset_default_graph()  # must be in the beginning
 
-        if hparams is None:
-            hparams = tools.load_hparams(save_dir)
-            if hparams is None:
+        if hp is None:
+            hp = tools.load_hp(save_dir)
+            if hp is None:
                 raise ValueError(
-                    'No hparams found for save_dir {:s}'.format(save_dir))
+                    'No hp found for save_dir {:s}'.format(save_dir))
 
-        tf.set_random_seed(hparams['seed'])
-        rng = np.random.RandomState(hparams['seed'])
+        tf.set_random_seed(hp['seed'])
+        rng = np.random.RandomState(hp['seed'])
 
         if sigma_rec is not None:
             print('Overwrite sigma_rec with {:0.3f}'.format(sigma_rec))
-            hparams['sigma_rec'] = sigma_rec
+            hp['sigma_rec'] = sigma_rec
 
         if dt is not None:
             print('Overwrite original dt with {:0.1f}'.format(dt))
-            hparams['dt'] = dt
+            hp['dt'] = dt
 
-        hparams['alpha'] = 1.0*hparams['dt']/hparams['tau']
+        hp['alpha'] = 1.0*hp['dt']/hp['tau']
 
         # Input, target output, and cost mask
         # Shape: [Time, Batch, Num_units]
-        if hparams['in_type'] != 'normal':
-            raise ValueError('Only support in_type ' + hparams['in_type'])
-        n_input = hparams['n_input']
-        n_rnn = hparams['n_rnn']
-        n_output = hparams['n_output']
+        if hp['in_type'] != 'normal':
+            raise ValueError('Only support in_type ' + hp['in_type'])
+        n_input = hp['n_input']
+        n_rnn = hp['n_rnn']
+        n_output = hp['n_output']
 
         self.x = tf.placeholder("float", [None, None, n_input])
         self.y = tf.placeholder("float", [None, None, n_output])
-        if hparams['loss_type'] == 'lsq':
+        if hp['loss_type'] == 'lsq':
             self.c_mask = tf.placeholder("float", [None, n_output])
         else:
             # Mask on time
             self.c_mask = tf.placeholder("float", [None])
 
         # Activation functions
-        if hparams['activation'] == 'power':
+        if hp['activation'] == 'power':
             f_act = lambda x: tf.square(tf.nn.relu(x))
-        elif hparams['activation'] == 'retanh':
+        elif hp['activation'] == 'retanh':
             f_act = lambda x: tf.tanh(tf.nn.relu(x))
         else:
-            f_act = getattr(tf.nn, hparams['activation'])
+            f_act = getattr(tf.nn, hp['activation'])
 
         # Recurrent activity
-        if hparams['rnn_type'] == 'LeakyRNN':
+        if hp['rnn_type'] == 'LeakyRNN':
             n_in_rnn = self.x.get_shape().as_list()[-1]
             cell = LeakyRNNCell(n_rnn, n_in_rnn,
-                                hparams['alpha'],
-                                sigma_rec=hparams['sigma_rec'],
-                                activation=hparams['activation'],
-                                w_rec_init=hparams['w_rec_init'],
+                                hp['alpha'],
+                                sigma_rec=hp['sigma_rec'],
+                                activation=hp['activation'],
+                                w_rec_init=hp['w_rec_init'],
                                 rng=rng)
-        elif hparams['rnn_type'] == 'LeakyGRU':
+        elif hp['rnn_type'] == 'LeakyGRU':
             cell = LeakyGRUCell(
-                    n_rnn, hparams['alpha'],
-                    sigma_rec=hparams['sigma_rec'], activation=f_act)
-        elif hparams['rnn_type'] == 'LSTM':
+                    n_rnn, hp['alpha'],
+                    sigma_rec=hp['sigma_rec'], activation=f_act)
+        elif hp['rnn_type'] == 'LSTM':
             cell = tf.contrib.rnn.LSTMCell(n_rnn, activation=f_act)
 
-        elif hparams['rnn_type'] == 'GRU':
+        elif hp['rnn_type'] == 'GRU':
             cell = tf.contrib.rnn.GRUCell(n_rnn, activation=f_act)
         else:
             raise NotImplementedError("""rnn_type must be one of LeakyRNN,
@@ -437,7 +437,7 @@ class Model(object):
         y_shaped = tf.reshape(self.y, (-1, n_output))
         # y_hat_ shape (n_time*n_batch, n_unit)
         y_hat_ = tf.matmul(h_shaped, w_out) + b_out
-        if hparams['loss_type'] == 'lsq':
+        if hp['loss_type'] == 'lsq':
             # Least-square loss
             y_hat = tf.sigmoid(y_hat_)
             self.cost_lsq = tf.reduce_mean(
@@ -461,21 +461,21 @@ class Model(object):
 
         # Regularization terms
         self.cost_reg = tf.constant(0.)
-        if hparams['l1_h'] > 0:
-            self.cost_reg += tf.reduce_sum(tf.abs(self.h))*hparams['l1_h']
-        if hparams['l2_h'] > 0:
-            self.cost_reg += tf.nn.l2_loss(self.h)*hparams['l2_h']
+        if hp['l1_h'] > 0:
+            self.cost_reg += tf.reduce_sum(tf.abs(self.h))*hp['l1_h']
+        if hp['l2_h'] > 0:
+            self.cost_reg += tf.nn.l2_loss(self.h)*hp['l2_h']
 
-        if hparams['l1_weight'] > 0:
-            self.cost_reg += hparams['l1_weight']*tf.add_n(
+        if hp['l1_weight'] > 0:
+            self.cost_reg += hp['l1_weight']*tf.add_n(
                 [tf.reduce_sum(tf.abs(v)) for v in self.weight_list])
-        if hparams['l2_weight'] > 0:
-            self.cost_reg += hparams['l2_weight']*tf.add_n(
+        if hp['l2_weight'] > 0:
+            self.cost_reg += hp['l2_weight']*tf.add_n(
                 [tf.nn.l2_loss(v) for v in self.weight_list])
 
         # Create an optimizer.
         self.opt = tf.train.AdamOptimizer(
-            learning_rate=hparams['learning_rate'])
+            learning_rate=hp['learning_rate'])
         # Set cost
         self.set_optimizer()
 
@@ -483,7 +483,7 @@ class Model(object):
         self.saver = tf.train.Saver(self.var_list)
 
         self.save_dir = save_dir
-        self.hparams = hparams
+        self.hp = hp
         for v in self.var_list:
             if 'rnn' in v.name:
                 if 'kernel' in v.name or 'weight' in v.name:
@@ -567,7 +567,7 @@ class Model(object):
             units = np.array(units)
 
         # This lesioning will work for both RNN and GRU
-        n_input = self.hparams['n_input']
+        n_input = self.hp['n_input']
         for v in self.var_list:
             if 'kernel' in v.name or 'weight' in v.name:
                 # Connection weights

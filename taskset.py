@@ -58,28 +58,28 @@ class TaskSetAnalysis(object):
         h_lastt_byepoch   = OrderedDict()
 
         model = Model(model_dir)
-        hparams = model.hparams
+        hp = model.hp
 
         if rules is None:
             # Default value
-            rules = hparams['rules']
+            rules = hp['rules']
         n_rules = len(rules)
 
         with tf.Session() as sess:
             model.restore()
 
             for rule in rules:
-                trial = generate_trials(rule=rule, hparams=hparams, mode='test')
-                feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                trial = generate_trials(rule=rule, hp=hp, mode='test')
+                feed_dict = tools.gen_feed_dict(model, trial, hp)
                 h = sess.run(model.h, feed_dict=feed_dict)
 
                 # Average across stimulus conditions
                 h_stimavg = h.mean(axis=1)
 
                 # dt_new = 50
-                # every_t = int(dt_new/hparams['dt'])
+                # every_t = int(dt_new/hp['dt'])
 
-                t_start = int(500/hparams['dt']) # Important: Ignore the initial transition
+                t_start = int(500/hp['dt']) # Important: Ignore the initial transition
                 # Average across stimulus conditions
                 h_stimavg_byrule[rule] = h_stimavg[t_start:, :]
 
@@ -474,14 +474,14 @@ def compute_taskspace(model_dir, setup, restore=False, representation='rate'):
         from task import get_rule_index
 
         model = Model(model_dir)
-        hparams = model.hparams
-        n_hidden = hparams['n_rnn']
-        n_output = hparams['n_output']
+        hp = model.hp
+        n_hidden = hp['n_rnn']
+        n_output = hp['n_output']
         with tf.Session() as sess:
             model.restore()
             w_in = sess.run(model.w_in).T
 
-        rule_indices = [get_rule_index(r, hparams) for r in rules]
+        rule_indices = [get_rule_index(r, hp) for r in rules]
         w_rules = w_in[:, rule_indices]
 
         from sklearn.decomposition import PCA
@@ -687,7 +687,7 @@ def run_network_replacerule(model_dir, rule, replace_rule, rule_strength):
         rule_strength: the relative strength of each replace rule unit
     """
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
     with tf.Session() as sess:
         model.restore()
 
@@ -697,9 +697,9 @@ def run_network_replacerule(model_dir, rule, replace_rule, rule_strength):
         batch_size_test_rep = int(batch_size_test/n_rep)
         perf_rep = list()
         for i_rep in range(n_rep):
-            trial = generate_trials(rule, hparams, 'random', batch_size=batch_size_test_rep,
+            trial = generate_trials(rule, hp, 'random', batch_size=batch_size_test_rep,
                                      replace_rule=replace_rule, rule_strength=rule_strength)
-            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            feed_dict = tools.gen_feed_dict(model, trial, hp)
             y_hat_test = sess.run(model.y_hat, feed_dict=feed_dict)
 
             perf_rep.append(np.mean(get_perf(y_hat_test, trial.y_loc)))

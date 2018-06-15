@@ -31,13 +31,13 @@ def _compute_variance_bymodel(model, sess, rules=None, random_rotation=False):
         """
     h_all_byrule = OrderedDict()
     h_all_byepoch = OrderedDict()
-    hparams = model.hparams
+    hp = model.hp
 
     if rules is None:
-        rules = hparams['rules']
+        rules = hp['rules']
     print(rules)
 
-    n_hidden = hparams['n_rnn']
+    n_hidden = hp['n_rnn']
 
     if random_rotation:
         # Generate random orthogonal matrix
@@ -45,8 +45,8 @@ def _compute_variance_bymodel(model, sess, rules=None, random_rotation=False):
         random_ortho_matrix = ortho_group.rvs(dim=n_hidden)
 
     for rule in rules:
-        trial = generate_trials(rule, hparams, 'test', noise_on=False)
-        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+        trial = generate_trials(rule, hp, 'test', noise_on=False)
+        feed_dict = tools.gen_feed_dict(model, trial, hp)
         h = sess.run(model.h, feed_dict=feed_dict)
         if random_rotation:
             h = np.dot(h, random_ortho_matrix)  # randomly rotate
@@ -303,8 +303,8 @@ def plot_hist_varprop_all(model_dir, plot_control=True):
 
     model_dirs = tools.valid_model_dirs(model_dir)
 
-    hparams = tools.load_hparams(model_dirs[0])
-    rules = hparams['rules']
+    hp = tools.load_hp(model_dirs[0])
+    rules = hp['rules']
 
     figsize = (7, 7)
 

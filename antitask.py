@@ -24,7 +24,7 @@ class Analysis(object):
 
         # Run model
         model = Model(model_dir)
-        self.hparams = model.hparams
+        self.hp = model.hp
         with tf.Session() as sess:
             model.restore()
             for name in ['w_in', 'w_rec', 'w_out', 'b_rec', 'b_out']:
@@ -83,7 +83,7 @@ class Analysis(object):
 
     def plot_inout_connections(self):
         """Plot the input and output connections."""
-        n_eachring = self.hparams['n_eachring']
+        n_eachring = self.hp['n_eachring']
         w_in, w_out = self.w_in, self.w_out
 
         w_in_ = (w_in[:, 1:n_eachring+1]+w_in[:, 1+n_eachring:2*n_eachring+1])/2.
@@ -144,8 +144,8 @@ class Analysis(object):
 
         # Rule index for the connectivity
         from task import get_rule_index
-        indconn_rules_anti     = [get_rule_index(r, self.hparams) for r in self.rules_anti]
-        indconn_rules_nonanti  = [get_rule_index(r, self.hparams) for r in self.rules_nonanti]
+        indconn_rules_anti     = [get_rule_index(r, self.hp) for r in self.rules_anti]
+        indconn_rules_nonanti  = [get_rule_index(r, self.hp) for r in self.rules_nonanti]
 
         for ind, unit_type in zip([self.ind_anti_orig, self.ind_nonanti_orig],
                                   ['Anti units', 'Non-Anti units']):
@@ -173,7 +173,7 @@ class Analysis(object):
     def plot_rec_connections(self):
         """Plot connectivity between recurrent units"""
 
-        n_eachring = self.hparams['n_eachring']
+        n_eachring = self.hp['n_eachring']
         w_in, w_rec, w_out = self.w_in, self.w_rec, self.w_out
 
         w_in_ = (w_in[:, 1:n_eachring+1]+w_in[:, 1+n_eachring:2*n_eachring+1])/2.
@@ -278,7 +278,7 @@ class Analysis(object):
     def plot_lesions(self):
         """Plot results of lesioning."""
 
-        n_hidden = self.hparams['n_rnn']
+        n_hidden = self.hp['n_rnn']
         # Randomly select a group to lesion. The group has the same size as the anti group
         ind_randomselect = np.arange(n_hidden)
         np.random.shuffle(ind_randomselect)
@@ -294,15 +294,15 @@ class Analysis(object):
 
         for lesion_units in lesion_units_list:
             model = Model(self.model_dir)
-            hparams = model.hparams
+            hp = model.hp
             with tf.Session() as sess:
                 model.restore()
                 model.lesion_units(sess, lesion_units)
 
                 perfs_store = list()
                 for rule in self.rules:
-                    trial = generate_trials(rule, hparams, mode='test')
-                    feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                    trial = generate_trials(rule, hp, mode='test')
+                    feed_dict = tools.gen_feed_dict(model, trial, hp)
                     y_hat_test = sess.run(model.y_hat, feed_dict=feed_dict)
                     perf = np.mean(get_perf(y_hat_test, trial.y_loc))
                     perfs_store.append(perf)

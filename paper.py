@@ -13,7 +13,7 @@ import antitask
 import clustering
 import variance
 import taskset
-import varyhparams
+import varyhp
 
 
 def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
@@ -76,7 +76,7 @@ root_dir = './data/train_all'
 model_dir = root_dir + '/0'
 
 # =============================================================================
-# root_dir = './data/varyhparams'
+# root_dir = './data/varyhp'
 # hp_target = {'activation': 'softplus',
 #              'rnn_type': 'LeakyGRU',
 #              'w_rec_init': 'randortho',
@@ -86,7 +86,7 @@ model_dir = root_dir + '/0'
 # =============================================================================
 
 # =============================================================================
-# root_dir = './data/varyhparams'
+# root_dir = './data/varyhp'
 # hp_target = {'activation': 'tanh',
 #              'rnn_type': 'LeakyRNN',
 #              'w_rec_init': 'diag',
@@ -146,8 +146,8 @@ CA = clustering.Analysis(model_dir, data_type='rule')
 # variance.plot_hist_varprop_all(root_dir)
 
 # Varying hyperparameter analysis------------------------------------------
-# varyhparams.plot_n_clusters()
-# varyhparams.plot_hist_varprop_tanh()
+# varyhp.plot_n_clusters()
+# varyhp.plot_hist_varprop_tanh()
 
 # Task Representation------------------------------------------------------
 # tsa = taskset.TaskSetAnalysis(model_dir)

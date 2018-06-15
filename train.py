@@ -18,20 +18,20 @@ import clustering
 import tools
 
 
-def get_default_hparams(ruleset):
-    '''Get a default hparamsuration.
+def get_default_hp(ruleset):
+    '''Get a default hpuration.
 
     Useful for debugging.
 
     Returns:
-        hparams : a dictionary containing training hparamsuration
+        hp : a dictionary containing training hpuration
     '''
     num_ring = task.get_num_ring(ruleset)
     n_rule = task.get_num_rule(ruleset)
 
     n_eachring = 32
     n_input, n_output = 1+num_ring*n_eachring+n_rule, n_eachring+1
-    hparams = {
+    hp = {
             # batch size for training
             'batch_size_train': 64,
             # batch_size for testing
@@ -94,7 +94,7 @@ def get_default_hparams(ruleset):
             'param_intsyn': None
             }
 
-    return hparams
+    return hp
 
 
 def update_intsyn():
@@ -153,7 +153,7 @@ def do_eval(sess, model, log, rule_train):
         log: dictionary that stores the log
         rule_train: string or list of strings, the rules being trained
     """
-    hparams = model.hparams
+    hp = model.hp
     if not hasattr(rule_train, '__iter__'):
         rule_name_print = rule_train
     else:
@@ -163,16 +163,16 @@ def do_eval(sess, model, log, rule_train):
           '  | Time {:0.2f} s'.format(log['times'][-1]) +
           '  | Now training '+rule_name_print)
 
-    for rule_test in hparams['rules']:
+    for rule_test in hp['rules']:
         n_rep = 16
-        batch_size_test_rep = int(hparams['batch_size_test']/n_rep)
+        batch_size_test_rep = int(hp['batch_size_test']/n_rep)
         clsq_tmp = list()
         creg_tmp = list()
         perf_tmp = list()
         for i_rep in range(n_rep):
             trial = generate_trials(
-                rule_test, hparams, 'random', batch_size=batch_size_test_rep)
-            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                rule_test, hp, 'random', batch_size=batch_size_test_rep)
+            feed_dict = tools.gen_feed_dict(model, trial, hp)
             c_lsq, c_reg, y_hat_test = sess.run(
                 [model.cost_lsq, model.cost_reg, model.y_hat],
                 feed_dict=feed_dict)
@@ -212,7 +212,7 @@ def do_eval(sess, model, log, rule_train):
 
 
 def train_old(train_dir,
-          hparams=None,
+          hp=None,
           max_steps=1e7,
           display_step=500,
           ruleset='mante',
@@ -223,7 +223,7 @@ def train_old(train_dir,
 
     Args:
         train_dir: str, training directory
-        hparams: dictionary of hyperparameters
+        hp: dictionary of hyperparameters
         max_steps: int, maximum number of training steps
         display_step: int, display steps
         ruleset: the set of rules to train
@@ -232,7 +232,7 @@ def train_old(train_dir,
 
     Returns:
         model is stored at train_dir/model.ckpt
-        training configuration is stored at train_dir/hparams.json
+        training configuration is stored at train_dir/hp.json
     '''
 
     tools.mkdir_p(train_dir)
@@ -243,29 +243,29 @@ def train_old(train_dir,
         raise NotImplementedError()  # temporarily disable
         # Build the model from save_name
         model = Model(train_dir)
-        hparams = model.hparams
+        hp = model.hp
 
     else:
         # Random number generator used
-        default_hparams = get_default_hparams(ruleset)
-        if hparams is not None:
-            default_hparams.update(hparams)
-        hparams = default_hparams
-        hparams['seed'] = seed
-        tools.save_hparams(hparams, train_dir)
+        default_hp = get_default_hp(ruleset)
+        if hp is not None:
+            default_hp.update(hp)
+        hp = default_hp
+        hp['seed'] = seed
+        tools.save_hp(hp, train_dir)
         # rng can not be serialized
-        hparams['rng'] = np.random.RandomState(seed)
+        hp['rng'] = np.random.RandomState(seed)
 
         # Build the model
-        model = Model(train_dir, hparams=hparams)
+        model = Model(train_dir, hp=hp)
 
-    # Display hparamsuration
-    for key, val in hparams.items():
+    # Display hpuration
+    for key, val in hp.items():
         print('{:20s} = '.format(key) + str(val))
 
     # Number of training iterations for each rule
     rule_train_iters = []
-    for rule_train in hparams['rule_trains']:
+    for rule_train in hp['rule_trains']:
         if not hasattr(rule_train, '__iter__'):
             tmp = 1
         else:
@@ -273,8 +273,8 @@ def train_old(train_dir,
         rule_train_iters.append(tmp*max_steps)
 
     # Using continual learning or not
-    if hparams['param_intsyn']:
-        c_intsyn, ksi_intsyn = hparams['param_intsyn']
+    if hp['param_intsyn']:
+        c_intsyn, ksi_intsyn = hp['param_intsyn']
         print('Using continual learning')
 
     # Store results
@@ -291,58 +291,58 @@ def train_old(train_dir,
             sess.run(tf.global_variables_initializer())
 
         # penalty on deviation from initial weight
-        if hparams['l2_weight_init'] > 0:
+        if hp['l2_weight_init'] > 0:
             # TODO: Need checking
             anchor_ws = sess.run(model.weight_list)
 
             # TODO: only change weights
             for w, w_val in zip(model.weight_list, anchor_ws):
-                model.cost_reg += (hparams['l2_weight_init'] *
+                model.cost_reg += (hp['l2_weight_init'] *
                                    tf.nn.l2_loss(w-w_val))
 
             model.set_optimizer()
 
         # Looping
         step_total = 0
-        for i_rule_train, rule_train in enumerate(hparams['rule_trains']):
+        for i_rule_train, rule_train in enumerate(hp['rule_trains']):
             step = 0
 
             # At the beginning of new tasks
-            if hparams['param_intsyn']:
+            if hp['param_intsyn']:
                 update_intsyn()
 
             # Keep training until reach max iterations
-            while (step * hparams['batch_size_train'] <=
+            while (step * hp['batch_size_train'] <=
                    rule_train_iters[i_rule_train]):
                 try:
                     # Validation
                     if step % display_step == 0:
-                        trial = step_total * hparams['batch_size_train']
+                        trial = step_total * hp['batch_size_train']
                         log['trials'].append(trial)
                         log['times'].append(time.time()-t_start)
                         log['rule_now'].append(rule_train)
                         log = do_eval(sess, model, log, rule_train)
-                        if log['perf_avg'][-1] > model.hparams['target_perf']:
+                        if log['perf_avg'][-1] > model.hp['target_perf']:
                             print('Perf reached the target: {:0.2f}'.format(
-                                hparams['target_perf']))
+                                hp['target_perf']))
                             break
 
                     # Training
                     if not hasattr(rule_train, '__iter__'):
                         rule_train_now = rule_train
                     else:
-                        p = hparams['rule_probs'][i_rule_train]
-                        rule_train_now = hparams['rng'].choice(rule_train, p=p)
+                        p = hp['rule_probs'][i_rule_train]
+                        rule_train_now = hp['rng'].choice(rule_train, p=p)
                     # Generate a random batch of trials.
                     # Each batch has the same trial length
                     trial = generate_trials(
-                            rule_train_now, hparams, 'random',
-                            batch_size=hparams['batch_size_train'])
+                            rule_train_now, hp, 'random',
+                            batch_size=hp['batch_size_train'])
 
                     # Generating feed_dict.
-                    feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                    feed_dict = tools.gen_feed_dict(model, trial, hp)
 
-                    if hparams['param_intsyn']:
+                    if hp['param_intsyn']:
                         update_intsyn2()
                     else:
                         sess.run(model.train_step, feed_dict=feed_dict)
@@ -371,7 +371,7 @@ def display_rich_output(model, sess, step, log, train_dir):
 
 
 def train(train_dir,
-          hparams=None,
+          hp=None,
           max_steps=1e7,
           display_step=500,
           ruleset='mante',
@@ -380,11 +380,11 @@ def train(train_dir,
           seed=0,
           rich_output=False,
           ):
-    '''Train the network
+    """Train the network
 
     Args:
         train_dir: str, training directory
-        hparams: dictionary of hyperparameters
+        hp: dictionary of hyperparameters
         max_steps: int, maximum number of training steps
         display_step: int, display steps
         ruleset: the set of rules to train
@@ -394,45 +394,45 @@ def train(train_dir,
 
     Returns:
         model is stored at train_dir/model.ckpt
-        training configuration is stored at train_dir/hparams.json
-    '''
+        training configuration is stored at train_dir/hp.json
+    """
 
     tools.mkdir_p(train_dir)
 
     # Network parameters
-    default_hparams = get_default_hparams(ruleset)
-    if hparams is not None:
-        default_hparams.update(hparams)
-    hparams = default_hparams
-    hparams['seed'] = seed
-    hparams['rng'] = np.random.RandomState(seed)
+    default_hp = get_default_hp(ruleset)
+    if hp is not None:
+        default_hp.update(hp)
+    hp = default_hp
+    hp['seed'] = seed
+    hp['rng'] = np.random.RandomState(seed)
 
     # Rules to train and test. Rules in a set are trained together
     if rule_trains is None:
         # By default, training all rules available to this ruleset
-        hparams['rule_trains'] = task.rules_dict[ruleset]
+        hp['rule_trains'] = task.rules_dict[ruleset]
     else:
-        hparams['rule_trains'] = rule_trains
-    hparams['rules'] = hparams['rule_trains']
+        hp['rule_trains'] = rule_trains
+    hp['rules'] = hp['rule_trains']
 
     # Assign probabilities for rule_trains.
     if rule_prob_map is None:
         rule_prob_map = dict()
 
     # Turn into rule_trains format
-    hparams['rule_probs'] = None
-    if hasattr(hparams['rule_trains'], '__iter__'):
+    hp['rule_probs'] = None
+    if hasattr(hp['rule_trains'], '__iter__'):
         # Set default as 1.
         rule_prob = np.array(
-                [rule_prob_map.get(r, 1.) for r in hparams['rule_trains']])
-        hparams['rule_probs'] = list(rule_prob/np.sum(rule_prob))
-    tools.save_hparams(hparams, train_dir)
+                [rule_prob_map.get(r, 1.) for r in hp['rule_trains']])
+        hp['rule_probs'] = list(rule_prob/np.sum(rule_prob))
+    tools.save_hp(hp, train_dir)
 
     # Build the model
-    model = Model(train_dir, hparams=hparams)
+    model = Model(train_dir, hp=hp)
 
-    # Display hparamsuration
-    for key, val in hparams.items():
+    # Display hpuration
+    for key, val in hp.items():
         print('{:20s} = '.format(key) + str(val))
 
     # Store results
@@ -446,24 +446,24 @@ def train(train_dir,
         sess.run(tf.global_variables_initializer())
 
         # penalty on deviation from initial weight
-        if hparams['l2_weight_init'] > 0:
+        if hp['l2_weight_init'] > 0:
             anchor_ws = sess.run(model.weight_list)
             for w, w_val in zip(model.weight_list, anchor_ws):
-                model.cost_reg += (hparams['l2_weight_init'] *
+                model.cost_reg += (hp['l2_weight_init'] *
                                    tf.nn.l2_loss(w - w_val))
 
             model.set_optimizer()
 
         # partial weight training
-        if ('p_weight_train' in hparams and
-            (hparams['p_weight_train'] is not None) and
-            hparams['p_weight_train'] < 1.0):
+        if ('p_weight_train' in hp and
+            (hp['p_weight_train'] is not None) and
+            hp['p_weight_train'] < 1.0):
             for w in model.weight_list:
                 w_val = sess.run(w)
                 w_size = sess.run(tf.size(w))
                 w_mask_tmp = np.linspace(0, 1, w_size)
-                hparams['rng'].shuffle(w_mask_tmp)
-                ind_fix = w_mask_tmp > hparams['p_weight_train']
+                hp['rng'].shuffle(w_mask_tmp)
+                ind_fix = w_mask_tmp > hp['p_weight_train']
                 w_mask = np.zeros(w_size, dtype=np.float32)
                 w_mask[ind_fix] = 1e-1  # will be squared in l2_loss
                 w_mask = tf.constant(w_mask)
@@ -472,34 +472,34 @@ def train(train_dir,
             model.set_optimizer()
 
         step = 0
-        while step * hparams['batch_size_train'] <= max_steps:
+        while step * hp['batch_size_train'] <= max_steps:
             try:
                 # Validation
                 if step % display_step == 0:
-                    log['trials'].append(step * hparams['batch_size_train'])
+                    log['trials'].append(step * hp['batch_size_train'])
                     log['times'].append(time.time()-t_start)
-                    log = do_eval(sess, model, log, hparams['rule_trains'])
-                    #if log['perf_avg'][-1] > model.hparams['target_perf']:
+                    log = do_eval(sess, model, log, hp['rule_trains'])
+                    #if log['perf_avg'][-1] > model.hp['target_perf']:
                     #check if minimum performance is above target    
-                    if log['perf_min'][-1] > model.hparams['target_perf']:
+                    if log['perf_min'][-1] > model.hp['target_perf']:
                         print('Perf reached the target: {:0.2f}'.format(
-                            hparams['target_perf']))
+                            hp['target_perf']))
                         break
 
                     if rich_output:
                         display_rich_output(model, sess, step, log, train_dir)
 
                 # Training
-                rule_train_now = hparams['rng'].choice(hparams['rule_trains'],
-                                                       p=hparams['rule_probs'])
+                rule_train_now = hp['rng'].choice(hp['rule_trains'],
+                                                       p=hp['rule_probs'])
                 # Generate a random batch of trials.
                 # Each batch has the same trial length
                 trial = generate_trials(
-                        rule_train_now, hparams, 'random',
-                        batch_size=hparams['batch_size_train'])
+                        rule_train_now, hp, 'random',
+                        batch_size=hp['batch_size_train'])
 
                 # Generating feed_dict.
-                feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                feed_dict = tools.gen_feed_dict(model, trial, hp)
                 sess.run(model.train_step, feed_dict=feed_dict)
 
                 step += 1
@@ -508,13 +508,13 @@ def train(train_dir,
                 print("Optimization interrupted by user")
                 break
 
-        print("Optimization Finished!")
+        print("Optimization finished!")
 
 
 if __name__ == '__main__':
     pass
     run_analysis = []
-    hparams = {'rnn_type': 'LeakyRNN',
+    hp = {'rnn_type': 'LeakyRNN',
                'n_rnn': 128,
                'activation': 'softplus',
                'l1_h': 0,
@@ -525,9 +525,9 @@ if __name__ == '__main__':
                'p_weight_train': 0.5,
                'target_perf': 0.9,
                'w_rec_init': 'randortho'}
-    train('data/mantetemp', seed=1, hparams=hparams, ruleset='mante',
+    train('data/mantetemp', seed=1, hp=hp, ruleset='mante',
           display_step=500, rich_output=False)
     
     # rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    # hparams = {'rnn_type': 'LeakyGRU', 'n_rnn': 128}
-    # train('debug',hparams=hparams, ruleset='all',rule_prob_map=rule_prob_map,seed=1)
+    # hp = {'rnn_type': 'LeakyGRU', 'n_rnn': 128}
+    # train('debug',hp=hp, ruleset='all',rule_prob_map=rule_prob_map,seed=1)

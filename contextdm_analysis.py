@@ -151,12 +151,12 @@ class UnitAnalysis(object):
 
         # Sort data by labels and by input connectivity
         model = Model(model_dir)
-        hparams = model.hparams
+        hp = model.hp
         with tf.Session() as sess:
             model.restore()
             w_in, w_out = sess.run([model.w_in, model.w_out])
 
-        n_ring = hparams['n_eachring']
+        n_ring = hp['n_eachring']
         groups = ['1', '2', '12']
 
         # Plot input from stim or output to loc
@@ -216,7 +216,7 @@ class UnitAnalysis(object):
 
         # Sort data by labels and by input connectivity
         model = Model(model_dir)
-        hparams = model.hparams
+        hp = model.hp
         with tf.Session() as sess:
             model.restore()
             w_in = sess.run(model.w_in)
@@ -233,7 +233,7 @@ class UnitAnalysis(object):
             w_store_tmp = list()
             ind = self.group_ind_orig[group]
             for rule in rules:
-                ind_rule = get_rule_index(rule, hparams)
+                ind_rule = get_rule_index(rule, hp)
                 w_conn = w_in[ind, ind_rule].mean(axis=0)
                 w_store_tmp.append(w_conn)
 
@@ -274,13 +274,13 @@ class UnitAnalysis(object):
 
         # Sort data by labels and by input connectivity
         model = Model(model_dir)
-        hparams = model.hparams
+        hp = model.hp
         with tf.Session() as sess:
             model.restore()
             w_in, w_rec = sess.run([model.w_in, model.w_rec])
         w_in, w_rec = w_in.T, w_rec.T
 
-        n_ring = hparams['n_eachring']
+        n_ring = hp['n_eachring']
         groups = ['1', '2', '12']
 
         w_in_ = (w_in[:, 1:n_ring + 1] + w_in[:, 1+n_ring:2*n_ring+1]) / 2.
@@ -513,7 +513,7 @@ class StateSpaceAnalysis(object):
         H_new_list = list()
 
         model = Model(model_dir, sigma_rec=sigma_rec)
-        hparams = model.hparams
+        hp = model.hp
         with tf.Session() as sess:
             model.restore()
             if lesion_units is not None:
@@ -536,7 +536,7 @@ class StateSpaceAnalysis(object):
                 # Start computing the neural activity
                 for i, rule in enumerate(rules):
                     # Generating task information
-                    trial = generate_trials(rule, hparams, 'psychometric', params=params, noise_on=True)
+                    trial = generate_trials(rule, hp, 'psychometric', params=params, noise_on=True)
                     x.append(trial.x)
                     y_loc.append(trial.y_loc)
 
@@ -566,7 +566,7 @@ class StateSpaceAnalysis(object):
 
         # Downsample in time
         dt_new = 50
-        every_t = int(dt_new/hparams['dt'])
+        every_t = int(dt_new/hp['dt'])
         # Only analyze the target epoch
         epoch = trial.epochs['stim1']
         H = H[epoch[0]:epoch[1],...][int(every_t/2)::every_t,...]
@@ -576,7 +576,7 @@ class StateSpaceAnalysis(object):
         # TODO: Temporary
         self.x = x[epoch[0]:epoch[1],...][::every_t,...]
 
-        hparams['dt_new'] = dt_new
+        hp['dt_new'] = dt_new
 
         nt, nb, nh = H.shape
 
@@ -716,7 +716,7 @@ class StateSpaceAnalysis(object):
 
         H_new_tran = np.dot(H_new, q)
 
-        self.hparams = hparams
+        self.hp = hp
         self.task_var = task_var
         self.Regrs_orig = Regrs
         self.Regrs = Regrs_new
@@ -850,7 +850,7 @@ class StateSpaceAnalysis(object):
                       'stim2_mod2_strengths' : [1],
                       'stim_time'    : 600}
 
-            task        = generate_onebatch(rule, self.hparams, 'psychometric', noise_on=False, params=params)
+            task        = generate_onebatch(rule, self.hp, 'psychometric', noise_on=False, params=params)
             epoch       = task.epochs['stim1']
             input_coh0  = task.x[epoch[1]-1, 0, :]
 
@@ -872,7 +872,7 @@ class StateSpaceAnalysis(object):
                 tmp += self.meanh
 
 
-            nh_orig = self.hparams['shape'][1]
+            nh_orig = self.hp['shape'][1]
             sstimt_points = np.zeros((2, nh_orig))
             print(sstimt_points.shape)
             # Re-express sstimting points in original space
@@ -1108,7 +1108,7 @@ class StateSpaceAnalysis(object):
 
         rules = ['contextdm1', 'contextdm2']
 
-        t_plot = np.arange(self.H.shape[0])*self.hparams['dt_new']/1000
+        t_plot = np.arange(self.H.shape[0])*self.hp['dt_new']/1000
 
         # Plot the group averaged activity
         fig, axarr = plt.subplots(1, 2, figsize=(2,1.0), sharey=True)
@@ -1172,7 +1172,7 @@ class StateSpaceAnalysis(object):
 
         rules = ['contextdm1', 'contextdm2']
 
-        t_plot = np.arange(self.H.shape[0])*self.hparams['dt_new']/1000
+        t_plot = np.arange(self.H.shape[0])*self.hp['dt_new']/1000
 
         # Plot the group averaged activity
         fig, axarr = plt.subplots(1, 2, figsize=(4,2.0), sharey=True)
@@ -1345,7 +1345,7 @@ def plot_performance_lesionbyactivity(root_dir, activation, n_lesion=20):
                          ind_sort[mid-int(n_lesion/2):mid+int(n_lesion/2)]]
     legends = ['Intact', 'Most Neg ' + str(n_lesion),
                'Most Pos ' + str(n_lesion), 'Mid ' + str(n_lesion)]
-    save_name = '_byactivity_' + ssa.hparams['activation']
+    save_name = '_byactivity_' + ssa.hp['activation']
     _plot_performance_choicetasks(model_dir, lesion_units_list,
                                   legends=legends, save_name=save_name)
 
@@ -1357,15 +1357,15 @@ def plot_fullconnectivity(model_dir):
     h_normvar_all = ua.h_normvar_all
     # Sort data by labels and by input connectivity
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
     with tf.Session() as sess:
         model.restore()
         w_in, w_out, w_rec = sess.run(
             [model.w_in, model.w_out, model.w_rec])
     w_in, w_rec, w_out = w_in.T, w_rec.T, w_out.T
 
-    nx, nh, ny = hparams['n_input'], hparams['n_rnn'], hparams['n_output']
-    n_ring = hparams['n_eachring']
+    nx, nh, ny = hp['n_input'], hp['n_rnn'], hp['n_output']
+    n_ring = hp['n_eachring']
 
     ind_active_new = list()
     labels = list()
@@ -1440,7 +1440,7 @@ def plot_fullconnectivity(model_dir):
     l0 = (1-1.5*l)/nh
 
     rules = ['contextdm1', 'contextdm2']
-    ind_rule = [get_rule_index(r, hparams) for r in rules]
+    ind_rule = [get_rule_index(r, hp) for r in rules]
     w_in_rule = w_in[:, ind_rule]
 
     plot_infos = [(w_rec              , [l               ,l          ,nh*l0    ,nh*l0]),
@@ -1492,7 +1492,7 @@ def plot_groupsize_TEMPDISABLED(save_type):
     HDIM_plot = list()
     for HDIM in HDIMs:
         model_dir = save_type+'_'+str(HDIM)
-        fname = 'data/hparams'+model_dir+'.pkl'
+        fname = 'data/hp'+model_dir+'.pkl'
         if not os.path.isfile(fname):
             continue
         ua = UnitAnalysis(model_dir)
@@ -1551,13 +1551,13 @@ def quick_statespace(model_dir):
     rules = ['contextdm1', 'contextdm2']
     h_lastts = dict()
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
     with tf.Session() as sess:
         model.restore()
         for rule in rules:
             # Generate a batch of trial from the test mode
-            trial = generate_trials(rule, hparams, mode='test')
-            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            trial = generate_trials(rule, hp, mode='test')
+            feed_dict = tools.gen_feed_dict(model, trial, hp)
             h = sess.run(model.h, feed_dict=feed_dict)
             lastt = trial.epochs['stim1'][-1]
             h_lastts[rule] = h[lastt,:,:]
@@ -1674,7 +1674,7 @@ def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
     data = list()
 
     model = Model(model_dir, sigma_rec=sigma_rec)
-    hparams = model.hparams
+    hp = model.hp
     with tf.Session() as sess:
         model.restore()
         if lesion_units is not None:
@@ -1693,7 +1693,7 @@ def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
             # Start computing the neural activity
             for i, rule in enumerate(rules):
                 # Generating task information
-                trial = generate_trials(rule, hparams, 'psychometric',
+                trial = generate_trials(rule, hp, 'psychometric',
                                         params=params, noise_on=True)
                 x.append(trial.x)
                 y_loc.append(trial.y_loc)
@@ -1716,7 +1716,7 @@ def load_data(model_dir=None, sigma_rec=0, lesion_units=None, n_rep=1):
 
             # Downsample in time
             dt_new = 50
-            every_t = int(dt_new / hparams['dt'])
+            every_t = int(dt_new / hp['dt'])
             # Only analyze the target epoch
             epoch = trial.epochs['stim1']
             H = H[epoch[0]:epoch[1], ...][int(every_t / 2)::every_t, ...]

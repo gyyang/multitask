@@ -8,24 +8,24 @@ import json
 import numpy as np
 
 
-def gen_feed_dict(model, trial, hparams):
+def gen_feed_dict(model, trial, hp):
     """Generate feed_dict for session run."""
-    if hparams['in_type'] == 'normal':
+    if hp['in_type'] == 'normal':
         feed_dict = {model.x: trial.x,
                      model.y: trial.y,
                      model.c_mask: trial.c_mask}
-    elif hparams['in_type'] == 'multi':
+    elif hp['in_type'] == 'multi':
         n_time, batch_size = trial.x.shape[:2]
         new_shape = [n_time,
                      batch_size,
-                     hparams['rule_start']*hparams['n_rule']]
+                     hp['rule_start']*hp['n_rule']]
 
         x = np.zeros(new_shape, dtype=np.float32)
         for i in range(batch_size):
-            ind_rule = np.argmax(trial.x[0, i, hparams['rule_start']:])
-            i_start = ind_rule*hparams['rule_start']
-            x[:, i, i_start:i_start+hparams['rule_start']] = \
-                trial.x[:, i, :hparams['rule_start']]
+            ind_rule = np.argmax(trial.x[0, i, hp['rule_start']:])
+            i_start = ind_rule*hp['rule_start']
+            x[:, i, i_start:i_start+hp['rule_start']] = \
+                trial.x[:, i, :hp['rule_start']]
 
         feed_dict = {model.x: x,
                      model.y: trial.y,
@@ -81,27 +81,27 @@ def save_log(log):
         json.dump(log, f)
 
 
-def load_hparams(save_dir):
+def load_hp(save_dir):
     """Load the hyper-parameter file of model save_name"""
-    fname = os.path.join(save_dir, 'hparams.json')
+    fname = os.path.join(save_dir, 'hp.json')
     if not os.path.isfile(fname):
         return None
 
     with open(fname, 'r') as f:
-        hparams = json.load(f)
+        hp = json.load(f)
 
     # Use a different seed aftering loading,
     # since loading is typically for analysis
-    hparams['rng'] = np.random.RandomState(hparams['seed']+1000)
-    return hparams
+    hp['rng'] = np.random.RandomState(hp['seed']+1000)
+    return hp
 
 
-def save_hparams(hparams, save_dir):
+def save_hp(hp, save_dir):
     """Save the hyper-parameter file of model save_name"""
-    hparams_copy = hparams.copy()
-    hparams_copy.pop('rng')  # rng can not be serialized
-    with open(os.path.join(save_dir, 'hparams.json'), 'w') as f:
-        json.dump(hparams_copy, f)
+    hp_copy = hp.copy()
+    hp_copy.pop('rng')  # rng can not be serialized
+    with open(os.path.join(save_dir, 'hp.json'), 'w') as f:
+        json.dump(hp_copy, f)
 
 
 def find_all_models(root_dir, hp_target):
@@ -120,7 +120,7 @@ def find_all_models(root_dir, hp_target):
     model_dirs = list()
     hps = list()
     for d in dirs:
-        hp = load_hparams(d)
+        hp = load_hp(d)
         if all(hp[key] == val for key, val in hp_target.items()):
             model_dirs.append(d)
             hps.append(hp)
@@ -150,7 +150,7 @@ def find_model(root_dir, hp_target, perf_min=None):
         return None, None
 
     d = model_dirs[0]
-    hp = load_hparams(d)
+    hp = load_hp(d)
 
     log = load_log(d)
     # check if performance exceeds target

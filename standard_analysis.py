@@ -20,13 +20,13 @@ def easy_activity_plot(model_dir, rule):
     """
 
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
 
     with tf.Session() as sess:
         model.restore()
 
-        trial = generate_trials(rule, hparams, mode='test')
-        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+        trial = generate_trials(rule, hp, mode='test')
+        feed_dict = tools.gen_feed_dict(model, trial, hp)
         h, y_hat = sess.run([model.h, model.y_hat], feed_dict=feed_dict)
         # All matrices have shape (n_time, n_condition, n_neuron)
 
@@ -88,21 +88,21 @@ def pretty_inputoutput_plot(model_dir, rule, save=False, plot_ylabel=False):
     fs = 7
 
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
 
     with tf.Session() as sess:
         model.restore()
 
-        trial = generate_trials(rule, hparams, mode='test')
+        trial = generate_trials(rule, hp, mode='test')
         x, y = trial.x, trial.y
-        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+        feed_dict = tools.gen_feed_dict(model, trial, hp)
         h, y_hat = sess.run([model.h, model.y_hat], feed_dict=feed_dict)
 
-        t_plot = np.arange(x.shape[0])*hparams['dt']/1000
+        t_plot = np.arange(x.shape[0])*hp['dt']/1000
 
-        assert hparams['num_ring'] == 2
+        assert hp['num_ring'] == 2
 
-        n_eachring = hparams['n_eachring']
+        n_eachring = hp['n_eachring']
 
         fig = plt.figure(figsize=(1.3,2))
         ylabels = ['fix. in', 'stim. mod1', 'stim. mod2','fix. out', 'out']
@@ -219,16 +219,16 @@ def pretty_singleneuron_plot(model_dir,
 
     h_tests = dict()
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
     with tf.Session() as sess:
         model.restore()
 
-        t_start = int(500/hparams['dt'])
+        t_start = int(500/hp['dt'])
 
         for rule in rules:
             # Generate a batch of trial from the test mode
-            trial = generate_trials(rule, hparams, mode='test')
-            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            trial = generate_trials(rule, hp, mode='test')
+            feed_dict = tools.gen_feed_dict(model, trial, hp)
             h = sess.run(model.h, feed_dict=feed_dict)
             h_tests[rule] = h
 
@@ -239,13 +239,13 @@ def pretty_singleneuron_plot(model_dir,
             fig = plt.figure(figsize=(1.0,0.8))
             ax = fig.add_axes([0.35,0.25,0.55,0.55])
             # ax.set_color_cycle(sns.color_palette("husl", h_tests[rule].shape[1]))
-            t_plot = np.arange(h_tests[rule][t_start:].shape[0])*hparams['dt']/1000
+            t_plot = np.arange(h_tests[rule][t_start:].shape[0])*hp['dt']/1000
             _ = ax.plot(t_plot,
                         h_tests[rule][t_start:,:,neuron], lw=0.5, color='gray')
 
             if plot_stim_avg:
                 # Plot stimulus averaged trace
-                _ = ax.plot(np.arange(h_tests[rule][t_start:].shape[0])*hparams['dt']/1000,
+                _ = ax.plot(np.arange(h_tests[rule][t_start:].shape[0])*hp['dt']/1000,
                         h_tests[rule][t_start:,:,neuron].mean(axis=1), lw=1, color='black')
 
             if epoch is not None:
@@ -298,16 +298,16 @@ def activity_histogram(model_dir,
 
     h_all = None
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
     with tf.Session() as sess:
         model.restore()
 
-        t_start = int(500/hparams['dt'])
+        t_start = int(500/hp['dt'])
 
         for rule in rules:
             # Generate a batch of trial from the test mode
-            trial = generate_trials(rule, hparams, mode='test')
-            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            trial = generate_trials(rule, hp, mode='test')
+            feed_dict = tools.gen_feed_dict(model, trial, hp)
             h = sess.run(model.h, feed_dict=feed_dict)
             h = h[t_start:, :, :]
             if h_all is None:
@@ -335,18 +335,18 @@ def schematic_plot(model_dir, rule=None):
     rule = rule or 'dm1'
 
     model = Model(model_dir, dt=1)
-    hparams = model.hparams
+    hp = model.hp
 
     with tf.Session() as sess:
         model.restore()
-        trial = generate_trials(rule, hparams, mode='test', t_tot=1000)
-        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+        trial = generate_trials(rule, hp, mode='test', t_tot=1000)
+        feed_dict = tools.gen_feed_dict(model, trial, hp)
         x = trial.x
         h, y_hat = sess.run([model.h, model.y_hat], feed_dict=feed_dict)
 
 
-    n_eachring = hparams['n_eachring']
-    n_hidden = hparams['n_rnn']
+    n_eachring = hp['n_eachring']
+    n_hidden = hp['n_rnn']
 
     # Plot Stimulus
     fig = plt.figure(figsize=(1.0,1.2))
@@ -543,7 +543,7 @@ if __name__ == "__main__":
     #                          trace_only=True, plot_stim_avg=True)
 
     # Plot activity histogram
-    # model_dir = '/Users/guangyuyang/MyPython/RecurrentNetworkTraining/multitask/data/varyhparams/33'
+    # model_dir = '/Users/guangyuyang/MyPython/RecurrentNetworkTraining/multitask/data/varyhp/33'
     # activity_histogram(model_dir, ['contextdm1', 'contextdm2'])
 
     # Plot schematic

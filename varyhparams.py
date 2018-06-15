@@ -16,7 +16,7 @@ import standard_analysis
 
 mpl.rcParams.update({'font.size': 7})
 
-DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhparams')
+DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhp')
 FIGPATH = os.path.join(os.getcwd(), 'figure')
 
 model_dirs = tools.valid_model_dirs(DATAPATH)
@@ -50,7 +50,7 @@ def compute_n_cluster():
     for model_dir in model_dirs:
         print(model_dir)
         log = tools.load_log(model_dir)
-        hparams = tools.load_hparams(model_dir)
+        hp = tools.load_hp(model_dir)
         try:
             analysis = clustering.Analysis(model_dir, 'rule')
 
@@ -59,7 +59,7 @@ def compute_n_cluster():
             tools.save_log(log)
         except IOError:
             # Training never finished
-            assert log['perf_min'][-1] <= hparams['target_perf']
+            assert log['perf_min'][-1] <= hp['target_perf']
 
         # analysis.plot_example_unit()
         # analysis.plot_variance()
@@ -74,37 +74,37 @@ def plot_histogram():
     initdictotherother = defaultdict(list)
 
     for model_dir in model_dirs:
-        hparams = tools.load_hparams(model_dir)
+        hp = tools.load_hp(model_dir)
         #check if performance exceeds target
         log = tools.load_log(model_dir)
-        #if log['perf_avg'][-1] > hparams['target_perf']: 
-        if log['perf_min'][-1] > hparams['target_perf']:         
+        #if log['perf_avg'][-1] > hp['target_perf']: 
+        if log['perf_min'][-1] > hp['target_perf']:         
             print('no. of clusters', log['n_cluster'])
             n_clusters.append(log['n_cluster'])
-            hparams_list.append(hparams)
+            hp_list.append(hp)
             
-            initdict[hparams['w_rec_init']].append(log['n_cluster'])
-            initdict[hparams['activation']].append(log['n_cluster'])
+            initdict[hp['w_rec_init']].append(log['n_cluster'])
+            initdict[hp['activation']].append(log['n_cluster'])
     
-            #initdict[hparams['rnn_type']].append(log['n_cluster']) 
-            if hparams['activation'] != 'tanh':
-                initdict[hparams['rnn_type']].append(log['n_cluster']) 
-                initdictother[hparams['rnn_type']+hparams['activation']].append(log['n_cluster']) 
-                initdictotherother[hparams['rnn_type']+hparams['activation']+hparams['w_rec_init']].append(log['n_cluster']) 
+            #initdict[hp['rnn_type']].append(log['n_cluster']) 
+            if hp['activation'] != 'tanh':
+                initdict[hp['rnn_type']].append(log['n_cluster']) 
+                initdictother[hp['rnn_type']+hp['activation']].append(log['n_cluster']) 
+                initdictotherother[hp['rnn_type']+hp['activation']+hp['w_rec_init']].append(log['n_cluster']) 
     
-            if hparams['l1_h'] == 0:
+            if hp['l1_h'] == 0:
                 initdict['l1_h_0'].append(log['n_cluster'])   
-            else: #hparams['l1_h'] == 1e-3 or 1e-4 or 1e-5:  
-                keyvalstr = 'l1_h_1emin'+str(int(abs(np.log10(hparams['l1_h']))))
+            else: #hp['l1_h'] == 1e-3 or 1e-4 or 1e-5:  
+                keyvalstr = 'l1_h_1emin'+str(int(abs(np.log10(hp['l1_h']))))
                 initdict[keyvalstr].append(log['n_cluster'])   
                 
-            if hparams['l1_weight'] == 0:            
+            if hp['l1_weight'] == 0:            
                 initdict['l1_weight_0'].append(log['n_cluster'])  
-            else: #hparams['l1_h'] == 1e-3 or 1e-4 or 1e-5:    
-                keyvalstr = 'l1_weight_1emin'+str(int(abs(np.log10(hparams['l1_weight']))))
+            else: #hp['l1_h'] == 1e-3 or 1e-4 or 1e-5:    
+                keyvalstr = 'l1_weight_1emin'+str(int(abs(np.log10(hp['l1_weight']))))
                 initdict[keyvalstr].append(log['n_cluster'])   
                 
-            #initdict[hparams['l1_weight']].append(log['n_cluster'])      
+            #initdict[hp['l1_weight']].append(log['n_cluster'])      
             
     # Check no of clusters under various conditions.
     f, axarr = plt.subplots(7, 1, figsize=(3,12), sharex=True)
@@ -176,22 +176,22 @@ def plot_histogram():
 
 
 def get_n_clusters():
-    hparams_list = list()
+    hp_list = list()
     n_clusters = list()
     for i, model_dir in enumerate(model_dirs):
         if i % 50 == 0:
             print('Analyzing model {:d}/{:d}'.format(i, len(model_dirs)))
-        hparams = tools.load_hparams(model_dir)
+        hp = tools.load_hp(model_dir)
         log = tools.load_log(model_dir)
         # check if performance exceeds target
-        if log['perf_min'][-1] > hparams['target_perf']:
+        if log['perf_min'][-1] > hp['target_perf']:
             n_clusters.append(log['n_cluster'])
-            hparams_list.append(hparams)
-    return n_clusters, hparams_list
+            hp_list.append(hp)
+    return n_clusters, hp_list
 
 
 def _get_hp_ranges():
-    """Get ranges of hparams."""
+    """Get ranges of hp."""
     hp_ranges = OrderedDict()
     hp_ranges['activation'] = ['softplus', 'relu', 'retanh', 'tanh']
     hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
@@ -202,30 +202,30 @@ def _get_hp_ranges():
     return hp_ranges
 
 
-def plot_n_clusters(n_clusters, hparams_list):
+def plot_n_clusters(n_clusters, hp_list):
     """Plot the number of clusters.
     
     Args:
         n_clusters: list of cluster numbers
-        hparams_list: list of hparams dictionary
+        hp_list: list of hp dictionary
     """
     hp_ranges = _get_hp_ranges()
 
-    # The hparams to show
+    # The hp to show
     hp_plots = hp_ranges.keys()
 
     # Sort by number of clusters
     ind_sort = np.argsort(n_clusters)[::-1]
     n_clusters_sorted = [n_clusters[i] for i in ind_sort]
-    hparams_list_sorted = [hparams_list[i] for i in ind_sort]
+    hp_list_sorted = [hp_list[i] for i in ind_sort]
 
-    # Fill a matrix with the index of hparams
-    hparams_visualize = np.zeros([len(hp_plots), len(n_clusters)])
-    for i, hparams in enumerate(hparams_list_sorted):
+    # Fill a matrix with the index of hp
+    hp_visualize = np.zeros([len(hp_plots), len(n_clusters)])
+    for i, hp in enumerate(hp_list_sorted):
         for j, hp in enumerate(hp_plots):
-            ind = hp_ranges[hp].index(hparams[hp])
+            ind = hp_ranges[hp].index(hp[hp])
             ind /= len(hp_ranges[hp]) - 1.
-            hparams_visualize[j, i] = ind
+            hp_visualize[j, i] = ind
 
     # Plot results
     fig = plt.figure(figsize=(3, 2))
@@ -246,7 +246,7 @@ def plot_n_clusters(n_clusters, hparams_list):
     cmap.set_over('0')
     cmap.set_under('1')
     ax = fig.add_axes([0.3, 0.15, 0.65, 0.35])
-    ax.imshow(hparams_visualize, aspect='auto', cmap='viridis')
+    ax.imshow(hp_visualize, aspect='auto', cmap='viridis')
     ax.set_xticks([0, len(n_clusters) - 1])
     ax.set_xticklabels([1, len(n_clusters)])
     ax.set_yticks(range(len(hp_plots)))
@@ -280,16 +280,16 @@ def plot_n_clusters(n_clusters, hparams_list):
     plt.savefig(figname, transparent=True)
     
 
-def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
+def _plot_n_cluster_hist(hp_plot, n_clusters=None, hp_list=None):
     """Plot histogram for number of clusters, separating by an attribute.
     
     Args:
         hp_plot: str, the attribute to separate histogram by
         n_clusters: list of cluster numbers
-        hparams_list: list of hparams dictionary
+        hp_list: list of hp dictionary
     """
-    if hparams_list is None:
-        n_clusters, hparams_list = get_n_clusters()
+    if hp_list is None:
+        n_clusters, hp_list = get_n_clusters()
 
     # Compare activation, ignore tanh that can not be trained with LeakyRNN
     # hp_plot = 'activation'
@@ -301,7 +301,7 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     for key in hp_ranges[hp_plot]:
         n_cluster_dict[key] = list()
 
-    for hp, n_cluster in zip(hparams_list, n_clusters):
+    for hp, n_cluster in zip(hp_list, n_clusters):
         # if hp_plot == 'activation' and hp['rnn_type'] != 'LeakyGRU':
             # For activation, only analyze LeakyGRU cells
         #     continue
@@ -349,17 +349,17 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     return n_cluster_dict
 
 
-def plot_n_cluster_hist(n_clusters, hparams_list):
+def plot_n_cluster_hist(n_clusters, hp_list):
     """Plot histogram of number of clusters.
     
     Args:
         n_clusters: list of cluster numbers
-        hparams_list: list of hparams dictionary
+        hp_list: list of hp dictionary
     """
     hp_plots = ['activation', 'rnn_type', 'w_rec_init', 'l1_h', 'l1_weight']
     # hp_plots = ['activation']
     for hp_plot in hp_plots:
-        n_cluster_dict = _plot_n_cluster_hist(hp_plot, n_clusters, hparams_list)
+        n_cluster_dict = _plot_n_cluster_hist(hp_plot, n_clusters, hp_list)
 
 
 def get_model_by_activation(activation):
@@ -401,30 +401,30 @@ def activity_histogram(activation):
 if __name__ == '__main__':
     pass
     # compute_n_cluster()
-    # n_clusters, hparams_list = get_n_clusters()
-    # plot_n_clusters(n_clusters, hparams_list)
-    # plot_n_cluster_hist(n_clusters, hparams_list)
+    # n_clusters, hp_list = get_n_clusters()
+    # plot_n_clusters(n_clusters, hp_list)
+    # plot_n_cluster_hist(n_clusters, hp_list)
     # pretty_singleneuron_plot('tanh')
     # pretty_singleneuron_plot('relu')
     # [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
     
     
-    DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhparams_reg')
+    DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhp_reg')
     FIGPATH = os.path.join(os.getcwd(), 'figure')
     model_dirs = tools.valid_model_dirs(DATAPATH)
     
-    hparams_list = list()
+    hp_list = list()
     n_clusters = list()
     logs = list()
     perfs = list()
     for i, model_dir in enumerate(model_dirs):
-        hparams = tools.load_hparams(model_dir)
+        hp = tools.load_hp(model_dir)
         log = tools.load_log(model_dir)
         # check if performance exceeds target
         perfs.append(log['perf_min'][-1])
         if log['perf_min'][-1] > 0.8:
             logs.append(log)
             n_clusters.append(log['n_cluster'])
-            hparams_list.append(hparams)
+            hp_list.append(hp)
         
 

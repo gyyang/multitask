@@ -32,7 +32,7 @@ class NetworkTest(unittest.TestCase):
         n_rule = 20
         n_eachring = 32
         n_input, n_output = 1 + num_ring * n_eachring + n_rule, n_eachring + 1
-        hparams = {
+        hp = {
             # batch size for training
             'batch_size_train': 64,
             # batch_size for testing
@@ -94,14 +94,14 @@ class NetworkTest(unittest.TestCase):
             # random seed
             'seed': 0
         }
-        hparams['rnn_type'] = 'LeakyRNN'
+        hp['rnn_type'] = 'LeakyRNN'
         # Build the model
-        model = network.Model(None, hparams=hparams)
+        model = network.Model(None, hp=hp)
 
         # Use customized session that launches the graph as well
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
-            model.lesion_units(sess, [hparams['n_rnn']-1])
+            model.lesion_units(sess, [hp['n_rnn']-1])
 
             for v in model.var_list:
                 if 'kernel' in v.name or 'weight' in v.name:

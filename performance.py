@@ -111,7 +111,7 @@ def plot_trainingprogress(model_dir, rule_plot=None, save=True):
 def plot_performanceprogress(model_dir, rule_plot=None, save=False):
     # Plot Training Progress
     log = tools.load_log(model_dir)
-    hparams = tools.load_hparams(model_dir)
+    hp = tools.load_hp(model_dir)
 
     trials = log['trials']
 
@@ -123,7 +123,7 @@ def plot_performanceprogress(model_dir, rule_plot=None, save=False):
 
     x_plot = np.array(trials)/1000.
     if rule_plot == None:
-        rule_plot = hparams['rules']
+        rule_plot = hp['rules']
 
     for i, rule in enumerate(rule_plot):
         # line = ax1.plot(x_plot, np.log10(cost_tests[rule]),color=color_rules[i%26])
@@ -162,7 +162,7 @@ def plot_performanceprogress_cont(model_dirs, save=True, **kwargs):
 def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=None):
     # Plot Training Progress
     log = tools.load_log(model_dir)
-    hparams = tools.load_hparams(model_dir)
+    hp = tools.load_hp(model_dir)
 
     trials      = np.array(log['trials'])/1000.
     times       = log['times']
@@ -180,8 +180,8 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=N
     labels = list()
 
 
-    rule_train_plot = hparams['rule_trains']
-    rule_test_plot  = hparams['rules']
+    rule_train_plot = hp['rule_trains']
+    rule_test_plot  = hp['rules']
 
     if dims is None:
         nx, ny = 4, 3
@@ -278,9 +278,9 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=N
 def get_finalperformance(save_pattern):
     model_dirs = tools.valid_model_dirs(save_pattern)
 
-    hparams = tools.load_hparams(model_dirs[0])
+    hp = tools.load_hp(model_dirs[0])
 
-    rule_plot = hparams['rules']
+    rule_plot = hp['rules']
 
     final_cost, final_perf = OrderedDict(), OrderedDict()
     for rule in rule_plot:
@@ -414,13 +414,13 @@ def get_allperformance(save_pattern, param_list=None):
 
     for model_dir in model_dirs:
         log = tools.load_log(model_dir)
-        hparams = tools.load_hparams(model_dir)
+        hp = tools.load_hp(model_dir)
 
         perf_tests = log['perf_tests']
 
         final_perf = np.mean([float(val[-1]) for val in perf_tests.values()])
 
-        key = tuple([hparams[p] for p in param_list])
+        key = tuple([hp[p] for p in param_list])
         if key in final_perfs.keys():
             final_perfs[key].append(final_perf)
         else:
@@ -459,7 +459,7 @@ def plot_finalperformance_lr():
         for key in perf_tests.keys():
             final_perf[key] += [float(perf_tests[key][-1])]
             final_cost[key]        += [float(cost_tests[key][-1])]
-        # lr_plot.append(hparams['learning_rate'])
+        # lr_plot.append(hp['learning_rate'])
         lr_plot.append(np.logspace(-2,-4,100)[i_lr]) # Temporary
         training_time_plot.append(log['times'][-1])
 
@@ -528,15 +528,15 @@ def _psychometric_dm(model_dir, rule, params_list, batch_shape):
     print('Starting psychometric analysis of the {:s} task...'.format(rule_name[rule]))
 
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
     with tf.Session() as sess:
         model.restore()
 
         ydatas = list()
         for params in params_list:
 
-            trial  = generate_trials(rule, hparams, 'psychometric', params=params)
-            feed_dict = tools.gen_feed_dict(model, trial, hparams)
+            trial  = generate_trials(rule, hp, 'psychometric', params=params)
+            feed_dict = tools.gen_feed_dict(model, trial, hp)
             y_loc_sample = sess.run(model.y_hat_loc, feed_dict=feed_dict)
             y_loc_sample = np.reshape(y_loc_sample[-1], batch_shape)
 
@@ -730,7 +730,7 @@ def psychometric_intrepro(model_dir):
             params = {'stim_mod1_locs'  : stim_mod1_locs,
                       'interval'       : interval}
 
-            task  = generate_onebatch(INTREPRO, R.hparams, 'psychometric', params=params)
+            task  = generate_onebatch(INTREPRO, R.hp, 'psychometric', params=params)
             h_test = R.f_h(task.x)
             y = R.f_y(h_test)
 
@@ -892,15 +892,15 @@ def psychometric_choicefamily_2D(model_dir, rule, lesion_units=None,
           }
 
     model = Model(model_dir)
-    hparams = model.hparams
+    hp = model.hp
     with tf.Session() as sess:
         model.restore()
         model.lesion_units(sess, lesion_units)
 
         params = params_dict[rule]
-        trial = generate_trials(rule, hparams, 'psychometric',
+        trial = generate_trials(rule, hp, 'psychometric',
                                 params=params)
-        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+        feed_dict = tools.gen_feed_dict(model, trial, hp)
         y_sample, y_loc_sample = sess.run([model.y_hat, model.y_hat_loc],
                                           feed_dict=feed_dict)
 
@@ -1226,7 +1226,7 @@ def psychometric_choice_varyloc(model_dir, **kwargs):
                   'stim2_strengths' : stim2_strengths,
                   'stim_time'    : 600}
 
-        task  = generate_onebatch('dm1', R.hparams, 'psychometric', params=params)
+        task  = generate_onebatch('dm1', R.hp, 'psychometric', params=params)
         y_sample = R.f_y_from_x(task.x)
         y_sample_loc = R.f_y_loc(y_sample)
 
@@ -1312,7 +1312,7 @@ def psychometric_delaymatching_fromsession(R, rule):
 
     # rule = DMSGO
     # rule = DMCGO
-    task  = generate_onebatch(rule, R.hparams, 'psychometric', params=params)
+    task  = generate_onebatch(rule, R.hp, 'psychometric', params=params)
     y_sample = R.f_y_from_x(task.x)
 
     if rule in [DMSGO, DMCGO]:
@@ -1382,7 +1382,7 @@ def psychometric_goantifamily_2D(model_dir, rule, title=None, **kwargs):
         raise ValueError('Not supported rule value')
 
     with Run(model_dir, fast_eval=True) as R:
-        task  = generate_onebatch(rule, R.hparams, 'psychometric', params=params)
+        task  = generate_onebatch(rule, R.hp, 'psychometric', params=params)
         # response locations at last time points
         y_hat_loc = R.f_y_loc_from_x(task.x)[-1]
 

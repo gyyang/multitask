@@ -1587,7 +1587,7 @@ rule_name    = {'reactgo'           : 'RT Go',
                 'dmc'               : 'DMC'
                 }
 
-def generate_trials(rule, hparams, mode, noise_on=True, **kwargs):
+def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
     '''
     Generate one batch of data
     :param rule: the rule for this batch
@@ -1597,7 +1597,7 @@ def generate_trials(rule, hparams, mode, noise_on=True, **kwargs):
     :param param: a dictionary of parameters
     :return: dictionary of list of data.
     '''
-    config = hparams
+    config = hp
     trial = rule_mapping[rule](config, mode, **kwargs)
 
     # Add rule input to every task

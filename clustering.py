@@ -50,7 +50,7 @@ save = True
 
 class Analysis(object):
     def __init__(self, model_dir, data_type, normalization_method='max'):
-        hparams = tools.load_hparams(model_dir)
+        hp = tools.load_hp(model_dir)
 
         # If not computed, use variance.py
         fname = os.path.join(model_dir, 'variance_'+data_type)
@@ -129,7 +129,7 @@ class Analysis(object):
 
         # # Sort data by labels and by input connectivity
         # model = Model(save_name)
-        # hparams = model.hparams
+        # hp = model.hp
         # with tf.Session() as sess:
         #     model.restore(sess)
         #     var_list = sess.run(model.var_list)
@@ -141,8 +141,8 @@ class Analysis(object):
         # w_rec = var_list[2][n_input:, :].T
         # b_rec = var_list[3]
         #
-        # # nx, nh, ny = hparams['shape']
-        # nr = hparams['n_eachring']
+        # # nx, nh, ny = hp['shape']
+        # nr = hp['n_eachring']
         #
         # sort_by = 'w_in'
         # if sort_by == 'w_in':
@@ -171,9 +171,9 @@ class Analysis(object):
         self.unique_labels = np.unique(labels)
 
         self.model_dir = model_dir
-        self.hparams = hparams
+        self.hp = hp
         self.data_type = data_type
-        self.rules = hparams['rules']
+        self.rules = hp['rules']
 
     def plot_cluster_score(self, save_name=None):
         """Plot the score by the number of clusters."""
@@ -370,7 +370,7 @@ class Analysis(object):
 
         # Sort data by labels and by input connectivity
         model = Model(self.model_dir)
-        hparams = model.hparams
+        hp = model.hp
         with tf.Session() as sess:
             model.restore()
             w_in = sess.run(model.w_in).T
@@ -384,8 +384,8 @@ class Analysis(object):
         w_out = w_out[:, ind_active]
         b_rec = b_rec[ind_active]
 
-        # nx, nh, ny = hparams['shape']
-        nr = hparams['n_eachring']
+        # nx, nh, ny = hp['shape']
+        nr = hp['n_eachring']
 
         sort_by = 'w_in'
         if sort_by == 'w_in':
@@ -400,11 +400,11 @@ class Analysis(object):
         ind_sort = np.lexsort((w_prefs, self.labels))
 
         ######################### Plotting Connectivity ###############################
-        nx = self.hparams['n_input']
-        ny = self.hparams['n_output']
+        nx = self.hp['n_input']
+        ny = self.hp['n_output']
         nh = len(self.ind_active)
-        nr = self.hparams['n_eachring']
-        nrule = len(self.hparams['rules'])
+        nr = self.hp['n_eachring']
+        nrule = len(self.hp['rules'])
 
         # Plot active units
         _w_rec  = w_rec[ind_sort,:][:,ind_sort]
@@ -473,7 +473,7 @@ class Analysis(object):
 
         for i, lesion_units in enumerate(lesion_units_list):
             model = Model(self.model_dir)
-            hparams = model.hparams
+            hp = model.hp
             with tf.Session() as sess:
                 model.restore()
                 model.lesion_units(sess, lesion_units)
@@ -481,8 +481,8 @@ class Analysis(object):
                 perfs_store = list()
                 cost_store = list()
                 for rule in self.rules:
-                    # trial = generate_trials(rule=rule, hparams=hparams, mode='test')
-                    # trial = generate_trials(rule=rule, hparams=hparams, mode='random', batch_size=100)
+                    # trial = generate_trials(rule=rule, hp=hp, mode='test')
+                    # trial = generate_trials(rule=rule, hp=hp, mode='random', batch_size=100)
                     # y_hat_test = model.get_y(trial.x)
                     # feed_dict = {model.x: trial.x,
                     #              model.y: trial.y.reshape((-1,n_output)),
@@ -499,9 +499,9 @@ class Analysis(object):
                     clsq_tmp = list()
                     perf_tmp = list()
                     for i_rep in range(n_rep):
-                        trial = generate_trials(rule, hparams, 'random',
+                        trial = generate_trials(rule, hp, 'random',
                                                 batch_size=batch_size_test_rep)
-                        feed_dict = tools.gen_feed_dict(model, trial, hparams)
+                        feed_dict = tools.gen_feed_dict(model, trial, hp)
                         y_hat_test, c_lsq = sess.run(
                             [model.y_hat, model.cost_lsq], feed_dict=feed_dict)
 

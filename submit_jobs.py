@@ -107,7 +107,7 @@ elif args.run == 'all_varyhp':
     for i in range(0, 20):
         jobname = 'train_varyhp_{:d}'.format(i)
         train_arg = '{:d}'.format(i)
-        cmd = r'''python -c "import experiment as e;e.train_vary_hparams('''+\
+        cmd = r'''python -c "import experiment as e;e.train_vary_hp('''+\
               train_arg+''')"'''
 
         jobfile = write_jobfile(

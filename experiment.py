@@ -53,17 +53,17 @@ def analysis(run_analysis, model_dir):
 
 def train_mante(seed=0, train_dir='train_mante'):
     """Training of only the Mante task."""
-    hparams = {'target_perf': 0.9}
+    hp = {'target_perf': 0.9}
     train_dir = os.path.join(DATAPATH, train_dir, str(seed))
-    train.train(train_dir, hparams=hparams, ruleset='mante', seed=seed)
+    train.train(train_dir, hp=hp, ruleset='mante', seed=seed)
 
 
 def mante_tanh(seed=0, train_dir='mante_tanh'):
     """Training of only the Mante task."""
-    hparams = {'activation': 'tanh',
+    hp = {'activation': 'tanh',
                'target_perf': 0.9}
     train_dir = os.path.join(DATAPATH, train_dir, str(seed))
-    train.train(train_dir, hparams=hparams, ruleset='mante', seed=seed)
+    train.train(train_dir, hp=hp, ruleset='mante', seed=seed)
     # Analyses
     variance.compute_variance(train_dir)
 
@@ -77,13 +77,13 @@ def mante_tanh(seed=0, train_dir='mante_tanh'):
 def train_all(seed=0, train_dir='train_all'):
     """Training of all tasks."""
     train_dir = os.path.join(DATAPATH, train_dir, str(seed))
-    hparams = {'activation': 'softplus'}
+    hp = {'activation': 'softplus'}
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir, hparams=hparams, ruleset='all',
+    train.train(train_dir, hp=hp, ruleset='all',
                 rule_prob_map=rule_prob_map, seed=seed)
 
 
-def train_vary_hparams(i):
+def train_vary_hp(i):
     """Vary the hyperparameters.
 
     This experiment loops over a set of hyperparameters.
@@ -111,13 +111,13 @@ def train_vary_hparams(i):
     indices = np.unravel_index(i % n_max, dims=dims)
 
     # Set up new hyperparameter
-    hparams = dict()
+    hp = dict()
     for key, index in zip(keys, indices):
-        hparams[key] = hp_ranges[key][index]
+        hp[key] = hp_ranges[key][index]
 
-    train_dir = os.path.join(DATAPATH, 'varyhparams_reg2', str(i))
+    train_dir = os.path.join(DATAPATH, 'varyhp_reg2', str(i))
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir, hparams, ruleset='all',
+    train.train(train_dir, hp, ruleset='all',
                 rule_prob_map=rule_prob_map, seed=i // n_max)
 
     # Analyses
@@ -138,12 +138,12 @@ def _base_vary_hp_mante(i, hp_ranges, base_name):
     indices = np.unravel_index(i % n_max, dims=dims)
 
     # Set up new hyperparameter
-    hparams = dict()
+    hp = dict()
     for key, index in zip(keys, indices):
-        hparams[key] = hp_ranges[key][index]
+        hp[key] = hp_ranges[key][index]
 
     train_dir = os.path.join(DATAPATH, base_name, str(i))
-    train.train(train_dir, hparams, ruleset='mante',
+    train.train(train_dir, hp, ruleset='mante',
                 max_steps=1e7, seed=i // n_max)
 
     # Analyses
@@ -219,11 +219,11 @@ if __name__ == '__main__':
     train_mante()
     # train_all()
     # for i in range(10):
-    #     train_vary_hparams(i)
+    #     train_vary_hp(i)
     """ 
 
     #train_all()
     for i in np.arange(0,3):
-        #train_vary_hparams(i)
+        #train_vary_hp(i)
         train_all(i)
 
