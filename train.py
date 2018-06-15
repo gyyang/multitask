@@ -445,7 +445,8 @@ def train(train_dir,
             model.set_optimizer()
 
         if ('p_weight_train' in hparams and
-            hparams['p_weight_train'] is not None):
+            (hparams['p_weight_train'] is not None) and
+            hparams['p_weight_train'] < 1.0):
             for w in model.weight_list:
                 w_val = sess.run(w)
                 w_size = sess.run(tf.size(w))

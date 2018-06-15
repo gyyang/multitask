@@ -263,6 +263,8 @@ class LeakyGRUCell(RNNCell):
     self._alpha = alpha
     self._sigma = np.sqrt(2 / alpha) * sigma_rec
 
+    # TODO(gryang): allow this to use different initialization
+
   @property
   def state_size(self):
       return self._num_units
@@ -626,6 +628,7 @@ class Model(object):
             y_hat = tf.sigmoid(y_hat_)
             self.cost_lsq = tf.reduce_mean(
                     tf.square((y_shaped-y_hat)*self.c_mask))
+            # TODO(gryang): mean or sum?
         else:
             y_hat = tf.nn.softmax(y_hat_)
             # Cross-entropy loss

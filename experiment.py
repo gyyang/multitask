@@ -93,12 +93,15 @@ def train_vary_hparams(i):
     """
     # Ranges of hyperparameters to loop over
     hp_ranges = OrderedDict()
-    hp_ranges['activation'] = ['softplus', 'relu', 'tanh', 'retanh']
-    hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
-    hp_ranges['w_rec_init'] = ['diag', 'randortho']
-    hp_ranges['l1_h'] = [0, 1e-5, 1e-4, 1e-3]  # TODO(gryang): Change this?
+    # hp_ranges['activation'] = ['softplus', 'relu', 'tanh', 'retanh']
+    # hp_ranges['rnn_type'] = ['LeakyRNN', 'LeakyGRU']
+    # hp_ranges['w_rec_init'] = ['diag', 'randortho']
+    hp_ranges['activation'] = ['softplus']
+    hp_ranges['rnn_type'] = ['LeakyRNN']
+    hp_ranges['w_rec_init'] = ['randortho']
+    hp_ranges['l1_h'] = [0, 1e-9, 1e-8, 1e-7, 1e-6]  # TODO(gryang): Change this?
     hp_ranges['l2_h'] = [0]
-    hp_ranges['l1_weight'] = [0, 1e-5, 1e-4, 1e-3]
+    hp_ranges['l1_weight'] = [0, 1e-7, 1e-6, 1e-5]
     # TODO(gryang): add the level of overtraining
 
     # Unravel the input index
@@ -112,7 +115,7 @@ def train_vary_hparams(i):
     for key, index in zip(keys, indices):
         hparams[key] = hp_ranges[key][index]
 
-    train_dir = os.path.join(DATAPATH, 'varyhparams', str(i))
+    train_dir = os.path.join(DATAPATH, 'varyhparams_reg2', str(i))
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     train.train(train_dir, hparams, ruleset='all',
                 rule_prob_map=rule_prob_map, seed=i // n_max)
@@ -204,7 +207,8 @@ def vary_p_weight_train_mante(i):
     hp_ranges['activation'] = ['softplus']
     hp_ranges['rnn_type'] = ['LeakyRNN']
     hp_ranges['w_rec_init'] = ['randortho']
-    hp_ranges['p_weight_train'] = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    # hp_ranges['p_weight_train'] = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    hp_ranges['p_weight_train'] = [0.05, 0.075]
     hp_ranges['target_perf'] = [0.9]
 
     _base_vary_hp_mante(i, hp_ranges, base_name='vary_pweighttrain_mante')

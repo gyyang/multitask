@@ -104,7 +104,7 @@ if args.run == 'all':
         subprocess.call(['sbatch', jobfile])
 
 elif args.run == 'all_varyhp':
-    for i in range(0, 320):
+    for i in range(0, 20):
         jobname = 'train_varyhp_{:d}'.format(i)
         train_arg = '{:d}'.format(i)
         cmd = r'''python -c "import experiment as e;e.train_vary_hparams('''+\
@@ -159,7 +159,7 @@ elif args.run == 'mante_vary_l2weight':
         subprocess.call(['sbatch', jobfile])
 
 elif args.run == 'mante_vary_pweighttrain':
-    for i in range(0, 60):
+    for i in range(200, 260):
         jobname = 'mante_vary_pweighttrain_{:d}'.format(i)
         train_arg = '{:d}'.format(i)
         cmd = r'''python -c "import experiment as e;e.vary_p_weight_train_mante('''+\

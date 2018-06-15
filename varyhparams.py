@@ -258,7 +258,27 @@ def plot_n_clusters(n_clusters, hparams_list):
     ax.set_xlabel('Networks', labelpad=-5)
     # plt.title('target perf-min 0.9, total:'+str(len(n_clusters))) #
     plt.savefig(os.path.join(FIGPATH, 'NumClusters.eps'), transparent=True)
-
+    
+    val = n_clusters_sorted
+    fig = plt.figure(figsize=(1.0, 0.8))
+    ax = fig.add_axes([0.2, 0.4, 0.7, 0.5])
+    hist, bin_edges = np.histogram(val, density=True, range=(0, 30),
+                                   bins=30)
+    color = 'gray'
+    ax.hist(val, range=(0, 30),
+            density=True, bins=16, ec=color, facecolor=color,
+            lw=1.5)
+    ax.spines["left"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.set_yticks([])
+    ax.set_xticks([0, 30])
+    ax.set_xlim([0, 30])
+    ax.set_xlabel('No. clusters', labelpad=-5)
+    plt.tight_layout()
+    figname = os.path.join(FIGPATH, 'NumClustersHist.pdf')
+    plt.savefig(figname, transparent=True)
+    
 
 def _plot_n_cluster_hist(hp_plot, n_clusters=None, hparams_list=None):
     """Plot histogram for number of clusters, separating by an attribute.
@@ -387,4 +407,24 @@ if __name__ == '__main__':
     # pretty_singleneuron_plot('tanh')
     # pretty_singleneuron_plot('relu')
     # [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
+    
+    
+    DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhparams_reg')
+    FIGPATH = os.path.join(os.getcwd(), 'figure')
+    model_dirs = tools.valid_model_dirs(DATAPATH)
+    
+    hparams_list = list()
+    n_clusters = list()
+    logs = list()
+    perfs = list()
+    for i, model_dir in enumerate(model_dirs):
+        hparams = tools.load_hparams(model_dir)
+        log = tools.load_log(model_dir)
+        # check if performance exceeds target
+        perfs.append(log['perf_min'][-1])
+        if log['perf_min'][-1] > 0.8:
+            logs.append(log)
+            n_clusters.append(log['n_cluster'])
+            hparams_list.append(hparams)
+        
 

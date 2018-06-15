@@ -75,13 +75,15 @@ def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
 root_dir = './data/train_all'
 model_dir = root_dir + '/0'
 
-root_dir = './data/varyhparams'
-hp_target = {'activation': 'softplus',
-             'rnn_type': 'LeakyGRU',
-             'w_rec_init': 'diag',
-             'l1_h': 1e-4,
-             'l1_weight': 0}
-model_dir, _ = tools.find_model(root_dir, hp_target)
+# =============================================================================
+# root_dir = './data/varyhparams'
+# hp_target = {'activation': 'softplus',
+#              'rnn_type': 'LeakyGRU',
+#              'w_rec_init': 'randortho',
+#              'l1_h': 0,
+#              'l1_weight': 0}
+# model_dir, _ = tools.find_model(root_dir, hp_target)
+# =============================================================================
 
 # =============================================================================
 # root_dir = './data/varyhparams'
@@ -125,10 +127,14 @@ model_dir, _ = tools.find_model(root_dir, hp_target)
 
 CA = clustering.Analysis(model_dir, data_type='rule')
 # CA.plot_example_unit()
-CA.plot_cluster_score()
-CA.plot_variance()
-CA.plot_2Dvisualization()
+# CA.plot_cluster_score()
+# CA.plot_cluster_score(save_name=hp_target['activation'])
+# CA.plot_variance()
+# CA.plot_2Dvisualization('PCA')
+# CA.plot_2Dvisualization('MDS')
+# CA.plot_2Dvisualization('tSNE')
 # CA.plot_lesions()
+# CA.plot_connectivity_byclusters()
 
 
 # CA = clustering.Analysis(model_dir, data_type='epoch')
@@ -151,10 +157,10 @@ CA.plot_2Dvisualization()
 # Compositional Representation---------------------------------------------
 # setups = [1] # Go, Anti family
 # setups = [2] # Ctx DM family
-setups = [1, 2]
-for setup in setups:
-    pass
 # =============================================================================
+# setups = [1, 2]
+# for setup in setups:
+#     pass
 #     taskset.plot_taskspace_group(root_dir, setup=setup,
 #                                  restore=True, representation='rate')
 #     taskset.plot_taskspace_group(root_dir, setup=setup,

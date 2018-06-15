@@ -29,12 +29,11 @@ COLORS = [(0.9764705882352941, 0.45098039215686275, 0.023529411764705882),
  (0.4588235294117647, 0.7333333333333333, 0.9921568627450981)]
 
 
-def load_data(dataset='mante', smooth=True, analyze_single_units=False,
-              model_dir=None):
+def load_data(dataset='mante', smooth=True, model_dir=None):
     """Analyzing a dataset.
 
     Args:
-        dataset: str, 'mante', 'siegel', or 'model'
+        dataset: str, 'mante', 'mante_single', 'siegel', or 'model'
         smooth: bool, whether to use smoothed data
         analyze_single_units: bool, whether to analyze single units
     """
@@ -44,7 +43,10 @@ def load_data(dataset='mante', smooth=True, analyze_single_units=False,
         print('Loading original data')
     if dataset == 'mante':
         return mante_dataset_preprocess.load_data(
-            smooth=smooth, single_units=analyze_single_units)
+            smooth=smooth, single_units=False)
+    elif dataset == 'mante_single':
+        return mante_dataset_preprocess.load_data(
+            smooth=smooth, single_units=True)
     elif dataset == 'siegel':
         return siegel_dataset_preprocess.load_data(single_file=False)
     elif dataset == 'model':
@@ -963,6 +965,6 @@ def plot_all(dataset):
 
 if __name__ == '__main__':
     pass
-    # plot_all('mante')
+    plot_all('mante')
 
-    hists = plot_fracvar_hist_byhp(hp_vary='l2_weight', mode='all_var')
+    # hists = plot_fracvar_hist_byhp(hp_vary='l2_weight', mode='all_var')

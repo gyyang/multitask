@@ -72,7 +72,7 @@ def load_data(smooth=True, single_units=False):
 
 def get_single_units():
     # get single units
-    fname = os.path.join('mante_dataset', 'metadata.mat')
+    fname = os.path.join('datasets', 'mante_dataset', 'metadata.mat')
     mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
     metadata = mat_dict['metadata'].unit # as dictionary
     discriminable = np.array([(m.unitInfo.discriminability in [3,4]) for m in metadata])

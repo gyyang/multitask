@@ -175,10 +175,10 @@ class Analysis(object):
         self.data_type = data_type
         self.rules = hparams['rules']
 
-    def plot_cluster_score(self):
+    def plot_cluster_score(self, save_name=None):
         """Plot the score by the number of clusters."""
-        fig = plt.figure(figsize=(1.5, 1.5))
-        ax = fig.add_axes([0.2, 0.2, 0.7, 0.7])
+        fig = plt.figure(figsize=(2, 2))
+        ax = fig.add_axes([0.3, 0.3, 0.55, 0.55])
         ax.plot(self.n_clusters, self.scores, 'o-', ms=3)
         ax.set_xlabel('Number of clusters', fontsize=7)
         ax.set_ylabel('Silhouette score', fontsize=7)
@@ -188,6 +188,12 @@ class Analysis(object):
         ax.spines["top"].set_visible(False)
         ax.xaxis.set_ticks_position('bottom')
         ax.yaxis.set_ticks_position('left')
+        if save:
+            fig_name = 'cluster_score'
+            if save_name is not None:
+                fig_name = fig_name + save_name
+            plt.savefig('figure/'+fig_name+'.pdf', transparent=True)
+        plt.show()
 
     def plot_variance(self, save_name=None):
         labels = self.labels
@@ -220,6 +226,8 @@ class Analysis(object):
         plt.yticks(range(len(tick_names)), tick_names,
                    rotation=0, va='center', fontsize=fs)
         plt.xticks([])
+        plt.title('Units', fontsize=7, y=0.97)
+        plt.xlabel('Clusters', fontsize=7, labelpad=13)
         ax.tick_params('both', length=0)
         for loc in ['bottom','top','left','right']:
             ax.spines[loc].set_visible(False)
@@ -235,19 +243,17 @@ class Analysis(object):
 
         cb.set_label(clabel, fontsize=7, labelpad=0)
         plt.tick_params(axis='both', which='major', labelsize=7)
+        
 
         # Plot color bars indicating clustering
         if True:
             ax = fig.add_axes(rect_color)
             for il, l in enumerate(self.unique_labels):
                 ind_l = np.where(labels==l)[0][[0, -1]]+np.array([0,1])
-                #ax.plot(ind_l, [0,0], linewidth=4, solid_capstyle='butt',
-                #        color=kelly_colors[il+1]) #maddy changed
-                #ax.text(np.mean(ind_l), -0.5, str(il+1), fontsize=6,
-                #        ha='center', va='top', color=kelly_colors[il+1])
-                ax.plot(ind_l, [0,0], linewidth=4, solid_capstyle='butt') 
+                ax.plot(ind_l, [0,0], linewidth=4, solid_capstyle='butt',
+                        color=kelly_colors[il+1])
                 ax.text(np.mean(ind_l), -0.5, str(il+1), fontsize=6,
-                        ha='center', va='top')
+                        ha='center', va='top', color=kelly_colors[il+1])
             ax.set_xlim([0, len(labels)])
             ax.set_ylim([-1, 1])
             ax.axis('off')
@@ -293,17 +299,21 @@ class Analysis(object):
             plt.savefig('figure/feature_similarity_by'+self.data_type+'.pdf', transparent=True)
         plt.show()
 
-    def plot_2Dvisualization(self):
+    def plot_2Dvisualization(self, method='TSNE'):
         labels = self.labels
         ######################## Plotting 2-D visualization of variance map ###########
         from sklearn.manifold import TSNE, MDS, LocallyLinearEmbedding
         from sklearn.decomposition import PCA
-        # model = PCA(n_components=3, whiten=True)
-        # model = LocallyLinearEmbedding()
-        # model = MDS(n_components=2)
 
-        model = TSNE(n_components=2, random_state=0, init='pca',
-                     verbose=1, method='exact', learning_rate=100, perplexity=30)
+        # model = LocallyLinearEmbedding()
+        if method == 'PCA':
+            model = PCA(n_components=2, whiten=False)
+        elif method == 'MDS':
+            model = MDS(metric=True, n_components=2, n_init=10, max_iter=1000)
+        elif method == 'tSNE':
+            model = TSNE(n_components=2, random_state=0, init='pca',
+                         verbose=1, method='exact',
+                         learning_rate=100, perplexity=30)
 
         Y = model.fit_transform(self.h_normvar_all)
 
@@ -311,11 +321,12 @@ class Analysis(object):
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
         for il, l in enumerate(self.unique_labels):
             ind_l = np.where(labels==l)[0]
-            #ax.scatter(Y[ind_l,0], Y[ind_l,1], color=kelly_colors[il+1], s=10)#maddy changed
-            ax.scatter(Y[ind_l,0], Y[ind_l,1], s=10)
+            ax.scatter(Y[ind_l, 0], Y[ind_l, 1], color=kelly_colors[il+1], s=10)
         ax.axis('off')
+        plt.title(method, fontsize=7)
+        figname = 'figure/taskvar_visual_by'+method+self.data_type+'.pdf'
         if save:
-            plt.savefig('figure/taskvar_visual_by'+self.data_type+'.pdf', transparent=True)
+            plt.savefig(figname, transparent=True)
         plt.show()
 
         fig = plt.figure(figsize=(3.5, 3.5))
@@ -368,19 +379,25 @@ class Analysis(object):
             b_rec = sess.run(model.b_rec)
             b_out = sess.run(model.b_out)
 
+        w_rec = w_rec[ind_active, :][:, ind_active]
+        w_in = w_in[ind_active, :]
+        w_out = w_out[:, ind_active]
+        b_rec = b_rec[ind_active]
+
         # nx, nh, ny = hparams['shape']
         nr = hparams['n_eachring']
 
         sort_by = 'w_in'
         if sort_by == 'w_in':
-            w_in_mod1 = w_in[ind_active, :][:, 1:nr+1]
-            w_in_mod2 = w_in[ind_active, :][:, nr+1:2*nr+1]
+            w_in_mod1 = w_in[:, 1:nr+1]
+            w_in_mod2 = w_in[:, nr+1:2*nr+1]
             w_in_modboth = w_in_mod1 + w_in_mod2
             w_prefs = np.argmax(w_in_modboth, axis=1)
         elif sort_by == 'w_out':
-            w_prefs = np.argmax(w_out[1:, ind_active], axis=0)
+            w_prefs = np.argmax(w_out[1:], axis=0)
 
-        ind_sort        = np.lexsort((w_prefs, self.labels)) # sort by labels then by prefs
+        # sort by labels then by prefs
+        ind_sort = np.lexsort((w_prefs, self.labels))
 
         ######################### Plotting Connectivity ###############################
         nx = self.hparams['n_input']
@@ -397,7 +414,7 @@ class Analysis(object):
         _b_out  = b_out[:, np.newaxis]
         labels  = self.labels[ind_sort]
 
-        l = 0.35
+        l = 0.3
         l0 = (1-1.5*l)/nh
 
         plot_infos = [(_w_rec              , [l               ,l          ,nh*l0    ,nh*l0]),
@@ -411,7 +428,7 @@ class Analysis(object):
                       (_b_out              , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
 
         cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
-        fig = plt.figure(figsize=(6,6))
+        fig = plt.figure(figsize=(6, 6))
         for plot_info in plot_infos:
             ax = fig.add_axes(plot_info[1])
             vmin, vmid, vmax = np.percentile(plot_info[0].flatten(), [5,50,95])
@@ -434,7 +451,6 @@ class Analysis(object):
         if save:
             plt.savefig('figure/connectivity_by'+self.data_type+'.pdf', transparent=True)
         plt.show()
-
 
     def plot_lesions(self):
         """Lesion individual cluster and show performance."""
@@ -536,6 +552,7 @@ class Analysis(object):
             _ = plt.yticks(range(len(tick_names)), tick_names,
                        rotation=0, va='center', fontsize=fs)
             plt.xticks([])
+            plt.xlabel('Clusters', fontsize=7, labelpad=13)
             ax.tick_params('both', length=0)
             for loc in ['bottom','top','left','right']:
                 ax.spines[loc].set_visible(False)
@@ -560,4 +577,6 @@ class Analysis(object):
                 plt.savefig('figure/lesion_cluster_by'+self.data_type+'_{:d}.pdf'.format(i), transparent=True)
 
 if __name__ == '__main__':
-    pass
+    root_dir = './data/train_all'
+    model_dir = root_dir + '/1'
+    # CA = Analysis(model_dir, data_type='rule')
