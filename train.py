@@ -357,6 +357,19 @@ def train_old(train_dir,
         print("Optimization Finished!")
 
 
+def display_rich_output(model, sess, step, log, train_dir):
+    """Display step by step outputs during training."""
+    variance._compute_variance_bymodel(model, sess)
+    rule_pair = ['contextdm1', 'contextdm2']
+    save_name = '_atstep' + str(step)
+    title = ('Step ' + str(step) +
+             ' Perf. {:0.2f}'.format(log['perf_avg'][-1]))
+    variance.plot_hist_varprop(train_dir, rule_pair,
+                               figname_extra=save_name,
+                               title=title)
+    plt.close('all')
+
+
 def train(train_dir,
           hparams=None,
           max_steps=1e7,
@@ -413,7 +426,6 @@ def train(train_dir,
         rule_prob = np.array(
                 [rule_prob_map.get(r, 1.) for r in hparams['rule_trains']])
         hparams['rule_probs'] = list(rule_prob/np.sum(rule_prob))
-
     tools.save_hparams(hparams, train_dir)
 
     # Build the model
@@ -425,13 +437,11 @@ def train(train_dir,
 
     # Store results
     log = defaultdict(list)
-    
     log['train_dir'] = train_dir 
     
     # Record time
     t_start = time.time()
 
-    # Use customized session that launches the graph as well
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
@@ -444,6 +454,7 @@ def train(train_dir,
 
             model.set_optimizer()
 
+        # partial weight training
         if ('p_weight_train' in hparams and
             (hparams['p_weight_train'] is not None) and
             hparams['p_weight_train'] < 1.0):
@@ -476,15 +487,7 @@ def train(train_dir,
                         break
 
                     if rich_output:
-                        variance._compute_variance_bymodel(model, sess)
-                        rule_pair = ['contextdm1', 'contextdm2']
-                        save_name = '_atstep' + str(step)
-                        title = ('Step ' + str(step) +
-                                 ' Perf. {:0.2f}'.format(log['perf_avg'][-1]))
-                        variance.plot_hist_varprop(train_dir, rule_pair,
-                                                   figname_extra=save_name,
-                                                   title=title)
-                        plt.close('all')
+                        display_rich_output(model, sess, step, log, train_dir)
 
                 # Training
                 rule_train_now = hparams['rng'].choice(hparams['rule_trains'],
