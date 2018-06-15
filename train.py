@@ -19,7 +19,7 @@ import tools
 
 
 def get_default_hp(ruleset):
-    '''Get a default hpuration.
+    '''Get a default hp.
 
     Useful for debugging.
 
@@ -97,53 +97,6 @@ def get_default_hp(ruleset):
     return hp
 
 
-def update_intsyn():
-    # Only if using intelligent synapses
-    v_current = sess.run(model.var_list)
-
-    if i_rule_train == 0:
-        v_anc0 = v_current
-        Omega0 = [
-            np.zeros(v.shape, dtype='float32') for v in v_anc0]
-    else:
-        v_anc0_prev = v_anc0
-        v_anc0 = v_current
-        v_delta = [
-            v - v_prev for v, v_prev in zip(v_anc0, v_anc0_prev)]
-
-        # Make sure all elements in omega0 are non-negative
-        # Penalty
-        Omega0 = [(O + o * (o > 0.) / (v_d**2 + ksi_intsyn))
-                  for O, o, v_d in zip(Omega0, omega0, v_delta)]
-
-        # Update cost
-        extra_cost = tf.constant(0.)
-        for v, w, v_val in zip(model.var_list, Omega0, v_current):
-            extra_cost += c_intsyn*tf.reduce_sum(
-                    tf.multiply(w, tf.square(v - v_val)))
-        model.set_optimizer(extra_cost=extra_cost)
-
-    # Reset
-    omega0 = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
-    return 
-
-
-def update_intsyn2():
-    # Continual learning
-    v_prev = v_current
-
-    _, grads_and_vars_ = sess.run(
-            [model.optimizer, model.grads_and_vars],
-            feed_dict=feed_dict)
-    v_grad, v_current = zip(*grads_and_vars_)
-
-    # Update synaptic importance
-    omega0 = [
-        o - (v_c - v_p) * v_g for o, v_c, v_p, v_g in
-        zip(omega0, v_current, v_prev, v_grad)
-        ]
-
-
 def do_eval(sess, model, log, rule_train):
     """Do evaluation.
 
@@ -211,152 +164,6 @@ def do_eval(sess, model, log, rule_train):
     return log
 
 
-def train_old(train_dir,
-          hp=None,
-          max_steps=1e7,
-          display_step=500,
-          ruleset='mante',
-          reuse=False,
-          seed=0,
-          ):
-    '''Train the network
-
-    Args:
-        train_dir: str, training directory
-        hp: dictionary of hyperparameters
-        max_steps: int, maximum number of training steps
-        display_step: int, display steps
-        ruleset: the set of rules to train
-        reuse: boolean. If True, reload previous checkpoints
-        seed: int, random seed to be used
-
-    Returns:
-        model is stored at train_dir/model.ckpt
-        training configuration is stored at train_dir/hp.json
-    '''
-
-    tools.mkdir_p(train_dir)
-
-    # Network parameters
-    # Number of units each ring has
-    if reuse:
-        raise NotImplementedError()  # temporarily disable
-        # Build the model from save_name
-        model = Model(train_dir)
-        hp = model.hp
-
-    else:
-        # Random number generator used
-        default_hp = get_default_hp(ruleset)
-        if hp is not None:
-            default_hp.update(hp)
-        hp = default_hp
-        hp['seed'] = seed
-        tools.save_hp(hp, train_dir)
-        # rng can not be serialized
-        hp['rng'] = np.random.RandomState(seed)
-
-        # Build the model
-        model = Model(train_dir, hp=hp)
-
-    # Display hpuration
-    for key, val in hp.items():
-        print('{:20s} = '.format(key) + str(val))
-
-    # Number of training iterations for each rule
-    rule_train_iters = []
-    for rule_train in hp['rule_trains']:
-        if not hasattr(rule_train, '__iter__'):
-            tmp = 1
-        else:
-            tmp = len(rule_train)
-        rule_train_iters.append(tmp*max_steps)
-
-    # Using continual learning or not
-    if hp['param_intsyn']:
-        c_intsyn, ksi_intsyn = hp['param_intsyn']
-        print('Using continual learning')
-
-    # Store results
-    log = defaultdict(list)
-
-    # Record time
-    t_start = time.time()
-
-    # Use customized session that launches the graph as well
-    with tf.Session() as sess:
-        if reuse:
-            model.restore()
-        else:
-            sess.run(tf.global_variables_initializer())
-
-        # penalty on deviation from initial weight
-        if hp['l2_weight_init'] > 0:
-            # TODO: Need checking
-            anchor_ws = sess.run(model.weight_list)
-
-            # TODO: only change weights
-            for w, w_val in zip(model.weight_list, anchor_ws):
-                model.cost_reg += (hp['l2_weight_init'] *
-                                   tf.nn.l2_loss(w-w_val))
-
-            model.set_optimizer()
-
-        # Looping
-        step_total = 0
-        for i_rule_train, rule_train in enumerate(hp['rule_trains']):
-            step = 0
-
-            # At the beginning of new tasks
-            if hp['param_intsyn']:
-                update_intsyn()
-
-            # Keep training until reach max iterations
-            while (step * hp['batch_size_train'] <=
-                   rule_train_iters[i_rule_train]):
-                try:
-                    # Validation
-                    if step % display_step == 0:
-                        trial = step_total * hp['batch_size_train']
-                        log['trials'].append(trial)
-                        log['times'].append(time.time()-t_start)
-                        log['rule_now'].append(rule_train)
-                        log = do_eval(sess, model, log, rule_train)
-                        if log['perf_avg'][-1] > model.hp['target_perf']:
-                            print('Perf reached the target: {:0.2f}'.format(
-                                hp['target_perf']))
-                            break
-
-                    # Training
-                    if not hasattr(rule_train, '__iter__'):
-                        rule_train_now = rule_train
-                    else:
-                        p = hp['rule_probs'][i_rule_train]
-                        rule_train_now = hp['rng'].choice(rule_train, p=p)
-                    # Generate a random batch of trials.
-                    # Each batch has the same trial length
-                    trial = generate_trials(
-                            rule_train_now, hp, 'random',
-                            batch_size=hp['batch_size_train'])
-
-                    # Generating feed_dict.
-                    feed_dict = tools.gen_feed_dict(model, trial, hp)
-
-                    if hp['param_intsyn']:
-                        update_intsyn2()
-                    else:
-                        sess.run(model.train_step, feed_dict=feed_dict)
-
-                    step += 1
-                    step_total += 1
-
-                except KeyboardInterrupt:
-                    print("Optimization interrupted by user")
-                    break
-
-        print("Optimization Finished!")
-
-
 def display_rich_output(model, sess, step, log, train_dir):
     """Display step by step outputs during training."""
     variance._compute_variance_bymodel(model, sess)
@@ -380,7 +187,7 @@ def train(train_dir,
           seed=0,
           rich_output=False,
           ):
-    """Train the network
+    """Train the network.
 
     Args:
         train_dir: str, training directory
@@ -431,7 +238,7 @@ def train(train_dir,
     # Build the model
     model = Model(train_dir, hp=hp)
 
-    # Display hpuration
+    # Display hp
     for key, val in hp.items():
         print('{:20s} = '.format(key) + str(val))
 
@@ -511,23 +318,180 @@ def train(train_dir,
         print("Optimization finished!")
 
 
+def train_sequential(
+        train_dir,
+        rule_trains,
+        hp=None,
+        max_steps=1e7,
+        display_step=500,
+        ruleset='mante',
+        seed=0,
+        ):
+    '''Train the network sequentially.
+
+    Args:
+        train_dir: str, training directory
+        rule_trains: a list of list of tasks to train sequentially
+        hp: dictionary of hyperparameters
+        max_steps: int, maximum number of training steps for each list of tasks
+        display_step: int, display steps
+        ruleset: the set of rules to train
+        seed: int, random seed to be used
+
+    Returns:
+        model is stored at train_dir/model.ckpt
+        training configuration is stored at train_dir/hp.json
+    '''
+
+    tools.mkdir_p(train_dir)
+
+    # Network parameters
+    default_hp = get_default_hp(ruleset)
+    if hp is not None:
+        default_hp.update(hp)
+    hp = default_hp
+    hp['seed'] = seed
+    hp['rng'] = np.random.RandomState(seed)
+    hp['rule_trains'] = rule_trains
+    # Get all rules by flattening the list of lists
+    hp['rules'] = [r for rs in rule_trains for r in rs]
+
+    # Number of training iterations for each rule
+    rule_train_iters = [len(r)*max_steps for r in rule_trains]
+
+    tools.save_hp(hp, train_dir)
+    # Display hp
+    for key, val in hp.items():
+        print('{:20s} = '.format(key) + str(val))
+
+    # Using continual learning or not
+    c, ksi = hp['param_intsyn']
+
+    # Build the model
+    model = Model(train_dir, hp=hp)
+
+    # Store results
+    log = defaultdict(list)
+    log['train_dir'] = train_dir
+
+    # Record time
+    t_start = time.time()
+
+    # Use customized session that launches the graph as well
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+
+        # penalty on deviation from initial weight
+        if hp['l2_weight_init'] > 0:
+            raise NotImplementedError()
+
+        # Looping
+        step_total = 0
+        for i_rule_train, rule_train in enumerate(hp['rule_trains']):
+            step = 0
+
+            # At the beginning of new tasks
+            # Only if using intelligent synapses
+            v_current = sess.run(model.var_list)
+
+            if i_rule_train == 0:
+                v_anc0 = v_current
+                Omega0 = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
+            else:
+                v_anc0_prev = v_anc0
+                v_anc0 = v_current
+                v_delta = [v-v_prev for v, v_prev in zip(v_anc0, v_anc0_prev)]
+
+                # Make sure all elements in omega0 are non-negative
+                # Penalty
+                Omega0 = [(O + o * (o > 0.) / (v_d ** 2 + ksi))
+                          for O, o, v_d in zip(Omega0, omega0, v_delta)]
+
+                # Update cost
+                extra_cost = tf.constant(0.)
+                for v, w, v_val in zip(model.var_list, Omega0, v_current):
+                    extra_cost += c * tf.reduce_sum(
+                        tf.multiply(w, tf.square(v - v_val)))
+                model.set_optimizer(extra_cost=extra_cost)
+
+            # Reset
+            omega0 = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
+
+            # Keep training until reach max iterations
+            while (step * hp['batch_size_train'] <=
+                   rule_train_iters[i_rule_train]):
+                try:
+                    # Validation
+                    if step % display_step == 0:
+                        trial = step_total * hp['batch_size_train']
+                        log['trials'].append(trial)
+                        log['times'].append(time.time()-t_start)
+                        log['rule_now'].append(rule_train)
+                        log = do_eval(sess, model, log, rule_train)
+                        if log['perf_avg'][-1] > model.hp['target_perf']:
+                            print('Perf reached the target: {:0.2f}'.format(
+                                hp['target_perf']))
+                            break
+
+                    # Training
+                    rule_train_now = hp['rng'].choice(rule_train)
+                    # Generate a random batch of trials.
+                    # Each batch has the same trial length
+                    trial = generate_trials(
+                            rule_train_now, hp, 'random',
+                            batch_size=hp['batch_size_train'])
+
+                    # Generating feed_dict.
+                    feed_dict = tools.gen_feed_dict(model, trial, hp)
+
+                    # Continual learning with intelligent synapses
+                    v_prev = v_current
+
+                    _, grads_and_vars_ = sess.run(
+                        [model.train_step, model.grads_and_vars],
+                        feed_dict=feed_dict)
+                    v_grad, v_current = zip(*grads_and_vars_)
+
+                    # Update synaptic importance
+                    omega0 = [
+                        o - (v_c - v_p) * v_g for o, v_c, v_p, v_g in
+                        zip(omega0, v_current, v_prev, v_grad)
+                    ]
+
+                    step += 1
+                    step_total += 1
+
+                except KeyboardInterrupt:
+                    print("Optimization interrupted by user")
+                    break
+
+        print("Optimization Finished!")
+
+
 if __name__ == '__main__':
     pass
     run_analysis = []
-    hp = {'rnn_type': 'LeakyRNN',
-               'n_rnn': 128,
-               'activation': 'softplus',
-               'l1_h': 0,
-               'l2_h': 0,
-               'l1_weight': 0,
-               'l2_weight': 0,
-               'l2_weight_init': 0,
-               'p_weight_train': 0.5,
-               'target_perf': 0.9,
-               'w_rec_init': 'randortho'}
-    train('data/mantetemp', seed=1, hp=hp, ruleset='mante',
-          display_step=500, rich_output=False)
-    
-    # rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    # hp = {'rnn_type': 'LeakyGRU', 'n_rnn': 128}
-    # train('debug',hp=hp, ruleset='all',rule_prob_map=rule_prob_map,seed=1)
+    # hp = {'rnn_type': 'LeakyRNN',
+    #            'n_rnn': 128,
+    #            'activation': 'softplus',
+    #            'l1_h': 0,
+    #            'l2_h': 0,
+    #            'l1_weight': 0,
+    #            'l2_weight': 0,
+    #            'l2_weight_init': 0,
+    #            'p_weight_train': 0.5,
+    #            'target_perf': 0.9,
+    #            'w_rec_init': 'randortho'}
+    # train('data/mantetemp', seed=1, hp=hp, ruleset='mante',
+    #       display_step=500, rich_output=False)
+
+    hp = {'param_intsyn': (0.1, 0.01)}
+    train_sequential(
+        'data/debug_seq',
+        [['dm1'], ['dm2'], ['contextdm1'], ['contextdm2']],
+        hp=hp,
+        max_steps=1e5,
+        display_step=500,
+        ruleset='all',
+        seed=0,
+    )
