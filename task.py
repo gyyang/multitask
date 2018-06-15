@@ -3,7 +3,7 @@ Collections of tasks
 """
 
 from __future__ import division
-import os
+import six
 import numpy as np
 
 #-----------------------------------------------------------------------------------------
@@ -1618,7 +1618,7 @@ def generate_trials(rule, hparams, mode, noise_on=True, **kwargs):
         # Add no rule
         return trial
 
-    if isinstance(rule, basestring):
+    if isinstance(rule, six.string_types):
         # rule is not iterable
         # Expand to list
         if 'rule_strength' in kwargs:

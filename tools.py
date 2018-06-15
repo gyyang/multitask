@@ -68,7 +68,7 @@ def load_log(train_dir):
     if not os.path.isfile(fname):
         return None
 
-    with open(fname, 'rb') as f:
+    with open(fname, 'r') as f:
         log = json.load(f)
     return log
 
@@ -77,7 +77,7 @@ def save_log(log):
     """Save the log file of model."""
     model_dir = log['train_dir']
     fname = os.path.join(model_dir, 'log.json')
-    with open(fname, 'wb') as f:
+    with open(fname, 'w') as f:
         json.dump(log, f)
 
 
@@ -87,7 +87,7 @@ def load_hparams(save_dir):
     if not os.path.isfile(fname):
         return None
 
-    with open(fname, 'rb') as f:
+    with open(fname, 'r') as f:
         hparams = json.load(f)
 
     # Use a different seed aftering loading,
@@ -100,7 +100,7 @@ def save_hparams(hparams, save_dir):
     """Save the hyper-parameter file of model save_name"""
     hparams_copy = hparams.copy()
     hparams_copy.pop('rng')  # rng can not be serialized
-    with open(os.path.join(save_dir, 'hparams.json'), 'wb') as f:
+    with open(os.path.join(save_dir, 'hparams.json'), 'w') as f:
         json.dump(hparams_copy, f)
 
 
