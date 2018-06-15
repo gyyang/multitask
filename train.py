@@ -55,7 +55,7 @@ def get_default_hparams(ruleset):
             # input noise
             'sigma_x': 0.01,
             # leaky_rec weight initialization, diag, randortho, randgauss
-            'w_rec_init': 'diag',
+            'w_rec_init': 'randortho',
             # a default weak regularization prevents instability
             'l1_h': 0,
             # l2 regularization on activity
