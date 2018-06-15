@@ -100,7 +100,7 @@ if args.run == 'all':
               train_arg+''')"'''
 
         jobfile = write_jobfile(
-            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=1)
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
 elif args.run == 'all_varyhp':
