@@ -11,6 +11,7 @@ import train
 import variance
 import clustering
 import data_analysis
+import taskset
 
 # TODO: make this flexible
 DATAPATH = os.path.join(os.getcwd(), 'data')
@@ -79,8 +80,22 @@ def train_all(seed=0, train_dir='train_all'):
     train_dir = os.path.join(DATAPATH, train_dir, str(seed))
     hp = {'activation': 'softplus'}
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir, hp=hp, ruleset='all',
-                rule_prob_map=rule_prob_map, seed=seed)
+    # train.train(train_dir, hp=hp, ruleset='all',
+    #             rule_prob_map=rule_prob_map, seed=seed)
+    # Analyses
+    variance.compute_variance(train_dir)
+    log = tools.load_log(train_dir)
+    analysis = clustering.Analysis(train_dir, 'rule')
+    log['n_cluster'] = analysis.n_cluster
+    tools.save_log(log)
+    data_analysis.compute_var_all(train_dir)
+    
+    setups = [1, 2, 3]
+    for setup in setups:
+        taskset.compute_taskspace(train_dir, setup,
+                                  restore=False,
+                                  representation='rate')
+        taskset.compute_replacerule_performance(train_dir, setup, False)
 
 
 def train_vary_hp(i):
