@@ -85,7 +85,9 @@ def load_hp(save_dir):
     """Load the hyper-parameter file of model save_name"""
     fname = os.path.join(save_dir, 'hp.json')
     if not os.path.isfile(fname):
-        return None
+        fname = os.path.join(save_dir, 'hparams.json')  # backward compat
+        if not os.path.isfile(fname):
+            return None
 
     with open(fname, 'r') as f:
         hp = json.load(f)
