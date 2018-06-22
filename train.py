@@ -451,51 +451,46 @@ def train_sequential(
             # Keep training until reach max iterations
             while (step * hp['batch_size_train'] <=
                    rule_train_iters[i_rule_train]):
-                try:
-                    # Validation
-                    if step % display_step == 0:
-                        trial = step_total * hp['batch_size_train']
-                        log['trials'].append(trial)
-                        log['times'].append(time.time()-t_start)
-                        log['rule_now'].append(rule_train)
-                        log = do_eval(sess, model, log, rule_train)
-                        if log['perf_avg'][-1] > model.hp['target_perf']:
-                            print('Perf reached the target: {:0.2f}'.format(
-                                hp['target_perf']))
-                            break
+                # Validation
+                if step % display_step == 0:
+                    trial = step_total * hp['batch_size_train']
+                    log['trials'].append(trial)
+                    log['times'].append(time.time()-t_start)
+                    log['rule_now'].append(rule_train)
+                    log = do_eval(sess, model, log, rule_train)
+                    if log['perf_avg'][-1] > model.hp['target_perf']:
+                        print('Perf reached the target: {:0.2f}'.format(
+                            hp['target_perf']))
+                        break
 
-                    # Training
-                    rule_train_now = hp['rng'].choice(rule_train)
-                    # Generate a random batch of trials.
-                    # Each batch has the same trial length
-                    trial = generate_trials(
-                            rule_train_now, hp, 'random',
-                            batch_size=hp['batch_size_train'])
+                # Training
+                rule_train_now = hp['rng'].choice(rule_train)
+                # Generate a random batch of trials.
+                # Each batch has the same trial length
+                trial = generate_trials(
+                        rule_train_now, hp, 'random',
+                        batch_size=hp['batch_size_train'])
 
-                    # Generating feed_dict.
-                    feed_dict = tools.gen_feed_dict(model, trial, hp)
+                # Generating feed_dict.
+                feed_dict = tools.gen_feed_dict(model, trial, hp)
 
-                    # Continual learning with intelligent synapses
-                    v_prev = v_current
+                # Continual learning with intelligent synapses
+                v_prev = v_current
 
-                    # This will compute the gradient BEFORE train step
-                    _, v_grad = sess.run([model.train_step, grad_unreg],
-                                         feed_dict=feed_dict)
-                    # Get the weight after train step
-                    v_current = sess.run(model.var_list)
+                # This will compute the gradient BEFORE train step
+                _, v_grad = sess.run([model.train_step, grad_unreg],
+                                     feed_dict=feed_dict)
+                # Get the weight after train step
+                v_current = sess.run(model.var_list)
 
-                    # Update synaptic importance
-                    omega0 = [
-                        o - (v_c - v_p) * v_g for o, v_c, v_p, v_g in
-                        zip(omega0, v_current, v_prev, v_grad)
-                    ]
+                # Update synaptic importance
+                omega0 = [
+                    o - (v_c - v_p) * v_g for o, v_c, v_p, v_g in
+                    zip(omega0, v_current, v_prev, v_grad)
+                ]
 
-                    step += 1
-                    step_total += 1
-
-                except KeyboardInterrupt:
-                    print("Optimization interrupted by user")
-                    break
+                step += 1
+                step_total += 1
 
         print("Optimization Finished!")
 
