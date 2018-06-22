@@ -478,19 +478,13 @@ def train_sequential(
                     # Continual learning with intelligent synapses
                     v_prev = v_current
 
-# =============================================================================
-#                     _, grads_and_vars_ = sess.run(
-#                         [model.train_step, model.grads_and_vars],
-#                         feed_dict=feed_dict)
-#                     v_grad, v_current = zip(*grads_and_vars_)
-# =============================================================================
-                    _, v_grad = sess.run(
-                        [model.train_step, grad_unreg],
-                        feed_dict=feed_dict)
+                    # This will compute the gradient BEFORE train step
+                    _, v_grad = sess.run([model.train_step, grad_unreg],
+                                         feed_dict=feed_dict)
+                    # Get the weight after train step
                     v_current = sess.run(model.var_list)
 
                     # Update synaptic importance
-                    # TODO(gryang): Why are all omega0 negative??
                     omega0 = [
                         o - (v_c - v_p) * v_g for o, v_c, v_p, v_g in
                         zip(omega0, v_current, v_prev, v_grad)
@@ -507,7 +501,15 @@ def train_sequential(
 
 
 if __name__ == '__main__':
-    pass
+    import argparse
+    import os
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('--traindir', type=str, default='data/debug')
+    args = parser.parse_args()
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     run_analysis = []
     # hp = {'rnn_type': 'LeakyRNN',
     #            'n_rnn': 128,
@@ -524,7 +526,7 @@ if __name__ == '__main__':
     #       display_step=500, rich_output=False)
 
     # hp = {'param_intsyn': (0.1, 0.01)}
-    hp = {'param_intsyn': (0.1, 0.01),
+    hp = {'param_intsyn': (1.0, 0.01),
           'easy_task': True,
           'w_rec_init': 'randortho',
           'learning_rate': 0.001,
@@ -536,7 +538,7 @@ if __name__ == '__main__':
     #     ['delaydm1', 'delaydm2'], ['multidelaydm'],
     #     ['contextdelaydm1', 'contextdelaydm2'], ['contextdm1', 'contextdm2']]
     train_sequential(
-        'data/seq/newalgo3',
+        args.traindir,
         rule_trains,
         hp=hp,
         max_steps=1e5,
