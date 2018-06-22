@@ -437,7 +437,8 @@ def train_sequential(
                 model.cost_reg = tf.constant(0.)
                 for v, w, v_val in zip(model.var_list, Omega0, v_current):
                     model.cost_reg += c * tf.reduce_sum(
-                        tf.multiply(w, tf.square(v - v_val)))
+                        tf.multiply(tf.constant(w),
+                                    tf.square(v - tf.constant(v_val))))
                 model.set_optimizer()
 
             # Store Omega0 to tf summary

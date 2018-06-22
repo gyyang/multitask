@@ -60,10 +60,10 @@ def _compute_variance_bymodel(model, sess, rules=None, random_rotation=False):
         h_all_byrule[rule] = h[trial.epochs['fix1'][1]:, :, :]
 
     # Reorder h_all_byepoch by epoch-first
-    keys = h_all_byepoch.keys()
+    keys = list(h_all_byepoch.keys())
     # ind_key_sort = np.lexsort(zip(*keys))
     # Using mergesort because it is stable
-    ind_key_sort = np.argsort(zip(*keys)[1], kind='mergesort')
+    ind_key_sort = np.argsort(list(zip(*keys))[1], kind='mergesort')
     h_all_byepoch = OrderedDict(
         [(keys[i], h_all_byepoch[keys[i]]) for i in ind_key_sort])
 
@@ -83,12 +83,12 @@ def _compute_variance_bymodel(model, sess, rules=None, random_rotation=False):
             # Variance acros stimulus, then averaged across time
             h_var_all[:, i] = val.var(axis=1).mean(axis=0)
 
-        result = {'h_var_all': h_var_all, 'keys': h_all.keys()}
+        result = {'h_var_all': h_var_all, 'keys': list(h_all.keys())}
         save_name = 'variance_' + data_type
         if random_rotation:
             save_name += '_rr'
 
-        fname = os.path.join(model.save_dir, save_name + '.pkl')
+        fname = os.path.join(model.model_dir, save_name + '.pkl')
         print('Variance saved at {:s}'.format(fname))
         with open(fname, 'wb') as f:
             pickle.dump(result, f)

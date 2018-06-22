@@ -2,8 +2,7 @@
 
 import os
 import errno
-import fnmatch
-import pickle
+import six
 import json
 import numpy as np
 
@@ -53,7 +52,7 @@ def valid_model_dirs(root_dir):
     Args:
         root_dir: str or list of strings
     """
-    if isinstance(root_dir, basestring):  # only works for Python 2
+    if isinstance(root_dir, six.string_types):
         return _valid_model_dirs(root_dir)
     else:
         model_dirs = list()
@@ -81,11 +80,11 @@ def save_log(log):
         json.dump(log, f)
 
 
-def load_hp(save_dir):
+def load_hp(model_dir):
     """Load the hyper-parameter file of model save_name"""
-    fname = os.path.join(save_dir, 'hp.json')
+    fname = os.path.join(model_dir, 'hp.json')
     if not os.path.isfile(fname):
-        fname = os.path.join(save_dir, 'hparams.json')  # backward compat
+        fname = os.path.join(model_dir, 'hparams.json')  # backward compat
         if not os.path.isfile(fname):
             return None
 
@@ -98,11 +97,11 @@ def load_hp(save_dir):
     return hp
 
 
-def save_hp(hp, save_dir):
+def save_hp(hp, model_dir):
     """Save the hyper-parameter file of model save_name"""
     hp_copy = hp.copy()
     hp_copy.pop('rng')  # rng can not be serialized
-    with open(os.path.join(save_dir, 'hp.json'), 'w') as f:
+    with open(os.path.join(model_dir, 'hp.json'), 'w') as f:
         json.dump(hp_copy, f)
 
 

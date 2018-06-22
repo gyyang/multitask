@@ -332,7 +332,7 @@ class Model(object):
     """The model."""
 
     def __init__(self,
-                 save_dir,
+                 model_dir,
                  hp=None,
                  sigma_rec=None,
                  dt=None):
@@ -340,7 +340,7 @@ class Model(object):
         Initializing the model with information from hp
 
         Args:
-            save_dir: string, directory of the model
+            model_dir: string, directory of the model
             hp: a dictionary or None
             sigma_rec: if not None, overwrite the sigma_rec passed by hp
         """
@@ -349,10 +349,10 @@ class Model(object):
         tf.reset_default_graph()  # must be in the beginning
 
         if hp is None:
-            hp = tools.load_hp(save_dir)
+            hp = tools.load_hp(model_dir)
             if hp is None:
                 raise ValueError(
-                    'No hp found for save_dir {:s}'.format(save_dir))
+                    'No hp found for model_dir {:s}'.format(model_dir))
 
         tf.set_random_seed(hp['seed'])
         rng = np.random.RandomState(hp['seed'])
@@ -474,15 +474,19 @@ class Model(object):
                 [tf.nn.l2_loss(v) for v in self.weight_list])
 
         # Create an optimizer.
-        self.opt = tf.train.AdamOptimizer(
-            learning_rate=hp['learning_rate'])
+        if 'optimizer' not in hp or hp['optimizer'] == 'adam':
+            self.opt = tf.train.AdamOptimizer(
+                learning_rate=hp['learning_rate'])
+        elif hp['optimizer'] == 'sgd':
+            self.opt = tf.train.GradientDescentOptimizer(
+                learning_rate=hp['learning_rate'])
         # Set cost
         self.set_optimizer()
 
         # Variable saver
         self.saver = tf.train.Saver(self.var_list)
 
-        self.save_dir = save_dir
+        self.model_dir = model_dir
         self.hp = hp
         for v in self.var_list:
             if 'rnn' in v.name:
@@ -521,14 +525,14 @@ class Model(object):
     def restore(self):
         """restore the model"""
         sess = tf.get_default_session()
-        save_path = os.path.join(self.save_dir, 'model.ckpt')
+        save_path = os.path.join(self.model_dir, 'model.ckpt')
         self.saver.restore(sess, save_path)
         print("Model restored from file: %s" % save_path)
 
     def save(self):
         """Save the model."""
         sess = tf.get_default_session()
-        save_path = os.path.join(self.save_dir, 'model.ckpt')
+        save_path = os.path.join(self.model_dir, 'model.ckpt')
         self.saver.save(sess, save_path)
         print("Model saved in file: %s" % save_path)
 
@@ -547,7 +551,8 @@ class Model(object):
 
         self.grads_and_vars = self.opt.compute_gradients(cost, self.var_list)
         # gradient clipping
-        capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in self.grads_and_vars]
+        capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var)
+                      for grad, var in self.grads_and_vars]
         self.train_step = self.opt.apply_gradients(capped_gvs)
 
     def lesion_units(self, sess, units, verbose=False):
