@@ -369,6 +369,8 @@ def train_sequential(
 
     # Build the model
     model = Model(train_dir, hp=hp)
+    
+    grad_unreg = tf.gradients(model.cost_lsq, model.var_list)
 
     # Store results
     log = defaultdict(list)
@@ -376,6 +378,19 @@ def train_sequential(
 
     # Record time
     t_start = time.time()
+
+    # tensorboard summaries
+    placeholders = list()
+    for v_name in ['Omega0', 'omega0', 'vdelta']:
+        for v in model.var_list:
+            placeholder = tf.placeholder(tf.float32, shape=v.shape)
+            tf.summary.histogram(v_name + '/' + v.name, placeholder)
+            placeholders.append(placeholder)
+    merged = tf.summary.merge_all()
+    test_writer = tf.summary.FileWriter(train_dir + '/tb')
+
+    def relu(x):
+        return x * (x > 0.)
 
     # Use customized session that launches the graph as well
     with tf.Session() as sess:
@@ -397,6 +412,8 @@ def train_sequential(
             if i_rule_train == 0:
                 v_anc0 = v_current
                 Omega0 = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
+                omega0 = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
+                v_delta = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
             else:
                 v_anc0_prev = v_anc0
                 v_anc0 = v_current
@@ -404,15 +421,29 @@ def train_sequential(
 
                 # Make sure all elements in omega0 are non-negative
                 # Penalty
-                Omega0 = [(O + o * (o > 0.) / (v_d ** 2 + ksi))
+# =============================================================================
+#                 Omega0 = [(O + o * (o > 0.) / (v_d ** 2 + ksi))
+#                           for O, o, v_d in zip(Omega0, omega0, v_delta)]
+# =============================================================================
+                Omega0 = [relu(O + o / (v_d ** 2 + ksi))
                           for O, o, v_d in zip(Omega0, omega0, v_delta)]
-
+                
                 # Update cost
-                extra_cost = tf.constant(0.)
+                # extra_cost = tf.constant(0.)
+                # for v, w, v_val in zip(model.var_list, Omega0, v_current):
+                #     extra_cost += c * tf.reduce_sum(
+                #         tf.multiply(w, tf.square(v - v_val)))
+                # model.set_optimizer(extra_cost=extra_cost)
+                model.cost_reg = tf.constant(0.)
                 for v, w, v_val in zip(model.var_list, Omega0, v_current):
-                    extra_cost += c * tf.reduce_sum(
+                    model.cost_reg += c * tf.reduce_sum(
                         tf.multiply(w, tf.square(v - v_val)))
-                model.set_optimizer(extra_cost=extra_cost)
+                model.set_optimizer()
+
+            # Store Omega0 to tf summary
+            feed_dict = dict(zip(placeholders, Omega0 + omega0 + v_delta))
+            summary = sess.run(merged, feed_dict=feed_dict)
+            test_writer.add_summary(summary, i_rule_train)
 
             # Reset
             omega0 = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
@@ -447,12 +478,19 @@ def train_sequential(
                     # Continual learning with intelligent synapses
                     v_prev = v_current
 
-                    _, grads_and_vars_ = sess.run(
-                        [model.train_step, model.grads_and_vars],
+# =============================================================================
+#                     _, grads_and_vars_ = sess.run(
+#                         [model.train_step, model.grads_and_vars],
+#                         feed_dict=feed_dict)
+#                     v_grad, v_current = zip(*grads_and_vars_)
+# =============================================================================
+                    _, v_grad = sess.run(
+                        [model.train_step, grad_unreg],
                         feed_dict=feed_dict)
-                    v_grad, v_current = zip(*grads_and_vars_)
+                    v_current = sess.run(model.var_list)
 
                     # Update synaptic importance
+                    # TODO(gryang): Why are all omega0 negative??
                     omega0 = [
                         o - (v_c - v_p) * v_g for o, v_c, v_p, v_g in
                         zip(omega0, v_current, v_prev, v_grad)
@@ -485,10 +523,21 @@ if __name__ == '__main__':
     # train('data/mantetemp', seed=1, hp=hp, ruleset='mante',
     #       display_step=500, rich_output=False)
 
-    hp = {'param_intsyn': (0.1, 0.01)}
+    # hp = {'param_intsyn': (0.1, 0.01)}
+    hp = {'param_intsyn': (0.1, 0.01),
+          'easy_task': True,
+          'w_rec_init': 'randortho',
+          'learning_rate': 0.001,
+          'optimizer': 'adam'}
+    rule_trains = [['fdgo'], ['dmsgo', 'dmsnogo'], ['dmcgo', 'dmcnogo'],
+                   ['dm1', 'dm2'], ['contextdm1', 'contextdm2']]
+    # rule_trains = [
+    #     ['fdgo'], ['delaygo'], ['dm1', 'dm2'], ['multidm'],
+    #     ['delaydm1', 'delaydm2'], ['multidelaydm'],
+    #     ['contextdelaydm1', 'contextdelaydm2'], ['contextdm1', 'contextdm2']]
     train_sequential(
-        'data/debug_seq',
-        [['dm1'], ['dm2'], ['contextdm1'], ['contextdm2']],
+        'data/seq/newalgo3',
+        rule_trains,
         hp=hp,
         max_steps=1e5,
         display_step=500,
