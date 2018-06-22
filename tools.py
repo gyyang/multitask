@@ -61,9 +61,9 @@ def valid_model_dirs(root_dir):
         return model_dirs
 
 
-def load_log(train_dir):
+def load_log(model_dir):
     """Load the log file of model save_name"""
-    fname = os.path.join(train_dir, 'log.json')
+    fname = os.path.join(model_dir, 'log.json')
     if not os.path.isfile(fname):
         return None
 
@@ -74,7 +74,7 @@ def load_log(train_dir):
 
 def save_log(log): 
     """Save the log file of model."""
-    model_dir = log['train_dir']
+    model_dir = log['model_dir']
     fname = os.path.join(model_dir, 'log.json')
     with open(fname, 'w') as f:
         json.dump(log, f)

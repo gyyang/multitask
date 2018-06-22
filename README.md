@@ -22,7 +22,7 @@ analyses.
 Train a default network with:
 
     import train
-    train.train(train_dir='debug', hp={'learning_rate': 0.001}, ruleset='mante')
+    train.train(model_dir='debug', hp={'learning_rate': 0.001}, ruleset='mante')
 
 These lines will train a default network for the Mante task, and store the
 results in your_working_directory/debug/

@@ -14,11 +14,11 @@ import tools
 class ToolsTest(unittest.TestCase):
 
     def testLoadSaveLog(self):
-        train_dir = 'data/tmp'
-        tools.mkdir_p(train_dir)
+        model_dir = 'data/tmp'
+        tools.mkdir_p(model_dir)
 
         log = dict()
-        log['train_dir'] = train_dir
+        log['model_dir'] = model_dir
         log['step'] = range(10000)
         log['time'] = range(1000)
         for i in range(20):
@@ -29,7 +29,7 @@ class ToolsTest(unittest.TestCase):
         start_time = time.time()
         tools.save_log(log)
         print(time.time() - start_time)
-        log2 = tools.load_log(train_dir)
+        log2 = tools.load_log(model_dir)
         print(time.time() - start_time)
 
         for key, val in log.items():

@@ -164,20 +164,20 @@ def do_eval(sess, model, log, rule_train):
     return log
 
 
-def display_rich_output(model, sess, step, log, train_dir):
+def display_rich_output(model, sess, step, log, model_dir):
     """Display step by step outputs during training."""
     variance._compute_variance_bymodel(model, sess)
     rule_pair = ['contextdm1', 'contextdm2']
     save_name = '_atstep' + str(step)
     title = ('Step ' + str(step) +
              ' Perf. {:0.2f}'.format(log['perf_avg'][-1]))
-    variance.plot_hist_varprop(train_dir, rule_pair,
+    variance.plot_hist_varprop(model_dir, rule_pair,
                                figname_extra=save_name,
                                title=title)
     plt.close('all')
 
 
-def train(train_dir,
+def train(model_dir,
           hp=None,
           max_steps=1e7,
           display_step=500,
@@ -190,7 +190,7 @@ def train(train_dir,
     """Train the network.
 
     Args:
-        train_dir: str, training directory
+        model_dir: str, training directory
         hp: dictionary of hyperparameters
         max_steps: int, maximum number of training steps
         display_step: int, display steps
@@ -200,11 +200,11 @@ def train(train_dir,
         seed: int, random seed to be used
 
     Returns:
-        model is stored at train_dir/model.ckpt
-        training configuration is stored at train_dir/hp.json
+        model is stored at model_dir/model.ckpt
+        training configuration is stored at model_dir/hp.json
     """
 
-    tools.mkdir_p(train_dir)
+    tools.mkdir_p(model_dir)
 
     # Network parameters
     default_hp = get_default_hp(ruleset)
@@ -233,10 +233,10 @@ def train(train_dir,
         rule_prob = np.array(
                 [rule_prob_map.get(r, 1.) for r in hp['rule_trains']])
         hp['rule_probs'] = list(rule_prob/np.sum(rule_prob))
-    tools.save_hp(hp, train_dir)
+    tools.save_hp(hp, model_dir)
 
     # Build the model
-    model = Model(train_dir, hp=hp)
+    model = Model(model_dir, hp=hp)
 
     # Display hp
     for key, val in hp.items():
@@ -244,7 +244,7 @@ def train(train_dir,
 
     # Store results
     log = defaultdict(list)
-    log['train_dir'] = train_dir 
+    log['model_dir'] = model_dir
     
     # Record time
     t_start = time.time()
@@ -294,7 +294,7 @@ def train(train_dir,
                         break
 
                     if rich_output:
-                        display_rich_output(model, sess, step, log, train_dir)
+                        display_rich_output(model, sess, step, log, model_dir)
 
                 # Training
                 rule_train_now = hp['rng'].choice(hp['rule_trains'],
@@ -319,7 +319,7 @@ def train(train_dir,
 
 
 def train_sequential(
-        train_dir,
+        model_dir,
         rule_trains,
         hp=None,
         max_steps=1e7,
@@ -330,7 +330,7 @@ def train_sequential(
     '''Train the network sequentially.
 
     Args:
-        train_dir: str, training directory
+        model_dir: str, training directory
         rule_trains: a list of list of tasks to train sequentially
         hp: dictionary of hyperparameters
         max_steps: int, maximum number of training steps for each list of tasks
@@ -339,11 +339,11 @@ def train_sequential(
         seed: int, random seed to be used
 
     Returns:
-        model is stored at train_dir/model.ckpt
-        training configuration is stored at train_dir/hp.json
+        model is stored at model_dir/model.ckpt
+        training configuration is stored at model_dir/hp.json
     '''
 
-    tools.mkdir_p(train_dir)
+    tools.mkdir_p(model_dir)
 
     # Network parameters
     default_hp = get_default_hp(ruleset)
@@ -359,7 +359,7 @@ def train_sequential(
     # Number of training iterations for each rule
     rule_train_iters = [len(r)*max_steps for r in rule_trains]
 
-    tools.save_hp(hp, train_dir)
+    tools.save_hp(hp, model_dir)
     # Display hp
     for key, val in hp.items():
         print('{:20s} = '.format(key) + str(val))
@@ -368,13 +368,13 @@ def train_sequential(
     c, ksi = hp['param_intsyn']
 
     # Build the model
-    model = Model(train_dir, hp=hp)
+    model = Model(model_dir, hp=hp)
     
     grad_unreg = tf.gradients(model.cost_lsq, model.var_list)
 
     # Store results
     log = defaultdict(list)
-    log['train_dir'] = train_dir
+    log['model_dir'] = model_dir
 
     # Record time
     t_start = time.time()
@@ -387,7 +387,7 @@ def train_sequential(
             tf.summary.histogram(v_name + '/' + v.name, placeholder)
             placeholders.append(placeholder)
     merged = tf.summary.merge_all()
-    test_writer = tf.summary.FileWriter(train_dir + '/tb')
+    test_writer = tf.summary.FileWriter(model_dir + '/tb')
 
     def relu(x):
         return x * (x > 0.)

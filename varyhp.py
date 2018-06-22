@@ -55,7 +55,7 @@ def compute_n_cluster():
             analysis = clustering.Analysis(model_dir, 'rule')
 
             log['n_cluster'] = analysis.n_cluster
-            log['train_dir'] = model_dir
+            log['model_dir'] = model_dir
             tools.save_log(log)
         except IOError:
             # Training never finished

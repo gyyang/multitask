@@ -125,7 +125,7 @@ model_dir = root_dir + '/0'
 
 # Clustering Analysis------------------------------------------------------
 
-CA = clustering.Analysis(model_dir, data_type='rule')
+# CA = clustering.Analysis(model_dir, data_type='rule')
 # CA.plot_example_unit()
 # CA.plot_cluster_score()
 # CA.plot_cluster_score(save_name=hp_target['activation'])
@@ -157,8 +157,7 @@ CA = clustering.Analysis(model_dir, data_type='rule')
 # Compositional Representation---------------------------------------------
 # setups = [1] # Go, Anti family
 # setups = [2] # Ctx DM family
-# =============================================================================
-# setups = [1, 2]
+# setups = [1, 2, 3]
 # for setup in setups:
 #     pass
 #     taskset.plot_taskspace_group(root_dir, setup=setup,
@@ -167,7 +166,6 @@ CA = clustering.Analysis(model_dir, data_type='rule')
 #                                  restore=True, representation='weight')
 #     taskset.plot_replacerule_performance_group(
 #             root_dir, setup=setup, restore=True)
-# =============================================================================
 
 # Continual Learning Analysis----------------------------------------------
 # TODO(gryang): Remains to be fixed
@@ -177,3 +175,5 @@ CA = clustering.Analysis(model_dir, data_type='rule')
 # for save_pattern in ['*3cont']:
 #     variance.plot_hist_varprop_selection(save_pattern)
 # performance.plot_performanceprogress(model_dir='0_3seqlowlr') # Plot performance during training
+model_dir = './data/seq/newalgo3'
+variance.plot_hist_varprop_selection(model_dir)

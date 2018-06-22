@@ -52,50 +52,50 @@ def analysis(run_analysis, model_dir):
             compute_replacerule_performance(model_dir, setup, restore=False)
 
 
-def train_mante(seed=0, train_dir='train_mante'):
+def train_mante(seed=0, model_dir='train_mante'):
     """Training of only the Mante task."""
     hp = {'target_perf': 0.9}
-    train_dir = os.path.join(DATAPATH, train_dir, str(seed))
-    train.train(train_dir, hp=hp, ruleset='mante', seed=seed)
+    model_dir = os.path.join(DATAPATH, model_dir, str(seed))
+    train.train(model_dir, hp=hp, ruleset='mante', seed=seed)
 
 
-def mante_tanh(seed=0, train_dir='mante_tanh'):
+def mante_tanh(seed=0, model_dir='mante_tanh'):
     """Training of only the Mante task."""
     hp = {'activation': 'tanh',
                'target_perf': 0.9}
-    train_dir = os.path.join(DATAPATH, train_dir, str(seed))
-    train.train(train_dir, hp=hp, ruleset='mante', seed=seed)
+    model_dir = os.path.join(DATAPATH, model_dir, str(seed))
+    train.train(model_dir, hp=hp, ruleset='mante', seed=seed)
     # Analyses
-    variance.compute_variance(train_dir)
+    variance.compute_variance(model_dir)
 
-    log = tools.load_log(train_dir)
-    analysis = clustering.Analysis(train_dir, 'rule')
+    log = tools.load_log(model_dir)
+    analysis = clustering.Analysis(model_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
-    data_analysis.compute_var_all(train_dir)
+    data_analysis.compute_var_all(model_dir)
 
 
-def train_all(seed=0, train_dir='train_all'):
+def train_all(seed=0, model_dir='train_all'):
     """Training of all tasks."""
-    train_dir = os.path.join(DATAPATH, train_dir, str(seed))
+    model_dir = os.path.join(DATAPATH, model_dir, str(seed))
     hp = {'activation': 'softplus'}
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    # train.train(train_dir, hp=hp, ruleset='all',
+    # train.train(model_dir, hp=hp, ruleset='all',
     #             rule_prob_map=rule_prob_map, seed=seed)
     # Analyses
-    variance.compute_variance(train_dir)
-    log = tools.load_log(train_dir)
-    analysis = clustering.Analysis(train_dir, 'rule')
+    variance.compute_variance(model_dir)
+    log = tools.load_log(model_dir)
+    analysis = clustering.Analysis(model_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
-    data_analysis.compute_var_all(train_dir)
+    data_analysis.compute_var_all(model_dir)
     
     setups = [1, 2, 3]
     for setup in setups:
-        taskset.compute_taskspace(train_dir, setup,
+        taskset.compute_taskspace(model_dir, setup,
                                   restore=False,
                                   representation='rate')
-        taskset.compute_replacerule_performance(train_dir, setup, False)
+        taskset.compute_replacerule_performance(model_dir, setup, False)
 
 
 def train_vary_hp(i):
@@ -130,18 +130,18 @@ def train_vary_hp(i):
     for key, index in zip(keys, indices):
         hp[key] = hp_ranges[key][index]
 
-    train_dir = os.path.join(DATAPATH, 'varyhp_reg2', str(i))
+    model_dir = os.path.join(DATAPATH, 'varyhp_reg2', str(i))
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    train.train(train_dir, hp, ruleset='all',
+    train.train(model_dir, hp, ruleset='all',
                 rule_prob_map=rule_prob_map, seed=i // n_max)
 
     # Analyses
-    variance.compute_variance(train_dir)
-    log = tools.load_log(train_dir)
-    analysis = clustering.Analysis(train_dir, 'rule')
+    variance.compute_variance(model_dir)
+    log = tools.load_log(model_dir)
+    analysis = clustering.Analysis(model_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
-    data_analysis.compute_var_all(train_dir)
+    data_analysis.compute_var_all(model_dir)
 
 
 def _base_vary_hp_mante(i, hp_ranges, base_name):
@@ -157,18 +157,18 @@ def _base_vary_hp_mante(i, hp_ranges, base_name):
     for key, index in zip(keys, indices):
         hp[key] = hp_ranges[key][index]
 
-    train_dir = os.path.join(DATAPATH, base_name, str(i))
-    train.train(train_dir, hp, ruleset='mante',
+    model_dir = os.path.join(DATAPATH, base_name, str(i))
+    train.train(model_dir, hp, ruleset='mante',
                 max_steps=1e7, seed=i // n_max)
 
     # Analyses
-    variance.compute_variance(train_dir)
+    variance.compute_variance(model_dir)
     
-    log = tools.load_log(train_dir)
-    analysis = clustering.Analysis(train_dir, 'rule')
+    log = tools.load_log(model_dir)
+    analysis = clustering.Analysis(model_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
-    data_analysis.compute_var_all(train_dir)
+    data_analysis.compute_var_all(model_dir)
 
 
 def vary_l2_init_mante(i):
