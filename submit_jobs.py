@@ -114,6 +114,17 @@ elif args.run == 'all_varyhp':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
+elif args.run == 'seq_varyhp':
+    for i in range(0, 72):
+        jobname = 'seq_varyhp_{:d}'.format(i)
+        train_arg = '{:d}'.format(i)
+        cmd = r'''python -c "import experiment as e;e.train_vary_hp_seq('''+\
+              train_arg+''')"'''
+
+        jobfile = write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
 elif args.run == 'mante':
     for seed in range(0, 20):
         jobname = 'train_mante_{:d}'.format(seed)
@@ -169,10 +180,8 @@ elif args.run == 'mante_vary_pweighttrain':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
-# Current continual learning version
-elif args.run == 'cont':
+elif args.run == 'seq':
     s = 1
-    n_unit = 256
     for seed in range(0,20):
         for condition in [0, 1, 2, 3]:
             if condition == 0:

@@ -98,6 +98,43 @@ def train_all(seed=0, model_dir='train_all'):
         taskset.compute_replacerule_performance(model_dir, setup, False)
 
 
+def train_vary_hp_seq(i):
+    # Ranges of hyperparameters to loop over
+    hp_ranges = OrderedDict()
+    hp_ranges['activation'] = ['softplus', 'relu']
+    hp_ranges['w_rec_init'] = ['randortho']
+    hp_ranges['c_intsyn'] = [0, 0.1, 1.0, 10.]
+    hp_ranges['ksi_intsyn'] = [0.001, 0.01, 0.1]
+    hp_ranges['max_steps'] = [1e5, 2e5, 4e5]
+
+    # Unravel the input index
+    keys = hp_ranges.keys()
+    dims = [len(hp_ranges[k]) for k in keys]
+    n_max = np.prod(dims)
+    indices = np.unravel_index(i % n_max, dims=dims)
+
+    # Set up new hyperparameter
+    hp = dict()
+    for key, index in zip(keys, indices):
+        hp[key] = hp_ranges[key][index]
+    hp['learning_rate'] = 0.001
+    hp['w_rec_init'] = 'randortho'
+    hp['easy_task'] = True
+
+    model_dir = os.path.join(DATAPATH, 'seq', str(i))
+    rule_trains = [['fdgo'], ['delaygo'], ['dm1', 'dm2'], ['multidm'],
+                   ['contextdm1', 'contextdm2']]
+    train.train_sequential(
+        model_dir,
+        rule_trains,
+        hp=hp,
+        max_steps=hp['max_steps'],
+        display_step=500,
+        ruleset='all',
+        seed=i // n_max,
+    )
+
+
 def train_vary_hp(i):
     """Vary the hyperparameters.
 
