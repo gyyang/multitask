@@ -159,45 +159,30 @@ def plot_performanceprogress_cont(model_dirs, save=True, **kwargs):
     _plot_performanceprogress_cont(model_dir1, model_dir2=model_dir2, save=save, **kwargs)
 
 
-def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=None):
+def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None):
     # Plot Training Progress
     log = tools.load_log(model_dir)
     hp = tools.load_hp(model_dir)
 
-    trials      = np.array(log['trials'])/1000.
-    times       = log['times']
-    perf_tests  = log['perf_tests']
-    rule_now    = log['rule_now']
+    trials = np.array(log['trials'])/1000.
+    times = log['times']
+    rule_now = log['rule_now']
 
     if model_dir2 is not None:
         log2 = tools.load_log(model_dir2)
+        trials2 = np.array(log2['trials'])/1000.
 
-        trials2      = np.array(log2['trials'])/1000.
-        perf_tests2  = log2['perf_tests']
-
-    fs = 7 # fontsize
+    fs = 7  # fontsize
     lines = list()
     labels = list()
 
-
     rule_train_plot = hp['rule_trains']
-    rule_test_plot  = hp['rules']
+    rule_test_plot = hp['rules']
 
-    if dims is None:
-        nx, ny = 4, 3
-    else:
-        nx, ny = dims
-
-    print(nx, ny)
-    fig, axarr = plt.subplots(nx, ny, figsize=(nx,ny), sharex=True)
-
-    f_rule_color = lambda r : rule_color[r[0]] if hasattr(r, '__iter__') else rule_color[r]
-
-    # for i, rule in enumerate(rule_test_plot):
-    #     pass
-
+    nx, ny = 4, 2
+    fig, axarr = plt.subplots(nx, ny, figsize=(3, 3), sharex=True)
     for i in range(int(nx*ny)):
-        ix, iy = i%nx, int(i/nx)
+        ix, iy = i % nx, int(i / nx)
         print(ix, iy)
         ax = axarr[ix, iy]
 
@@ -208,7 +193,7 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=N
         rule = rule_test_plot[i]
 
         # Plot fills
-        trials_rule_prev_end = 0 # end of previous rule training time
+        trials_rule_prev_end = 0  # end of previous rule training time
         for rule_ in rule_train_plot:
             alpha = 0.2
             if hasattr(rule_, '__iter__'):
@@ -217,14 +202,14 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=N
                     ec = 'black'
                 else:
                     lw = 0.5
-                    ec = (0,0,0,0.1)
+                    ec = (0, 0, 0, 0.1)
             else:
                 if rule == rule_:
                     lw = 2
                     ec = 'black'
                 else:
                     lw = 0.5
-                    ec = (0,0,0,0.1)
+                    ec = (0, 0, 0, 0.1)
             trials_rule_now = [trials_rule_prev_end] + \
                               [trials[ii] for ii in range(len(rule_now)) if rule_now[ii]==rule_]
             trials_rule_prev_end = trials_rule_now[-1]
@@ -235,10 +220,10 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=N
 
         # Plot lines
         # line = ax.plot(trials, perf_tests[rule], lw=0.75, color=f_rule_color(rule))
-        line = ax.plot(trials, perf_tests[rule], lw=1, color='gray')
+        line = ax.plot(trials, log['perf_'+rule], lw=1, color='gray')
         if model_dir2 is not None:
             # ax.plot(trials2, perf_tests2[rule], lw=1.5, color=f_rule_color(rule))
-            ax.plot(trials2, perf_tests2[rule], lw=1, color='red')
+            ax.plot(trials2, log2['perf_'+rule], lw=1, color='red')
         lines.append(line[0])
         if not hasattr(rule, '__iter__'):
             rule_name_print = rule_name[rule]
@@ -275,9 +260,8 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None, dims=N
     plt.show()
 
 
-def get_finalperformance(save_pattern):
-    model_dirs = tools.valid_model_dirs(save_pattern)
-
+def get_finalperformance(model_dirs):
+    """Get lists of final performance."""
     hp = tools.load_hp(model_dirs[0])
 
     rule_plot = hp['rules']
@@ -294,12 +278,9 @@ def get_finalperformance(save_pattern):
         if log is None:
             continue
 
-        cost_tests = log['cost_tests']
-        perf_tests = log['perf_tests']
-
         for rule in rule_plot:
-            final_perf[rule] += [float(perf_tests[rule][-1])]
-            final_cost[rule] += [float(cost_tests[rule][-1])]
+            final_perf[rule] += [float(log['perf_'+rule][-1])]
+            final_cost[rule] += [float(log['cost_'+rule][-1])]
         training_time_plot.append(log['times'][-1])
 
     return final_cost, final_perf, rule_plot, training_time_plot
@@ -363,12 +344,12 @@ def obsolete_plot_finalperformance(save_type, save_type_end=None):
     plt.show()
 
 
-def plot_finalperformance_cont(save_pattern1, save_pattern2):
+def plot_finalperformance_cont(model_dirs1, model_dirs2):
     final_cost, final_perf1, rule_plot, training_time_plot = \
-        get_finalperformance(save_pattern1)
+        get_finalperformance(model_dirs1)
 
     final_cost, final_perf2, rule_plot, training_time_plot = \
-        get_finalperformance(save_pattern2)
+        get_finalperformance(model_dirs2)
 
     final_perf_plot1 = np.array(final_perf1.values())
     final_perf_plot2 = np.array(final_perf2.values())
@@ -402,9 +383,9 @@ def plot_finalperformance_cont(save_pattern1, save_pattern2):
     plt.show()
 
 
-def get_allperformance(save_pattern, param_list=None):
+def get_allperformance(model_dirs, param_list=None):
     # Get all model names that match patterns (strip off .ckpt.meta at the end)
-    model_dirs = tools.valid_model_dirs(save_pattern)
+    model_dirs = tools.valid_model_dirs(model_dirs)
 
     final_perfs = dict()
     filenames = dict()
