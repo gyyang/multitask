@@ -114,6 +114,17 @@ elif args.run == 'all_varyhp':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
+elif args.run == 'seq':
+    for i in range(0, 40):
+        jobname = 'seq_{:d}'.format(i)
+        train_arg = '{:d}'.format(i)
+        cmd = r'''python -c "import experiment as e;e.train_seq('''+\
+              train_arg+''')"'''
+
+        jobfile = write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
 elif args.run == 'seq_varyhp':
     for i in range(0, 72):
         jobname = 'seq_varyhp_{:d}'.format(i)
@@ -179,29 +190,6 @@ elif args.run == 'mante_vary_pweighttrain':
         jobfile = write_jobfile(
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
-
-elif args.run == 'seq':
-    s = 1
-    for seed in range(0,20):
-        for condition in [0, 1, 2, 3]:
-            if condition == 0:
-                c, ksi, seq = 0.1, 0.01, True
-            elif condition == 1:
-                c, ksi, seq = 1.0, 0.01, True
-            elif condition == 2:
-                c, ksi, seq = 0, 0, True
-            elif condition == 3:
-                c, ksi, seq = 0, 0, False
-
-            jobname = 'cont{:d}_{:d}'.format(seed, condition)
-            train_arg = 'c={:0.6f}, ksi={:0.6f}, seed={:d}'.format(c, ksi, seed)
-            train_arg+= r", save_name='"+'{:d}_{:d}cont'.format(seed, condition)+r"'"
-            train_arg+= ',seq='+str(seq)
-
-            cmd     = r'''python -c "import paper as p;p.cont_train('''+train_arg+''')"'''
-
-            jobfile = write_jobfile(cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
-            subprocess.call(['sbatch', jobfile])
 
 # Grid search
 elif args.run == 'grid':
