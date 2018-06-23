@@ -374,13 +374,13 @@ def get_model_by_activation(activation):
 
 def plot_hist_varprop(activation):
     """Plot FTV distribution."""
-    model_dir, hp = get_model_by_activation(activation)
+    model_dir = get_model_by_activation(activation)
     variance.plot_hist_varprop_selection(model_dir, figname_extra='_tanh')
 
 
 def pretty_singleneuron_plot(activation='tanh'):
     """Plot single neuron activity."""
-    model_dir, hp = get_model_by_activation(activation)
+    model_dir = get_model_by_activation(activation)
     standard_analysis.pretty_singleneuron_plot(
         model_dir, ['contextdm1', 'contextdm2'], range(2)
     )
@@ -388,7 +388,7 @@ def pretty_singleneuron_plot(activation='tanh'):
 
 def activity_histogram(activation):
     """Plot FTV distribution for tanh network."""
-    model_dir, hp = get_model_by_activation(activation)
+    model_dir = get_model_by_activation(activation)
     title = activation
     save_name = '_' + activation
     standard_analysis.activity_histogram(

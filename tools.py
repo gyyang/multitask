@@ -114,19 +114,16 @@ def find_all_models(root_dir, hp_target):
 
     Returns:
         model_dirs: list of model directories
-        hps: list of model hyperparameters
     """
     dirs = valid_model_dirs(root_dir)
 
     model_dirs = list()
-    hps = list()
     for d in dirs:
         hp = load_hp(d)
         if all(hp[key] == val for key, val in hp_target.items()):
             model_dirs.append(d)
-            hps.append(hp)
 
-    return model_dirs, hps
+    return model_dirs
 
 
 def find_model(root_dir, hp_target, perf_min=None):
@@ -139,9 +136,8 @@ def find_model(root_dir, hp_target, perf_min=None):
 
     Returns:
         d: model directory
-        hp: model hyperparameters
     """
-    model_dirs, _ = find_all_models(root_dir, hp_target)
+    model_dirs = find_all_models(root_dir, hp_target)
     if perf_min is not None:
         model_dirs = select_by_perf(model_dirs, perf_min)
 
@@ -160,7 +156,7 @@ def find_model(root_dir, hp_target, perf_min=None):
               performance {:0.2f}.""".format(
               log['perf_min'][-1], hp['target_perf']))
 
-    return d, hp
+    return d
 
 
 def select_by_perf(model_dirs, perf_min):

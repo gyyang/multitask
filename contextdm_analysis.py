@@ -1332,7 +1332,7 @@ def plot_performance_lesionbyactivity(root_dir, activation, n_lesion=20):
                  'w_rec_init': 'randortho',
                  'l1_h': 0,
                  'l1_weight': 0}
-    model_dir, _ = tools.find_model(root_dir, hp_target)
+    model_dir = tools.find_model(root_dir, hp_target)
     ssa = StateSpaceAnalysis(model_dir, lesion_units=None,
                              redefine_choice=True)
     hh = ssa.H_original
@@ -1755,7 +1755,7 @@ if __name__ == '__main__':
                  'w_rec_init': 'randortho',
                  'p_weight_train': 0.1}
     
-    model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
+    model_dir = tools.find_model(root_dir, hp_target, perf_min=0.8)
 
     root_dir = './data/train_all'
     model_dir = root_dir + '/0'

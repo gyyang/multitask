@@ -832,7 +832,7 @@ def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var'):
 
     hists, xs, bottoms, tops, labels = list(), list(), list(), list(), list()
     for hp_target in hp_targets:
-        model_dirs, _ = tools.find_all_models(root_dir, hp_target)
+        model_dirs = tools.find_all_models(root_dir, hp_target)
         print([tools.load_log(d)['perf_min'][-1] for d in model_dirs])
         # Only analyze models that trained
         model_dirs = tools.select_by_perf(model_dirs, perf_min=0.8)
@@ -929,8 +929,8 @@ def plot_all(dataset):
 #         root_dir = './data/mante_tanh'
 #         hp_target = {}
 # =============================================================================
-        # model_dir, _ = tools.find_model(root_dir, hp_target, perf_min=0.8)
-        model_dirs, _ = tools.find_all_models(root_dir, hp_target)
+        # model_dir = tools.find_model(root_dir, hp_target, perf_min=0.8)
+        model_dirs = tools.find_all_models(root_dir, hp_target)
         model_dirs = tools.select_by_perf(model_dirs, perf_min=0.8)
         print(len(model_dirs))
         model_dir = model_dirs[1]
