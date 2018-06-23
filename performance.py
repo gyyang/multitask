@@ -153,13 +153,13 @@ def plot_performanceprogress(model_dir, rule_plot=None, save=False):
     plt.show()
 
 
-def plot_performanceprogress_cont(model_dirs, save=True, **kwargs):
+def plot_performanceprogress_cont(model_dirs, save=True):
     model_dir1, model_dir2 = model_dirs
-    _plot_performanceprogress_cont(model_dir1, save=save, **kwargs)
-    _plot_performanceprogress_cont(model_dir1, model_dir2=model_dir2, save=save, **kwargs)
+    _plot_performanceprogress_cont(model_dir1, save=save)
+    _plot_performanceprogress_cont(model_dir1, model_dir2, save=save)
 
 
-def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None):
+def _plot_performanceprogress_cont(model_dir, model_dir2=None, save=True):
     # Plot Training Progress
     log = tools.load_log(model_dir)
     hp = tools.load_hp(model_dir)
@@ -183,7 +183,6 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None):
     fig, axarr = plt.subplots(nx, ny, figsize=(3, 3), sharex=True)
     for i in range(int(nx*ny)):
         ix, iy = i % nx, int(i / nx)
-        print(ix, iy)
         ax = axarr[ix, iy]
 
         if i >= len(rule_test_plot):
@@ -195,34 +194,26 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None):
         # Plot fills
         trials_rule_prev_end = 0  # end of previous rule training time
         for rule_ in rule_train_plot:
-            alpha = 0.2
             if hasattr(rule_, '__iter__'):
                 if rule in rule_:
-                    lw = 2
                     ec = 'black'
                 else:
-                    lw = 0.5
                     ec = (0, 0, 0, 0.1)
             else:
                 if rule == rule_:
-                    lw = 2
                     ec = 'black'
                 else:
-                    lw = 0.5
                     ec = (0, 0, 0, 0.1)
-            trials_rule_now = [trials_rule_prev_end] + \
-                              [trials[ii] for ii in range(len(rule_now)) if rule_now[ii]==rule_]
+            trials_rule_now = [trials_rule_prev_end] + [
+                    trials[ii] for ii in range(len(rule_now))
+                    if rule_now[ii] == rule_]
             trials_rule_prev_end = trials_rule_now[-1]
-            # ax.fill_between(trials_rule_now, 0, 1, facecolor=f_rule_color(rule_)+(alpha,),
-            #                 edgecolor=(0,0,0,0.5), linewidth=lw)
             ax.fill_between(trials_rule_now, 0, 1, facecolor='none',
                             edgecolor=ec, linewidth=0.5)
 
         # Plot lines
-        # line = ax.plot(trials, perf_tests[rule], lw=0.75, color=f_rule_color(rule))
         line = ax.plot(trials, log['perf_'+rule], lw=1, color='gray')
         if model_dir2 is not None:
-            # ax.plot(trials2, perf_tests2[rule], lw=1.5, color=f_rule_color(rule))
             ax.plot(trials2, log2['perf_'+rule], lw=1, color='red')
         lines.append(line[0])
         if not hasattr(rule, '__iter__'):
@@ -236,9 +227,9 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None):
         ax.set_ylim([0, 1.05])
         ax.set_xlim([0, trials_rule_prev_end])
         ax.set_yticks([0, 1])
-        ax.set_xticks([0, np.floor(trials_rule_prev_end/100.)*100])
-        if (ix==nx-1) and (iy==0):
-            ax.set_xlabel('Total trials (1,000)',fontsize=fs, labelpad=1)
+        ax.set_xticks([0, np.floor(trials_rule_prev_end / 100.) * 100])
+        if (ix == nx-1) and (iy == 0):
+            ax.set_xlabel('Total trials (1,000)', fontsize=fs, labelpad=1)
         if i == 0:
             ax.set_ylabel('Performance', fontsize=fs, labelpad=1)
 
@@ -246,13 +237,10 @@ def _plot_performanceprogress_cont(model_dir, save=True, model_dir2=None):
         ax.spines["top"].set_visible(False)
         ax.xaxis.set_ticks_position('none')
         ax.yaxis.set_ticks_position('left')
-
-        # ax.set_title(rule_name[rule], fontsize=fs, y=0.87, color=rule_color[rule])
         ax.set_title(rule_name[rule], fontsize=fs, y=0.87, color='black')
 
     print('Training time {:0.1f} hours'.format(times[-1]/3600.))
     if save:
-        # plt.savefig('figure/TrainingCont_Progress'+model_dir+'.pdf', transparent=True)
         name = 'TrainingCont_Progress'
         if model_dir2 is not None:
             name = name + '2'
@@ -284,64 +272,6 @@ def get_finalperformance(model_dirs):
         training_time_plot.append(log['times'][-1])
 
     return final_cost, final_perf, rule_plot, training_time_plot
-
-
-def obsolete_plot_finalperformance(save_type, save_type_end=None):
-
-    var_plot, final_cost, final_perf, rule_plot, training_time_plot = \
-        get_finalperformance(save_type, save_type_end)
-
-    fig = plt.figure(figsize=(5,3))
-    d1, d2 = 0.01, 0.35
-    ax1 = fig.add_axes([0.15,0.5+d1,   0.5,d2])
-    ax2 = fig.add_axes([0.15,0.5-d1-d2,0.5,d2])
-    lines = list()
-    labels = list()
-    for i, rule in enumerate(rule_plot):
-        # line = ax1.plot(x_plot,np.log10(final_cost[rule]),color=color_rules[i%26])
-        # ax2.plot(x_plot,final_perf[rule],color=color_rules[i%26])
-        line = ax1.plot(var_plot,np.log10(final_cost[rule]),color=rule_color[rule])
-        ax2.plot(var_plot,final_perf[rule],color=rule_color[rule])
-        lines.append(line[0])
-        labels.append(rule_name[rule])
-
-    ax2.plot(var_plot,np.array([final_perf[r] for r in rule_plot]).mean(axis=0),color='black',linewidth=3)
-
-    print('Overall final performance {:0.2f}'.format(np.array([final_perf[r] for r in rule_plot]).mean()))
-
-    ax1.tick_params(axis='both', which='major', labelsize=7)
-    ax2.tick_params(axis='both', which='major', labelsize=7)
-
-    ax2.set_ylim(top=1.05)
-    ax2.set_xlabel('Number of Recurrent Units',fontsize=7)
-    ax2.set_ylabel('performance',fontsize=7)
-    ax1.set_ylabel(r'$log_{10}$(cost)',fontsize=7)
-    ax1.set_xticklabels([])
-    # ax1.set_title('After {:.1E} trials'.format(n_trial),fontsize=7)
-    ax1.locator_params(axis='y', nbins=3)
-    ax2.locator_params(axis='y', nbins=4)
-    lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.7,0.5),
-                    fontsize=7,labelspacing=0.3,loc=6)
-    plt.setp(lg.get_title(),fontsize=7)
-    plt.savefig('figure/FinalCostPerformance_'+save_type+'.pdf', transparent=True)
-    plt.show()
-
-    # Training time as a function of number of recurrent units
-    x_plot = np.array(var_plot)/100.
-    y_plot = np.array(training_time_plot)/3600.
-    fig = plt.figure(figsize=(5,1.5))
-    ax  = fig.add_axes([0.15, 0.25, 0.5, 0.7])
-    p = np.polyfit(x_plot[x_plot<5], y_plot[x_plot<5], 2) # Temporary
-    #p = np.polyfit(x_plot, y_plot, 2)
-    ax.plot(x_plot, p[0]*x_plot**2+p[1]*x_plot+p[2], color='black')
-    ax.plot(x_plot, y_plot, color=sns.xkcd_palette(['cerulean'])[0])
-    ax.text(0.05, 0.7, 'Number of Hours = \n {:0.2f}$(N/100)^2$+{:0.2f}$(N/100)$+{:0.2f}'.format(*p), fontsize=7, transform=ax.transAxes)
-    ax.set_xlabel('Number of Recurrent Units $N$ (100)',fontsize=7)
-    ax.set_ylabel('Training time (hours)',fontsize=7)
-    ax.tick_params(axis='both', which='major', labelsize=7)
-    if save:
-        plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
-    plt.show()
 
 
 def plot_finalperformance_cont(model_dirs1, model_dirs2):
