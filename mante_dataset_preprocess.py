@@ -23,12 +23,13 @@ def _expand_task_var(task_var):
     return task_var
 
 
-def load_data(smooth=True, single_units=False):
+def load_data(smooth=True, single_units=False, animal='ar'):
     """Load Mante data into raw format.
 
     Args:
         smooth: bool, whether to load smoothed data
         single_units: bool, if True, only analyze single units
+        animal: str, 'ar' or 'fe'
 
     Returns:
         data: standard format, list of dict of arrays/dict
@@ -37,9 +38,9 @@ def load_data(smooth=True, single_units=False):
             response array has shape (n_trial, n_time)
     """
     if smooth:
-        fname = 'dataT_smooth.mat'
+        fname = 'dataTsmooth_' + animal + '.mat'
     else:
-        fname = 'dataT.mat'
+        fname = 'dataT_' + animal + '.mat'
 
     fname = os.path.join(DATASETPATH, fname)
 
@@ -51,7 +52,7 @@ def load_data(smooth=True, single_units=False):
     # time = dataT['time']
 
     if single_units:
-        single_units = get_single_units()
+        single_units = get_single_units(animal)
         ind_single_units = np.where(single_units)[0]
         data = [data[i] for i in ind_single_units]
 
@@ -70,15 +71,19 @@ def load_data(smooth=True, single_units=False):
     return new_data
 
 
-def get_single_units():
+def get_single_units(animal):
     # get single units
-    fname = os.path.join('datasets', 'mante_dataset', 'metadata.mat')
+    fname = os.path.join('datasets', 'mante_dataset',
+                         'metadata_'+animal+'.mat')
     mat_dict = loadmat(fname, squeeze_me=True, struct_as_record=False)
     metadata = mat_dict['metadata'].unit # as dictionary
     discriminable = np.array([(m.unitInfo.discriminability in [3,4]) for m in metadata])
     single_units = np.array([m.unitInfo.type=='s' for m in metadata])
     single_units = np.logical_and(single_units, discriminable)
-    assert np.sum(single_units)==181
+    if animal == 'ar':
+        assert np.sum(single_units)==181
+    else:
+        assert np.sum(single_units)==207
     return single_units
 
 

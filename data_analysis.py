@@ -41,12 +41,10 @@ def load_data(dataset='mante', smooth=True, model_dir=None):
         print('Loading smooth data')
     else:
         print('Loading original data')
-    if dataset == 'mante':
+    if 'mante' in dataset:
+        single_units = 'single' in dataset
         return mante_dataset_preprocess.load_data(
-            smooth=smooth, single_units=False)
-    elif dataset == 'mante_single':
-        return mante_dataset_preprocess.load_data(
-            smooth=smooth, single_units=True)
+            smooth=smooth, single_units=single_units, animal=dataset[-2:])
     elif dataset == 'siegel':
         return siegel_dataset_preprocess.load_data(single_file=False)
     elif dataset == 'model':
@@ -560,7 +558,7 @@ def plot_frac_var(frac_var, save_name=None, fancy_color=False):
                                               frac_var < 0.3))[0]
 
     colors = dict(zip([None, '1', '2', '12'], COLORS))
-    fs = 6
+    fs = 7
     fig = plt.figure(figsize=(2.0, 1.2))
     ax = fig.add_axes([0.3, 0.3, 0.5, 0.5])
     data_plot = frac_var
@@ -807,26 +805,39 @@ def plot_rate_distribution(data):
 
 def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var'):
     """Plot how fractional variance distribution depends on hparams."""
+    hp_target = {'activation': 'softplus',
+                 'rnn_type': 'LeakyRNN',
+                 'w_rec_init': 'randortho',
+                 }
     if hp_vary == 'l2_weight_init':
         root_dir = './data/vary_l2init_mante'
         title = r'$L_2$ initial weight'
         hp_vary_vals = [0, 8*1e-4]
         ylim = [0, 0.3]
+        n = len(hp_vary_vals)
+        colors = [mpl.cm.cool(i * 1.0 / n) for i in range(n)]
     elif hp_vary == 'l2_weight':
         root_dir = './data/vary_l2weight_mante'
         title = r'$L_2$ weight'
         hp_vary_vals = [0, 8 * 1e-4]
         ylim = [0, 0.3]
+        n = len(hp_vary_vals)
+        colors = [mpl.cm.cool(i * 1.0 / n) for i in range(n)]
     elif hp_vary == 'p_weight_train':
         root_dir = './data/vary_pweighttrain_mante'
         title = r'$P_{\mathrm{train}}$'
         hp_vary_vals = [1, 0.1]
         ylim = [0, 0.15]
-
-    hp_target = {'activation': 'softplus',
-                 'rnn_type': 'LeakyRNN',
-                 'w_rec_init': 'randortho',
-                 }
+        n = len(hp_vary_vals)
+        colors = [mpl.cm.cool(i * 1.0 / n) for i in range(n)]
+    elif hp_vary == 'c_intsyn':
+        root_dir = 'data/seq'
+        title = '$c$'
+        hp_vary_vals = [0, 1]
+        ylim = [0, 0.2]
+        hp_target = {}
+        n = len(hp_vary_vals)
+        colors = ['gray', 'red']
 
     hp_targets = [dict(hp_target, **{hp_vary: h}) for h in hp_vary_vals]
 
@@ -835,6 +846,7 @@ def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var'):
         model_dirs = tools.find_all_models(root_dir, hp_target)
         print([tools.load_log(d)['perf_min'][-1] for d in model_dirs])
         # Only analyze models that trained
+        # Perf_min applies to the last rule in sequential trained networks
         model_dirs = tools.select_by_perf(model_dirs, perf_min=0.8)
         if not model_dirs:
             continue
@@ -882,19 +894,17 @@ def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var'):
         _ = plt.plot(xs[-1], hist_tmp.T)
         plt.title(str(hp_target[hp_vary]))
 
-    n = len(hists)
-
-    fs = 6
+    fs = 7
     fig = plt.figure(figsize=(2.0, 1.2))
     ax = fig.add_axes([0.3, 0.3, 0.5, 0.5])
     for i in range(n):
-        color = mpl.cm.cool(i * 1.0 / n)
-        ax.plot(xs[i], hists[i], color=color, label=labels[i])
-        ax.fill_between(xs[i], bottoms[i], tops[i], alpha=0.2, color=color)
+        ax.plot(xs[i], hists[i], color=colors[i], label=labels[i])
+        ax.fill_between(xs[i], bottoms[i], tops[i], alpha=0.2, color=colors[i])
     lg = ax.legend(title=title, fontsize=fs, frameon=False,
                    loc=1, bbox_to_anchor=(1.2, 1.2))
     plt.setp(lg.get_title(), fontsize=fs)
     ax.set_ylim(ylim)
+    ax.set_xlim([-1.1, 1.1])
     ax.tick_params(axis='both', which='major', labelsize=fs)
     ax.locator_params(nbins=3)
     ax.spines["right"].set_visible(False)
@@ -912,6 +922,12 @@ def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var'):
     return hists
 
 def plot_all(dataset):
+    """Plot all statistics for datasets.
+    
+    Args:
+        dataset: str. Can be mante_ar, mante_single_ar, mante_fe,
+        mante_single_fe, siegel, model
+    """
     # [0, 3.*1e-6, 1e-5, 3*1e-4, 1e-4, 3*1e-3]
     if dataset == 'model':
 # =============================================================================
@@ -965,6 +981,7 @@ def plot_all(dataset):
 
 if __name__ == '__main__':
     pass
-    plot_all('mante')
+    plot_all('mante_single_fe')
 
     # hists = plot_fracvar_hist_byhp(hp_vary='l2_weight', mode='all_var')
+    # hists = plot_fracvar_hist_byhp(hp_vary='c_intsyn', mode='all_var')
