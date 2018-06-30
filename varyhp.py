@@ -222,9 +222,9 @@ def plot_n_clusters(n_clusters, hp_list):
     # Fill a matrix with the index of hp
     hp_visualize = np.zeros([len(hp_plots), len(n_clusters)])
     for i, hp in enumerate(hp_list_sorted):
-        for j, hp in enumerate(hp_plots):
-            ind = hp_ranges[hp].index(hp[hp])
-            ind /= len(hp_ranges[hp]) - 1.
+        for j, hp_plot in enumerate(hp_plots):
+            ind = hp_ranges[hp_plot].index(hp[hp_plot])
+            ind /= len(hp_ranges[hp_plot]) - 1.
             hp_visualize[j, i] = ind
 
     # Plot results
@@ -310,12 +310,14 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hp_list=None):
             continue
         n_cluster_dict[hp[hp_plot]].append(n_cluster)
 
-    label_map = {'softplus': 'softplus',
+    label_map = {'softplus': 'Softplus',
                  'relu': 'ReLU',
                  'retanh': 'Retanh',
-                 'tanh': 'tanh',
+                 'tanh': 'Tanh',
                  'LeakyGRU': 'GRU',
-                 'LeakyRNN': 'RNN'}
+                 'LeakyRNN': 'RNN',
+                 'randortho': 'Rand.\nOrtho.',
+                 'diag': 'Diag.'}
     # fig = plt.figure(figsize=(1.5, 1.2))
     # ax = fig.add_axes([0.2, 0.2, 0.7, 0.7])
     f, axs = plt.subplots(len(n_cluster_dict), 1,
@@ -327,7 +329,11 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hp_list=None):
         # plt.bar(bin_edges[:-1], hist, label=key)
         color_ind = i / (len(hp_ranges[hp_plot]) - 1.)
         color = mpl.cm.viridis(color_ind)
-        ax.hist(val, label=label_map.get(key, str(key)), range=(0, 30),
+        if isinstance(key, float):
+            label = '{:1.0e}'.format(key)
+        else:
+            label = label_map.get(key, str(key))
+        ax.hist(val, label=label, range=(0, 30),
                 density=True, bins=16, ec=color, facecolor=color,
                 lw=1.5)
         ax.spines["left"].set_visible(False)
@@ -336,8 +342,7 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hp_list=None):
         ax.set_yticks([])
         ax.set_xticks([0, 15, 30])
         ax.set_xlim([0, 30])
-        ax.text(0.7, 0.7, label_map.get(key, str(key)), fontsize=7,
-                transform=ax.transAxes)
+        ax.text(0.7, 0.7, label, fontsize=7, transform=ax.transAxes)
         if i == 0:
             ax.set_title(hp_name[hp_plot], fontsize=7)
     # ax.legend(loc=3, bbox_to_anchor=(1, 0), title=hp_name[hp_plot], frameon=False)
@@ -403,28 +408,30 @@ if __name__ == '__main__':
     # compute_n_cluster()
     # n_clusters, hp_list = get_n_clusters()
     # plot_n_clusters(n_clusters, hp_list)
-    # plot_n_cluster_hist(n_clusters, hp_list)
+    plot_n_cluster_hist(n_clusters, hp_list)
     # pretty_singleneuron_plot('tanh')
     # pretty_singleneuron_plot('relu')
     # [activity_histogram(a) for a in ['tanh', 'relu', 'softplus', 'retanh']]
+
     
-    
-    DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhp_reg')
-    FIGPATH = os.path.join(os.getcwd(), 'figure')
-    model_dirs = tools.valid_model_dirs(DATAPATH)
-    
-    hp_list = list()
-    n_clusters = list()
-    logs = list()
-    perfs = list()
-    for i, model_dir in enumerate(model_dirs):
-        hp = tools.load_hp(model_dir)
-        log = tools.load_log(model_dir)
-        # check if performance exceeds target
-        perfs.append(log['perf_min'][-1])
-        if log['perf_min'][-1] > 0.8:
-            logs.append(log)
-            n_clusters.append(log['n_cluster'])
-            hp_list.append(hp)
+# =============================================================================
+#     DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhp_reg')
+#     FIGPATH = os.path.join(os.getcwd(), 'figure')
+#     model_dirs = tools.valid_model_dirs(DATAPATH)
+#     
+#     hp_list = list()
+#     n_clusters = list()
+#     logs = list()
+#     perfs = list()
+#     for i, model_dir in enumerate(model_dirs):
+#         hp = tools.load_hp(model_dir)
+#         log = tools.load_log(model_dir)
+#         # check if performance exceeds target
+#         perfs.append(log['perf_min'][-1])
+#         if log['perf_min'][-1] > 0.8:
+#             logs.append(log)
+#             n_clusters.append(log['n_cluster'])
+#             hp_list.append(hp)
+# =============================================================================
         
 
