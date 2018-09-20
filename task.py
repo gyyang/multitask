@@ -1,14 +1,9 @@
-"""
-Collections of tasks
-"""
+"""Collections of tasks."""
 
 from __future__ import division
 import six
 import numpy as np
 
-#-----------------------------------------------------------------------------------------
-# Rules
-#-----------------------------------------------------------------------------------------
 
 # all rules
 rules_dict = \
@@ -33,30 +28,24 @@ def get_num_ring(ruleset):
     '''get number of stimulus rings'''
     return 3 if ruleset=='oicdmc' else 2
 
+
 def get_num_rule(ruleset):
     '''get number of rules'''
     return len(rules_dict[ruleset])
+
 
 def get_rule_index(rule, config):
     '''get the input index for the given rule'''
     return rule_index_map[config['ruleset']][rule]+config['rule_start']
 
-#-----------------------------------------------------------------------------------------
-# Network structure
-#-----------------------------------------------------------------------------------------
 
 def get_dist(original_dist):
     '''Get the distance in periodic boundary conditions'''
     return np.minimum(abs(original_dist),2*np.pi-abs(original_dist))
 
-#-----------------------------------------------------------------------------------------
-# Tasks
-#-----------------------------------------------------------------------------------------
 
 class Trial(object):
-    '''
-    Class representing a batch of trials.
-    '''
+    """Class representing a batch of trials."""
 
     def __init__(self, config, tdim, batch_size):
         '''
@@ -197,6 +186,7 @@ class Trial(object):
             y[ind] = 1.
         return y
 
+
 def test_init(config, mode, **kwargs):
     '''
     Test initialization of model. mode is not actually used
@@ -211,6 +201,7 @@ def test_init(config, mode, **kwargs):
     trial.add('fix_in', offs=fix_offs)
 
     return trial
+
 
 def delaygo_(config, mode, anti_response, **kwargs):
     '''
@@ -296,8 +287,10 @@ def delaygo_(config, mode, anti_response, **kwargs):
 
     return trial
 
+
 def delaygo(config, mode, **kwargs):
     return delaygo_(config, mode, False, **kwargs)
+
 
 def contextdm_genstim(batch_size, rng, stim_coh_range=None):
     stim_mean = rng.uniform(0.8, 1.2, (batch_size,))
@@ -309,7 +302,8 @@ def contextdm_genstim(batch_size, rng, stim_coh_range=None):
     stim2_strengths = stim_mean - stim_coh*stim_sign
     return stim1_strengths, stim2_strengths
 
-def contextdm_(config, mode, attend_mod, **kwargs):
+
+def _contextdm(config, mode, attend_mod, **kwargs):
     '''
     Fixate whenever fixation point is shown.
     Two stimuluss are shown in each ring,
@@ -450,18 +444,18 @@ def contextdm_(config, mode, attend_mod, **kwargs):
 
     return trial
 
+
 def contextdm1(config, mode, **kwargs):
-    return contextdm_(config, mode, 1, **kwargs)
+    return _contextdm(config, mode, 1, **kwargs)
+
 
 def contextdm2(config, mode, **kwargs):
-    return contextdm_(config, mode, 2, **kwargs)
+    return _contextdm(config, mode, 2, **kwargs)
+
 
 def multidm(config, mode, **kwargs):
-    return contextdm_(config, mode, 'both', **kwargs)
+    return _contextdm(config, mode, 'both', **kwargs)
 
-
-
-################## Additional Tasks ###########################################
 
 def reactgo_(config, mode, anti_response, **kwargs):
     '''
@@ -538,11 +532,14 @@ def reactgo_(config, mode, anti_response, **kwargs):
 
     return trial
 
+
 def reactgo(config, mode, **kwargs):
     return reactgo_(config, mode, False, **kwargs)
 
+
 def reactanti(config, mode, **kwargs):
     return reactgo_(config, mode, True, **kwargs)
+
 
 def fdgo_(config, mode, anti_response, **kwargs):
     '''
@@ -628,16 +625,20 @@ def fdgo_(config, mode, anti_response, **kwargs):
 
     return trial
 
+
 def fdgo(config, mode, **kwargs):
     return fdgo_(config, mode, False, **kwargs)
+
 
 def fdanti(config, mode, **kwargs):
     return fdgo_(config, mode, True, **kwargs)
 
+
 def delayanti(config, mode, **kwargs):
     return delaygo_(config, mode, True, **kwargs)
 
-def dm_(config, mode, stim_mod, **kwargs):
+
+def _dm(config, mode, stim_mod, **kwargs):
     '''
     Fixate whenever fixation point is shown.
     Two stimuluss are shown, saccade to the one with higher intensity
@@ -741,13 +742,16 @@ def dm_(config, mode, stim_mod, **kwargs):
 
     return trial
 
+
 def dm1(config, mode, **kwargs):
-    return dm_(config, mode, 1, **kwargs)
+    return _dm(config, mode, 1, **kwargs)
+
 
 def dm2(config, mode, **kwargs):
-    return dm_(config, mode, 2, **kwargs)
+    return _dm(config, mode, 2, **kwargs)
 
-def delaydm_(config, mode, stim_mod, **kwargs):
+
+def _delaydm(config, mode, stim_mod, **kwargs):
     '''
     Fixate whenever fixation point is shown.
     Two stimuluss are shown at different time, with different intensities
@@ -861,13 +865,16 @@ def delaydm_(config, mode, stim_mod, **kwargs):
 
     return trial
 
+
 def delaydm1(config, mode, **kwargs):
-    return delaydm_(config, mode, 1, **kwargs)
+    return _delaydm(config, mode, 1, **kwargs)
+
 
 def delaydm2(config, mode, **kwargs):
-    return delaydm_(config, mode, 2, **kwargs)
+    return _delaydm(config, mode, 2, **kwargs)
 
-def contextdelaydm_(config, mode, attend_mod, **kwargs):
+
+def _contextdelaydm(config, mode, attend_mod, **kwargs):
     '''
     Fixate whenever fixation point is shown.
     Two stimuluss are shown in each ring,
@@ -1015,14 +1022,18 @@ def contextdelaydm_(config, mode, attend_mod, **kwargs):
 
     return trial
 
+
 def contextdelaydm1(config, mode, **kwargs):
-    return contextdelaydm_(config, mode, 1, **kwargs)
+    return _contextdelaydm(config, mode, 1, **kwargs)
+
 
 def contextdelaydm2(config, mode, **kwargs):
-    return contextdelaydm_(config, mode, 2, **kwargs)
+    return _contextdelaydm(config, mode, 2, **kwargs)
+
 
 def multidelaydm(config, mode, **kwargs):
-    return contextdelaydm_(config, mode, 'both', **kwargs)
+    return _contextdelaydm(config, mode, 'both', **kwargs)
+
 
 def dms_(config, mode, matchnogo, **kwargs):
     '''
@@ -1139,11 +1150,14 @@ def dms_(config, mode, matchnogo, **kwargs):
 
     return trial
 
+
 def dmsgo(config, mode, **kwargs):
     return dms_(config, mode, 0, **kwargs)
 
+
 def dmsnogo(config, mode, **kwargs):
     return dms_(config, mode, 1, **kwargs)
+
 
 def dmc_(config, mode, matchnogo, **kwargs):
     '''
@@ -1263,11 +1277,14 @@ def dmc_(config, mode, matchnogo, **kwargs):
 
     return trial
 
+
 def dmcgo(config, mode, **kwargs):
     return dmc_(config, mode, 0, **kwargs)
 
+
 def dmcnogo(config, mode, **kwargs):
     return dmc_(config, mode, 1, **kwargs)
+
 
 def oic(config, mode, **kwargs):
     '''
@@ -1354,6 +1371,7 @@ def oic(config, mode, **kwargs):
                    'go1'      : (fix_offs, None)}
 
     return trial
+
 
 def delaymatchcategory_original(config, mode, **kwargs):
     '''
@@ -1498,6 +1516,7 @@ rule_name    = {'reactgo'           : 'RT Go',
                 'oic'               : '1IC',
                 'dmc'               : 'DMC'
                 }
+
 
 def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
     '''
