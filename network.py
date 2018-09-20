@@ -388,6 +388,8 @@ class Model(object):
             f_act = lambda x: tf.square(tf.nn.relu(x))
         elif hp['activation'] == 'retanh':
             f_act = lambda x: tf.tanh(tf.nn.relu(x))
+        elif hp['activation'] == 'relu+':
+            f_act = lambda x: tf.nn.relu(x + tf.constant(1.))
         else:
             f_act = getattr(tf.nn, hp['activation'])
 

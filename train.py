@@ -42,6 +42,8 @@ def get_default_hp(ruleset):
             'rnn_type': 'LeakyRNN',
             # Type of loss functions
             'loss_type': 'lsq',
+            # Optimizer
+            'optimizer': 'adam',
             # Type of activation runctions, relu, softplus, tanh, elu
             'activation': 'relu',
             # Time constant (ms)
@@ -365,7 +367,7 @@ def train_sequential(
         print('{:20s} = '.format(key) + str(val))
 
     # Using continual learning or not
-    c, ksi = hp['param_intsyn']
+    c, ksi = hp['c_intsyn'], hp['ksi_intsyn']
 
     # Build the model
     model = Model(model_dir, hp=hp)
@@ -502,43 +504,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--traindir', type=str, default='data/debug')
+    parser.add_argument('--modeldir', type=str, default='data/debug')
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     run_analysis = []
-    # hp = {'rnn_type': 'LeakyRNN',
-    #            'n_rnn': 128,
-    #            'activation': 'softplus',
-    #            'l1_h': 0,
-    #            'l2_h': 0,
-    #            'l1_weight': 0,
-    #            'l2_weight': 0,
-    #            'l2_weight_init': 0,
-    #            'p_weight_train': 0.5,
-    #            'target_perf': 0.9,
-    #            'w_rec_init': 'randortho'}
-    # train('data/mantetemp', seed=1, hp=hp, ruleset='mante',
-    #       display_step=500, rich_output=False)
-
-    # hp = {'param_intsyn': (0.1, 0.01)}
-    hp = {'param_intsyn': (1.0, 0.01),
-          'easy_task': True,
-          'w_rec_init': 'randortho',
-          'learning_rate': 0.001,
-          'optimizer': 'adam'}
-    rule_trains = [['fdgo'], ['dmsgo', 'dmsnogo'], ['dmcgo', 'dmcnogo'],
-                   ['dm1', 'dm2'], ['contextdm1', 'contextdm2']]
-    # rule_trains = [
-    #     ['fdgo'], ['delaygo'], ['dm1', 'dm2'], ['multidm'],
-    #     ['delaydm1', 'delaydm2'], ['multidelaydm'],
-    #     ['contextdelaydm1', 'contextdelaydm2'], ['contextdm1', 'contextdm2']]
-    train_sequential(
-        args.traindir,
-        rule_trains,
-        hp=hp,
-        max_steps=1e5,
-        display_step=500,
-        ruleset='all',
-        seed=0,
-    )
+    hp = {'rnn_type': 'LeakyRNN',
+            'n_rnn': 128,
+            'activation': 'relu',
+            'l1_h': 0,
+            'l2_h': 0,
+            'l1_weight': 0,
+            'l2_weight': 0,
+            'l2_weight_init': 0,
+            'target_perf': 0.95,
+            'w_rec_init': 'randortho'}
+    train(args.modeldir, seed=1, hp=hp, ruleset='mante',
+          display_step=2000, rich_output=True)

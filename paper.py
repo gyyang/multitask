@@ -14,6 +14,7 @@ import clustering
 import variance
 import taskset
 import varyhp
+import data_analysis
 
 
 def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
@@ -73,6 +74,7 @@ def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
 # Directories of the models and the sample model
 # Change these to your directories
 root_dir = './data/train_all'
+# root_dir = './data/tanhgru'
 model_dir = root_dir + '/0'
 
 # =============================================================================
@@ -82,7 +84,7 @@ model_dir = root_dir + '/0'
 #              'w_rec_init': 'randortho',
 #              'l1_h': 0,
 #              'l1_weight': 0}
-# model_dir, _ = tools.find_model(root_dir, hp_target)
+# model_dir = tools.find_model(root_dir, hp_target)
 # =============================================================================
 
 # =============================================================================
@@ -91,7 +93,7 @@ model_dir = root_dir + '/0'
 #              'rnn_type': 'LeakyRNN',
 #              'w_rec_init': 'diag',
 #              'l1_h': 0}
-# root_dir, _ = tools.find_all_models(root_dir, hp_target)
+# root_dir = tools.find_all_models(root_dir, hp_target)
 # =============================================================================
 
 # root_dir = './data/mantetemp'
@@ -157,23 +159,30 @@ model_dir = root_dir + '/0'
 # Compositional Representation---------------------------------------------
 # setups = [1] # Go, Anti family
 # setups = [2] # Ctx DM family
-# setups = [1, 2, 3]
-# for setup in setups:
+setups = [1, 2, 3]
+for setup in setups:
 #     pass
-#     taskset.plot_taskspace_group(root_dir, setup=setup,
-#                                  restore=True, representation='rate')
-#     taskset.plot_taskspace_group(root_dir, setup=setup,
-#                                  restore=True, representation='weight')
-#     taskset.plot_replacerule_performance_group(
-#             root_dir, setup=setup, restore=True)
+    taskset.plot_taskspace_group(root_dir, setup=setup,
+                                 restore=True, representation='rate')
+    taskset.plot_taskspace_group(root_dir, setup=setup,
+                                 restore=True, representation='weight')
+    taskset.plot_replacerule_performance_group(
+            root_dir, setup=setup, restore=True)
 
 # Continual Learning Analysis----------------------------------------------
-# TODO(gryang): Remains to be fixed
-# performance.get_allperformance('*cont')
-# performance.plot_performanceprogress_cont(('0_2cont', '0_0cont'))
-# performance.plot_finalperformance_cont('*2cont', '*0cont')
-# for save_pattern in ['*3cont']:
-#     variance.plot_hist_varprop_selection(save_pattern)
-# performance.plot_performanceprogress(model_dir='0_3seqlowlr') # Plot performance during training
-model_dir = './data/seq/newalgo3'
-variance.plot_hist_varprop_selection(model_dir)
+# model_dir = './data/seq_debug/c1_s2_small'
+# =============================================================================
+# model_dirs = ['data/seq_varyhp/58']
+# hp_target0 = {'c_intsyn': 0, 'ksi_intsyn': 0.01,
+#               'activation': 'relu', 'max_steps': 4e5}
+# hp_target1 = {'c_intsyn': 1, 'ksi_intsyn': 0.01,
+#               'activation': 'relu', 'max_steps': 4e5}
+# model_dirs0 = tools.find_all_models('data/seq/', hp_target0)
+# model_dirs1 = tools.find_all_models('data/seq/', hp_target1)
+# model_dirs0 = tools.select_by_perf(model_dirs0, perf_min=0.8)
+# model_dirs1 = tools.select_by_perf(model_dirs1, perf_min=0.8)
+# performance.plot_performanceprogress_cont((model_dirs0[0], model_dirs1[2]))
+# performance.plot_finalperformance_cont(model_dirs0, model_dirs1)
+# data_analysis.plot_fracvar_hist_byhp(hp_vary='c_intsyn', mode='all_var')
+# data_analysis.plot_fracvar_hist_byhp(hp_vary='p_weight_train', mode='all_var')
+# =============================================================================

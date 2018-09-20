@@ -103,6 +103,17 @@ if args.run == 'all':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
+elif args.run == 'tanhgru':
+    for seed in range(0, 20):
+        jobname = 'tanhgru_{:d}'.format(seed)
+        train_arg = 'seed={:d}'.format(seed)
+        cmd = r'''python -c "import experiment as e;e.train_all_tanhgru('''+\
+              train_arg+''')"'''
+
+        jobfile = write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
 elif args.run == 'all_varyhp':
     for i in range(0, 20):
         jobname = 'train_varyhp_{:d}'.format(i)
