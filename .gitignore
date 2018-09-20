@@ -1,7 +1,9 @@
 *.pyc
+.idea/*
 data/*
 figure/*
 debug/*
 datasets/
 previous_versions/*
 sbatch/*
+*test.py
