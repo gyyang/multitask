@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 import tools
 import variance
-import clustering
+from analysis import clustering
 import standard_analysis
 
 mpl.rcParams.update({'font.size': 7})
