@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 from task import generate_trials, rule_name, get_rule_index, get_dist
 from network import Model
 import tools
-import performance
-from slowpoints import search_slowpoints
+from analysis import performance
+# from slowpoints import search_slowpoints
 
 save = True # TEMP
 COLORS = ['xkcd:'+c for c in ['orange', 'green', 'pink', 'sky blue']]

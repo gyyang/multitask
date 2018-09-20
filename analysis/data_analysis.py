@@ -3,22 +3,18 @@
 from __future__ import division
 
 import os
-import sys
 import numpy as np
 import pickle
-import json
 import time
-from collections import OrderedDict
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy.io import loadmat
-import scipy.stats as stats
 
-import performance
-import variance
-import mante_dataset_preprocess
-import siegel_dataset_preprocess
-import contextdm_analysis
+from analysis import performance
+from analysis import variance
+from datasets import mante_dataset_preprocess
+from datasets import siegel_dataset_preprocess
+from analysis import contextdm_analysis
 import tools
 
 DATAPATH = './datasets/mante_dataset'

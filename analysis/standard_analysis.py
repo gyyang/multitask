@@ -84,7 +84,6 @@ def pretty_inputoutput_plot(model_dir, rule, save=False, plot_ylabel=False):
     """
 
 
-    import seaborn as sns
     fs = 7
 
     model = Model(model_dir)
@@ -109,7 +108,7 @@ def pretty_inputoutput_plot(model_dir, rule, save=False, plot_ylabel=False):
         heights = np.array([0.03,0.2,0.2,0.03,0.2])+0.01
         for i in range(5):
             ax = fig.add_axes([0.15,sum(heights[i+1:]+0.02)+0.1,0.8,heights[i]])
-            cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+            cmap = 'Purples'
             plt.xticks([])
             ax.tick_params(axis='both', which='major', labelsize=fs,
                            width=0.5, length=2, pad=3)
@@ -129,7 +128,7 @@ def pretty_inputoutput_plot(model_dir, rule, save=False, plot_ylabel=False):
                 ax.xaxis.set_ticks_position('none')
 
             if i == 0:
-                plt.plot(t_plot, x[:,0,0], color=sns.xkcd_palette(['blue'])[0])
+                plt.plot(t_plot, x[:,0,0], color='xkcd:blue')
                 if plot_ylabel:
                     plt.yticks([0,1],['',''],rotation='vertical')
                 plt.ylim([-0.1,1.5])
@@ -152,8 +151,8 @@ def pretty_inputoutput_plot(model_dir, rule, save=False, plot_ylabel=False):
                         [r'0$\degree$', r'180$\degree$', r'360$\degree$'],
                         rotation='vertical')
             elif i == 3:
-                plt.plot(t_plot, y[:,0,0],color=sns.xkcd_palette(['green'])[0])
-                plt.plot(t_plot, y_hat[:,0,0],color=sns.xkcd_palette(['blue'])[0])
+                plt.plot(t_plot, y[:,0,0],color='xkcd:green')
+                plt.plot(t_plot, y_hat[:,0,0],color='xkcd:blue')
                 if plot_ylabel:
                     plt.yticks([0.05,0.8],['',''],rotation='vertical')
                 plt.ylim([-0.1,1.1])
@@ -238,7 +237,6 @@ def pretty_singleneuron_plot(model_dir,
             fs = 6
             fig = plt.figure(figsize=(1.0,0.8))
             ax = fig.add_axes([0.35,0.25,0.55,0.55])
-            # ax.set_color_cycle(sns.color_palette("husl", h_tests[rule].shape[1]))
             t_plot = np.arange(h_tests[rule][t_start:].shape[0])*hp['dt']/1000
             _ = ax.plot(t_plot,
                         h_tests[rule][t_start:,:,neuron], lw=0.5, color='gray')
@@ -329,7 +327,6 @@ def activity_histogram(model_dir,
 
 
 def schematic_plot(model_dir, rule=None):
-    import seaborn as sns
     fontsize = 6
 
     rule = rule or 'dm1'
@@ -339,7 +336,7 @@ def schematic_plot(model_dir, rule=None):
 
     with tf.Session() as sess:
         model.restore()
-        trial = generate_trials(rule, hp, mode='test', t_tot=1000)
+        trial = generate_trials(rule, hp, mode='test')
         feed_dict = tools.gen_feed_dict(model, trial, hp)
         x = trial.x
         h, y_hat = sess.run([model.h, model.y_hat], feed_dict=feed_dict)
@@ -353,7 +350,7 @@ def schematic_plot(model_dir, rule=None):
     heights = np.array([0.06,0.25,0.25])
     for i in range(3):
         ax = fig.add_axes([0.2,sum(heights[i+1:]+0.1)+0.05,0.7,heights[i]])
-        cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+        cmap = 'Purples'
         plt.xticks([])
 
         # Fixed style for these plots
@@ -366,12 +363,12 @@ def schematic_plot(model_dir, rule=None):
         ax.yaxis.set_ticks_position('left')
 
         if i == 0:
-            plt.plot(x[:,0,0], color=sns.xkcd_palette(['blue'])[0])
-            plt.yticks([0,1],['',''],rotation='vertical')
-            plt.ylim([-0.1,1.5])
+            plt.plot(x[:,0,0], color='xkcd:blue')
+            plt.yticks([0, 1], ['', ''],rotation='vertical')
+            plt.ylim([-0.1, 1.5])
             plt.title('Fixation input', fontsize=fontsize, y=0.9)
         elif i == 1:
-            plt.imshow(x[:,0,1:1+n_eachring].T, aspect='auto', cmap=cmap,
+            plt.imshow(x[:, 0, 1:1+n_eachring].T, aspect='auto', cmap=cmap,
                        vmin=0, vmax=1, interpolation='none',origin='lower')
             plt.yticks([0, (n_eachring-1)/2, n_eachring-1],
                        [r'0$\degree$', '', r'360$\degree$'],
@@ -391,12 +388,12 @@ def schematic_plot(model_dir, rule=None):
     # Plot Rule Inputs
     fig = plt.figure(figsize=(1.0, 0.5))
     ax = fig.add_axes([0.2,0.3,0.7,0.45])
-    cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
-    X = x[:,0,1+2*n_eachring:]
+    cmap = 'Purples'
+    X = x[:, 0, 1+2*n_eachring:]
     plt.imshow(X.T, aspect='auto', vmin=0, vmax=1, cmap=cmap,
                interpolation='none', origin='lower')
 
-    plt.xticks([0, 1000])
+    plt.xticks([0, X.shape[0]])
     ax.set_xlabel('Time (ms)', fontsize=fontsize, labelpad=-5)
 
     # Fixed style for these plots
@@ -409,7 +406,7 @@ def schematic_plot(model_dir, rule=None):
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
 
-    plt.yticks([0,X.shape[-1]-1],['1',str(X.shape[-1])],rotation='vertical')
+    plt.yticks([0, X.shape[-1]-1], ['1',str(X.shape[-1])], rotation='vertical')
     plt.title('Rule inputs', fontsize=fontsize, y=0.9)
     ax.get_yaxis().set_label_coords(-0.12,0.5)
 
@@ -420,7 +417,7 @@ def schematic_plot(model_dir, rule=None):
     # Plot Units
     fig = plt.figure(figsize=(1.0, 0.8))
     ax = fig.add_axes([0.2,0.1,0.7,0.75])
-    cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+    cmap = 'Purples'
     plt.xticks([])
     # Fixed style for these plots
     ax.tick_params(axis='both', which='major', labelsize=fontsize,
@@ -446,7 +443,7 @@ def schematic_plot(model_dir, rule=None):
     heights = np.array([0.1,0.45])+0.01
     for i in range(2):
         ax = fig.add_axes([0.2, sum(heights[i+1:]+0.15)+0.1, 0.7, heights[i]])
-        cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
+        cmap = 'Purples'
         plt.xticks([])
 
         # Fixed style for these plots
@@ -460,8 +457,7 @@ def schematic_plot(model_dir, rule=None):
         ax.yaxis.set_ticks_position('left')
 
         if i == 0:
-            # plt.plot(task.y[:,0,0],color=sns.xkcd_palette(['green'])[0])
-            plt.plot(y_hat[:,0,0],color=sns.xkcd_palette(['blue'])[0])
+            plt.plot(y_hat[:,0,0],color='xkcd:blue')
             plt.yticks([0.05,0.8],['',''],rotation='vertical')
             plt.ylim([-0.1,1.1])
             plt.title('Fixation output', fontsize=fontsize, y=0.9)

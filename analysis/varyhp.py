@@ -10,9 +10,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 import tools
-import variance
+from analysis import variance
 from analysis import clustering
-import standard_analysis
+from analysis import standard_analysis
 
 mpl.rcParams.update({'font.size': 7})
 

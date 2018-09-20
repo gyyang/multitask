@@ -29,6 +29,8 @@ def gen_feed_dict(model, trial, hp):
         feed_dict = {model.x: x,
                      model.y: trial.y,
                      model.c_mask: trial.c_mask}
+    else:
+        raise ValueError()
 
     return feed_dict
 
