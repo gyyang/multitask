@@ -225,7 +225,7 @@ def delaygo_(config, mode, anti_response, **kwargs):
     The output should be fixation location for (0, fix_off)
     and the stimulus location for (fix_off, T)
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -247,15 +247,6 @@ def delaygo_(config, mode, anti_response, **kwargs):
         # fix_offs = stim_offs + int(rng.choice([1600])/dt)
         tdim     = fix_offs + int(500/dt)
         stim_mod  = rng.choice([1,2])
-
-    elif mode == 'sample':
-        tdim = int(2000/dt)
-        fix_offs  = np.array([int(1500/dt)])
-        stim_locs  = [1.5*np.pi]
-        stim_ons   = [int(500/dt)]
-        stim_offs  = [int(700/dt)]
-        stim_mod   = 1
-        batch_size = 1
 
     elif mode == 'test':
         tdim = int(2500/dt)
@@ -335,7 +326,7 @@ def contextdm_(config, mode, attend_mod, **kwargs):
     then the maximum performance is 75%. So we need to make the highest correct performance
     much higher than that.
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -484,7 +475,7 @@ def reactgo_(config, mode, anti_response, **kwargs):
     The output should be fixation location for (0, fix_off)
     Otherwise should be the stimulus location
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -504,13 +495,6 @@ def reactgo_(config, mode, anti_response, **kwargs):
         stim_locs = rng.uniform(0, 2*np.pi, (batch_size,))
 
         stim_mod  = rng.choice([1,2])
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        stim_ons  = np.array([int(1500/dt)])
-        stim_locs  = [1.5*np.pi]
-        stim_mod   = 1
-        batch_size = 1
 
     elif mode == 'test':
         tdim = int(2500/dt)
@@ -576,7 +560,7 @@ def fdgo_(config, mode, anti_response, **kwargs):
     The output should be fixation location for (0, fix_off)
     Otherwise should be the stimulus location
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -597,14 +581,6 @@ def fdgo_(config, mode, anti_response, **kwargs):
 
         fix_offs  = stim_ons + int(rng.uniform(500,1500)/dt)
         tdim      = int(500/dt) + fix_offs
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(1500/dt)])
-        stim_locs  = [1.5*np.pi]
-        stim_ons   = np.array([int(300/dt)])
-        stim_mod   = 1
-        batch_size = 1
 
     elif mode == 'test':
         tdim = int(2000/dt)
@@ -673,7 +649,7 @@ def dm_(config, mode, stim_mod, **kwargs):
     The output should be fixation location for (0, fix_off)
     Otherwise the location of the stronger stimulus
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -715,16 +691,6 @@ def dm_(config, mode, stim_mod, **kwargs):
         fix_offs = (stim_ons+stim_dur).astype(int)
         # each batch consists of sequences of equal length
         tdim = stim_on+stim_dur+int(500/dt)
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        fix_offs  = np.array([int(0.75*tdim)])
-        stim1_locs = [0.5*np.pi]
-        stim2_locs = [1.5*np.pi]
-        stim1_strengths = [0.9]
-        stim2_strengths = [1.1]
-        stim_ons  = np.array([int(0.15*tdim)])
-        batch_size = 1
 
     elif mode == 'test':
         # Dense coverage of the stimulus space
@@ -792,7 +758,7 @@ def delaydm_(config, mode, stim_mod, **kwargs):
     The output should be fixation location for (0, fix_off)
     Otherwise the location of the stronger stimulus
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -839,20 +805,6 @@ def delaydm_(config, mode, stim_mod, **kwargs):
 
         # each batch consists of sequences of equal length
         tdim = fix_offs + int(500/dt) # longest trial
-
-    elif mode == 'sample':
-        stim1_locs = [0.5*np.pi]
-        stim2_locs = [1.5*np.pi]
-        stim1_strengths = [2.0] # always make stim1 stronger
-        stim2_strengths = [0.75]
-        stim1_ons = [int(100/dt)]
-        stim1_offs = [int(300/dt)]
-
-        tdim = int(2000/dt)
-        fix_offs  = np.array([int(1800/dt)])
-        stim2_ons = [int(1500/dt)]
-        stim2_offs = [int(1700/dt)]
-        batch_size = 1
 
     elif mode == 'test':
         tdim = int(3000/dt)
@@ -932,7 +884,7 @@ def contextdelaydm_(config, mode, attend_mod, **kwargs):
     then the maximum performance is 75%. So we need to make the highest correct performance
     much higher than that.
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -988,22 +940,6 @@ def contextdelaydm_(config, mode, attend_mod, **kwargs):
 
         # each batch consists of sequences of equal length
         tdim = fix_offs + int(500/dt) # longest trial
-
-    elif mode == 'sample':
-        stim1_locs = [0.5*np.pi]
-        stim2_locs = [1.5*np.pi]
-        stim1_mod1_strengths = [1.2]
-        stim2_mod1_strengths = [0.8]
-        stim1_mod2_strengths = [0.8]
-        stim2_mod2_strengths = [1.2]
-        batch_size = 1
-
-        stim1_ons = [int(100/dt)]
-        stim1_offs = [int(300/dt)]
-        stim2_ons = [int(1500/dt)]
-        stim2_offs = [int(1700/dt)]
-        fix_offs  = np.array([int(1800/dt)])
-        tdim = int(2000/dt)
 
     elif mode == 'test':
         n_stim_loc, n_stim_mod1_strength, n_stim_mod2_strength = batch_shape = 20, 5, 5
@@ -1110,7 +1046,7 @@ def dms_(config, mode, matchnogo, **kwargs):
     If two stimuli the different location, then for (stim2_on, T) go to stim2_loc
     Otherwise keep fixation
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -1137,19 +1073,6 @@ def dms_(config, mode, matchnogo, **kwargs):
         stim1_offs = stim1_ons + int(rng.choice([200, 400, 600])/dt)
         stim2_ons  = stim1_offs + int(rng.choice([200, 400, 800, 1600])/dt)
         tdim       = stim2_ons + int(500/dt)
-
-    elif mode == 'sample':
-        tdim = int(kwargs['t_tot']/dt)
-        stim1_mod = 1
-        stim2_mod = 1
-        matchs    = np.array([0])
-        stim_dist = 0.5*np.pi
-        stim1_locs = np.array([0.5*np.pi])
-        stim2_locs = np.array([(0.5*np.pi+stim_dist*(1-matchs))%(2*np.pi)])
-        stim1_ons = np.array([int(300/dt)])
-        stim1_offs = stim1_ons + int(200/dt)
-        stim2_ons = stim1_offs + int(1000/dt)
-        batch_size = 1
 
     elif mode == 'test':
         # Set this test so the model always respond
@@ -1240,7 +1163,7 @@ def dmc_(config, mode, matchnogo, **kwargs):
     The first stimulus is shown between (stim1_on, stim1_off)
     The second stimulus is shown between (stim2_on, T)
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -1268,17 +1191,6 @@ def dmc_(config, mode, matchnogo, **kwargs):
         stim1_offs = stim1_ons + int(rng.choice([200, 400, 600])/dt)
         stim2_ons  = stim1_offs + int(rng.choice([200, 400, 800, 1600])/dt)
         tdim       = stim2_ons + int(rng.choice([200, 400, 600])/dt)
-
-    elif mode == 'sample':
-        stim1_mod = 1
-        stim2_mod = 1
-        stim1_locs = np.array([0.25*np.pi])
-        stim2_locs = np.array([0.25*np.pi])
-        stim1_ons = np.array([int(300/dt)])
-        stim1_offs = stim1_ons + int(200/dt)
-        stim2_ons = stim1_offs + int(1000/dt)
-        batch_size = 1
-        tdim = stim2_ons[0] + int(500/dt)
 
     elif mode == 'test':
         # Set this test so the model always respond
@@ -1365,7 +1277,7 @@ def oic(config, mode, **kwargs):
     then two stimuluss are shown in rings 2 and 3.
     If the stimulus is category 1, then go to the location of ring 2, otherwise ring 3
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -1457,7 +1369,7 @@ def delaymatchcategory_original(config, mode, **kwargs):
     The first stimulus is shown between (stim1_on, stim1_off)
     The second stimulus is shown between (stim2_on, T)
 
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional parameters:
     :param batch_size: Batch size (required for mode=='random')
     :param tdim: dimension of time (required for mode=='sample')
@@ -1591,7 +1503,7 @@ def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
     '''
     Generate one batch of data
     :param rule: the rule for this batch
-    :param mode: the mode of generating. Options: 'random', 'sample', 'explicit'...
+    :param mode: the mode of generating. Options: 'random', 'explicit'...
     Optional:
     :param batch_size: Batch size (number of trials)
     :param param: a dictionary of parameters
