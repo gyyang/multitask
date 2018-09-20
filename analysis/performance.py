@@ -793,8 +793,11 @@ def plot_choicefamily_varytime(model_dir, rule):
     assert rule in ['dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm']
     savename = os.path.join(model_dir, 'varytime_' + rule)
 
-    with open(savename+'.pkl','rb') as f:
-        result = pickle.load(f)
+    try:
+        with open(savename+'.pkl','rb') as f:
+            result = pickle.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError('Run performance.compute_choicefamily_varytime first.')
 
     xdatas = result['xdatas']
     ydatas = result['ydatas']
