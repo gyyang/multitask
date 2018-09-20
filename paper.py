@@ -7,68 +7,14 @@ Yang GR et al. 2017 BioRxiv
 from __future__ import absolute_import
 
 import tools
-import performance
-import standard_analysis
-import antitask
-import clustering
-import variance
-import taskset
+from analysis import performance
+from analysis import standard_analysis
+from analysis import antitask
+from analysis import clustering
+from analysis import variance
+from analysis import taskset
 import varyhp
 import data_analysis
-
-
-def obsolete_cont_train(c, ksi, seed, save_name, seq=True):
-    """Sequantial training setup for paper
-
-    Args:
-        c, ksi : parameters for continual learning
-        seed: int, random seed.
-        save_name: string, name of file to be saved.
-        seq: bool, sequential or not.
-    """
-    from train import train
-    param_intsyn = (c, ksi)
-
-    nunit = 256
-    ruleset = 'all'
-
-    if seq:
-        # Sequential training
-        rule_trains = [
-                'fdgo', 'delaygo', 'dm1', 'dm2', ('contextdm1', 'contextdm2'),
-                'multidm', 'delaydm1', 'delaydm2',
-                ('contextdelaydm1', 'contextdelaydm2'), 'multidelaydm']
-    else:
-        rule_trains = [(
-                'fdgo', 'delaygo', 'dm1', 'dm2', 'contextdm1', 'contextdm2',
-                'multidm', 'delaydm1', 'delaydm2', 'contextdelaydm1',
-                'contextdelaydm2', 'multidelaydm')]
-
-    rule_tests = [
-            'fdgo', 'delaygo', 'dm1', 'dm2', 'contextdm1', 'contextdm2',
-            'multidm', 'delaydm1', 'delaydm2',
-            'contextdelaydm1', 'contextdelaydm2', 'multidelaydm']
-
-    learning_rate = 0.001  # learning is much better with smaller learning rate
-    activation = 'relu'  # softplus has lots of difficulty learning context-dms
-    easy_task = True   # Network has difficulty learning harder version
-
-    train(save_name,
-          ruleset=ruleset,
-          n_hidden=nunit,
-          learning_rate=learning_rate,
-          target_perf=None,
-          seed=seed,
-          activation=activation,
-          rnn_type='LeakyRNN',
-          l1_h=0.0001,
-          training_iters=100000,
-          display_step=500,
-          param_intsyn=param_intsyn,
-          rule_trains=rule_trains,
-          rule_tests=rule_tests,
-          run_analysis=['var'],
-          easy_task=easy_task)
 
 
 # Directories of the models and the sample model
@@ -127,11 +73,11 @@ model_dir = root_dir + '/0'
 
 # Clustering Analysis------------------------------------------------------
 
-# CA = clustering.Analysis(model_dir, data_type='rule')
+CA = clustering.Analysis(model_dir, data_type='rule')
 # CA.plot_example_unit()
 # CA.plot_cluster_score()
 # CA.plot_cluster_score(save_name=hp_target['activation'])
-# CA.plot_variance()
+CA.plot_variance()
 # CA.plot_2Dvisualization('PCA')
 # CA.plot_2Dvisualization('MDS')
 # CA.plot_2Dvisualization('tSNE')
@@ -159,15 +105,17 @@ model_dir = root_dir + '/0'
 # Compositional Representation---------------------------------------------
 # setups = [1] # Go, Anti family
 # setups = [2] # Ctx DM family
-setups = [1, 2, 3]
-for setup in setups:
-#     pass
-    taskset.plot_taskspace_group(root_dir, setup=setup,
-                                 restore=True, representation='rate')
-    taskset.plot_taskspace_group(root_dir, setup=setup,
-                                 restore=True, representation='weight')
-    taskset.plot_replacerule_performance_group(
-            root_dir, setup=setup, restore=True)
+# =============================================================================
+# setups = [1, 2, 3]
+# for setup in setups:
+# #     pass
+#     taskset.plot_taskspace_group(root_dir, setup=setup,
+#                                  restore=True, representation='rate')
+#     taskset.plot_taskspace_group(root_dir, setup=setup,
+#                                  restore=True, representation='weight')
+#     taskset.plot_replacerule_performance_group(
+#             root_dir, setup=setup, restore=True)
+# =============================================================================
 
 # Continual Learning Analysis----------------------------------------------
 # model_dir = './data/seq_debug/c1_s2_small'
