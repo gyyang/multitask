@@ -8,48 +8,14 @@ import numpy as np
 
 import tools
 import train
-import variance
-import clustering
-import data_analysis
-import taskset
+from analysis import variance
+from analysis import clustering
+from analysis import data_analysis
+from analysis import performance
+from analysis import taskset
 
 # TODO: make this flexible
 DATAPATH = os.path.join(os.getcwd(), 'data')
-
-
-def analysis(run_analysis, model_dir):
-    # Run a set of standard analysis
-    if run_analysis is None:
-        run_analysis = list()
-
-    if 'var' in run_analysis:
-        # Compute variance
-        from variance import compute_variance
-        compute_variance(model_dir)
-        compute_variance(model_dir, random_rotation=True)
-        print('Computed variance')
-
-    if 'psy' in run_analysis:
-        # Psychometric analysis
-        import performance
-        for rule in ['dm1', 'contextdm1', 'multidm']:
-            performance.compute_choicefamily_varytime(model_dir, rule)
-
-    # if 'compare' in run_analysis:
-    #     # Compute similarity with data and store results
-    #     from contextdm_analysis import run_score
-    #     log['score_train'], log['score_test'] = run_score(model_dir)
-    #     print('Data matching score : {:0.3f}'.format(log['score_test'].mean()))
-    #
-    #     with open(os.path.join('data', 'log_'+model_dir+'.pkl'), 'wb') as f:
-    #         pickle.dump(log, f)
-
-    if 'taskset' in run_analysis:
-        # Run analysis for task representation
-        from taskset import compute_taskspace, compute_replacerule_performance
-        for setup in [1, 2]:
-            compute_taskspace(model_dir, setup, restore=False)
-            compute_replacerule_performance(model_dir, setup, restore=False)
 
 
 def train_mante(seed=0, model_dir='train_mante'):
@@ -89,7 +55,10 @@ def train_all(seed=0, model_dir='train_all'):
     log['n_cluster'] = analysis.n_cluster
     tools.save_log(log)
     data_analysis.compute_var_all(model_dir)
-    
+
+    for rule in ['dm1', 'contextdm1', 'multidm']:
+        performance.compute_choicefamily_varytime(model_dir, rule)
+
     setups = [1, 2, 3]
     for setup in setups:
         taskset.compute_taskspace(model_dir, setup,
