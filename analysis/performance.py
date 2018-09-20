@@ -57,56 +57,6 @@ BLUES = [np.array([0.13333333, 0.13333333, 0.13333333, 1.        ]),
          np.array([0.3597078 , 0.47584775, 0.56246059, 1.        ]),
          np.array([0.58431373, 0.81568627, 0.98823529, 1.        ])]
 
-def plot_trainingprogress(model_dir, rule_plot=None, save=True):
-    # Plot Training Progress
-    log = tools.load_log(model_dir)
-
-    trials      = log['trials']
-    times       = log['times']
-    cost_tests  = log['cost_tests']
-    perf_tests  = log['perf_tests']
-
-    fs = 6 # fontsize
-    fig = plt.figure(figsize=(3.5,2.5))
-    d1, d2 = 0.015, 0.35
-    ax1 = fig.add_axes([0.15,0.5+d1,   0.5,d2])
-    ax2 = fig.add_axes([0.15,0.5-d1-d2,0.5,d2])
-    lines = list()
-    labels = list()
-
-    x_plot = np.array(trials)/1000.
-    if rule_plot == None:
-        rule_plot = cost_tests.keys()
-
-    for i, rule in enumerate(rule_plot):
-        # line = ax1.plot(x_plot, np.log10(cost_tests[rule]),color=color_rules[i%26])
-        # ax2.plot(x_plot, perf_tests[rule],color=color_rules[i%26])
-        line = ax1.plot(x_plot, np.log10(cost_tests[rule]),color=rule_color[rule])
-        ax2.plot(x_plot, perf_tests[rule],color=rule_color[rule])
-        lines.append(line[0])
-        labels.append(rule_name[rule])
-
-    if 'cost_ewcs' in log:
-        ax1.plot(x_plot, np.log10(log['cost_ewcs']), color='black')
-
-    ax1.tick_params(axis='both', which='major', labelsize=fs)
-    ax2.tick_params(axis='both', which='major', labelsize=fs)
-
-    ax2.set_ylim([-0.05, 1.05])
-    ax2.set_xlabel('Total trials (1,000)',fontsize=fs, labelpad=2)
-    ax2.set_ylabel('Performance',fontsize=fs)
-    ax1.set_ylabel(r'$log_{10}$(cost)',fontsize=fs)
-    ax1.set_xticklabels([])
-    ax1.set_title('Training time {:0.1f} hours'.format(times[-1]/3600.),fontsize=fs)
-    ax1.locator_params(axis='y', nbins=3)
-    ax2.locator_params(axis='y', nbins=4)
-    lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.7,0.5),
-                    fontsize=fs,labelspacing=0.3,loc=6)
-    plt.setp(lg.get_title(),fontsize=fs)
-    if save:
-        plt.savefig('figure/Training_Progress'+model_dir+'.pdf', transparent=True)
-    plt.show()
-
 
 def plot_performanceprogress(model_dir, rule_plot=None):
     # Plot Training Progress
@@ -343,83 +293,6 @@ def get_allperformance(model_dirs, param_list=None):
         print('{:0.3f}'.format(final_perfs[key])),
         print(filenames[key])
 
-
-def plot_finalperformance_lr():
-    # Specialized for varyign learning rate. Can be rewritten, but I'm lazy.
-    n_lr = 100
-    save_type = 'allrule_weaknoise'
-    model_dir = save_type+'_lr1'
-    log = tools.load_log(model_dir)
-    cost_tests  = log['cost_tests']
-    perf_tests  = log['perf_tests']
-
-    final_cost = {k: [] for k in cost_tests}
-    final_perf = {k: [] for k in cost_tests}
-    lr_plot = list()
-    training_time_plot = list()
-    # Recording performance and cost for networks
-    for i_lr in range(n_lr):
-        model_dir = save_type+'_lr'+str(i_lr)
-        log = tools.load_log(model_dir)
-        if log is None:
-            continue
-        cost_tests = log['cost_tests']
-        perf_tests = log['perf_tests']
-        # if perf_tests[DMCGO][-1] > 0.1:
-        for key in perf_tests.keys():
-            final_perf[key] += [float(perf_tests[key][-1])]
-            final_cost[key]        += [float(cost_tests[key][-1])]
-        # lr_plot.append(hp['learning_rate'])
-        lr_plot.append(np.logspace(-2,-4,100)[i_lr]) # Temporary
-        training_time_plot.append(log['times'][-1])
-
-    n_trial = log['trials'][-1]
-    x_plot = np.log10(np.array(lr_plot))
-    rule_plot = None
-    if rule_plot == None:
-        rule_plot = perf_tests.keys()
-
-    fig = plt.figure(figsize=(5,3))
-    d1, d2 = 0.01, 0.35
-    ax1 = fig.add_axes([0.15,0.5+d1,   0.5,d2])
-    ax2 = fig.add_axes([0.15,0.5-d1-d2,0.5,d2])
-    lines = list()
-    labels = list()
-    for i, rule in enumerate(rule_plot):
-        line = ax1.plot(x_plot,np.log10(final_cost[rule]),color=color_rules[i%26])
-        ax2.plot(x_plot,final_perf[rule],color=color_rules[i%26])
-        lines.append(line[0])
-        labels.append(rule_name[rule])
-
-    ax1.tick_params(axis='both', which='major', labelsize=7)
-    ax2.tick_params(axis='both', which='major', labelsize=7)
-
-    ax2.set_ylim(top=1.05)
-    ax2.set_xlabel('Log (Learning rate)',fontsize=7)
-    ax2.set_ylabel('performance',fontsize=7)
-    ax1.set_ylabel(r'$log_{10}$(cost)',fontsize=7)
-    ax1.set_xticklabels([])
-    ax1.set_title('After {:.1E} trials'.format(n_trial),fontsize=7)
-    lg = fig.legend(lines, labels, title='Rule',ncol=1,bbox_to_anchor=(0.65,0.5),
-                    fontsize=7,labelspacing=0.3,loc=6)
-    plt.setp(lg.get_title(),fontsize=7)
-    plt.savefig('figure/FinalCostPerformance_'+save_type+'_varylr.pdf', transparent=True)
-    plt.show()
-
-    # x_plot = np.array(HDIM_plot)/100.
-    # y_plot = np.array(training_time_plot)/3600.
-    # fig = plt.figure(figsize=(5,1.5))
-    # ax  = fig.add_axes([0.15, 0.25, 0.5, 0.7])
-    # p = np.polyfit(x_plot[x_plot<5], y_plot[x_plot<5], 2) # Temporary
-    # #p = np.polyfit(x_plot, y_plot, 2)
-    # ax.plot(x_plot, p[0]*x_plot**2+p[1]*x_plot+p[2], color='black')
-    # ax.plot(x_plot, y_plot, color=sns.xkcd_palette(['cerulean'])[0])
-    # ax.text(0.05, 0.7, 'Number of Hours = \n {:0.2f}$(N/100)^2$+{:0.2f}$(N/100)$+{:0.2f}'.format(*p), fontsize=7, transform=ax.transAxes)
-    # ax.set_xlabel('Number of Recurrent Units $N$ (100)',fontsize=7)
-    # ax.set_ylabel('Training time (hours)',fontsize=7)
-    # ax.tick_params(axis='both', which='major', labelsize=7)
-    # plt.savefig('figure/FinalTrainingTime_'+save_type+'.pdf', transparent=True)
-    # plt.show()
 
 ################ Psychometric - Varying Coherence #############################
 def _psychometric_dm(model_dir, rule, params_list, batch_shape):
@@ -846,8 +719,7 @@ def compute_choicefamily_varytime(model_dir, rule):
     assert rule in ['dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm']
     print('Starting vary time analysis of the {:s} task...'.format(rule_name[rule]))
     n_stim_loc = 3000
-    # n_stim_loc = 1000
-    # n_stim_loc = 100
+    # n_stim_loc = 100  # for quick debugging
 
     n_coh = 4
     batch_size = n_stim_loc * n_coh
@@ -911,14 +783,15 @@ def compute_choicefamily_varytime(model_dir, rule):
 
     result = {'xdatas' : xdatas, 'ydatas' : ydatas, 'cohs' : cohs}
 
-    savename = 'data/varytime_'+rule_name[rule].replace(' ','') +model_dir
+    savename = os.path.join(model_dir, 'varytime_'+rule)
     with open(savename+'.pkl','wb') as f:
         pickle.dump(result, f)
 
 
 def plot_choicefamily_varytime(model_dir, rule):
+    import seaborn as sns
     assert rule in ['dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm']
-    savename = 'data/varytime_'+rule_name[rule].replace(' ','') +model_dir
+    savename = os.path.join(model_dir, 'varytime_' + rule)
 
     with open(savename+'.pkl','rb') as f:
         result = pickle.load(f)
@@ -928,7 +801,6 @@ def plot_choicefamily_varytime(model_dir, rule):
     cohs   = result['cohs']
     stim_times = xdatas[0]
     n_coh  = len(xdatas)
-
 
     # Plot how the threshold varies with stimulus duration
     weibull = lambda x, a, b : 1 - 0.5*np.exp(-(x/a)**b)
@@ -980,6 +852,7 @@ def plot_choicefamily_varytime(model_dir, rule):
 
 
 def psychometric_delaychoice_varytime(model_dir, rule):
+    import seaborn as sns
     n_stim_loc = 100
     n_stim = 3
     batch_size = n_stim_loc * n_stim
@@ -1019,7 +892,7 @@ def psychometric_delaychoice_varytime(model_dir, rule):
     ydatas = _psychometric_dm(model_dir, rule, params_list, batch_shape)
     xdatas, ydatas = np.array(xdatas), np.array(ydatas).T
 
-    figname = 'varytime_'+rule_name[rule].replace(' ','')
+    figname = 'varytime_'+rule
     plot_psychometric_varytime(xdatas, ydatas, figname,
                                labels=['{:0.3f}'.format(t) for t in 2*cohs],
                                colors=sns.dark_palette("light blue", n_stim, input="xkcd"),
@@ -1069,95 +942,6 @@ def plot_psychometric_varytime(xdatas, ydatas, figname, labels, colors, **kwargs
     if save:
         plt.savefig('figure/'+figname+'.pdf', transparent=True)
     plt.show()
-
-
-################ Psychometric - Varying Stim Loc ##############################
-def psychometric_choice_varyloc(model_dir, **kwargs):
-    raise NotImplementedError
-    print('Starting standard analysis of the CHOICE task...')
-    with Run(model_dir, fast_eval=fast_eval) as R:
-        n_rep = 100
-        n_stim = 5
-        n_stim_loc = 36
-        batch_size = n_rep * n_stim * n_stim_loc
-        batch_shape = (n_rep,n_stim,n_stim_loc)
-        ind_rep, ind_stim, ind_stim_loc = np.unravel_index(range(batch_size),batch_shape)
-
-        stim1_locs = 2*np.pi*ind_stim_loc/n_stim_loc
-        stim2_locs = (stim1_locs+np.pi)%(2*np.pi)
-
-        stim_str_range = 0.04
-        cohs = stim_str_range*np.arange(n_stim)/(n_stim-1)
-        stim1_strengths = 1 + cohs[ind_stim]
-        stim2_strengths = 2 - stim1_strengths
-
-        params = {'stim1_locs' : stim1_locs,
-                  'stim2_locs' : stim2_locs,
-                  'stim1_strengths' : stim1_strengths,
-                  'stim2_strengths' : stim2_strengths,
-                  'stim_time'    : 600}
-
-        task  = generate_onebatch('dm1', R.hp, 'psychometric', params=params)
-        y_sample = R.f_y_from_x(task.x)
-        y_sample_loc = R.f_y_loc(y_sample)
-
-        stim1_locs_ = np.reshape(stim1_locs, batch_shape)
-        stim2_locs_ = np.reshape(stim2_locs, batch_shape)
-
-        y_sample_loc = np.reshape(y_sample_loc[-1], batch_shape)
-        choose1 = (get_dist(y_sample_loc - stim1_locs_) < THETA).sum(axis=0)
-        choose2 = (get_dist(y_sample_loc - stim2_locs_) < THETA).sum(axis=0)
-        ydatas = choose1/(choose1 + choose2)
-
-    xdatas = [2*np.pi*np.arange(n_stim_loc)/n_stim_loc] * n_stim
-
-    plot_psychometric_varyloc(xdatas, ydatas,
-                              labels=['{:0.3f}'.format(t) for t in 2*cohs],
-                              colors=sns.dark_palette("light blue", n_stim, input="xkcd"),
-                              legtitle='Tar1 - Tar2',rule='dm1', **kwargs)
-
-
-def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
-    """
-    Standard function for plotting the psychometric curves
-    Here the stimulus-present time is varied
-
-    xdatas, ydatas, labels, and colors are all lists. Each list contains
-    properties for each curve.
-    """
-    fig = plt.figure(figsize=(2,1.5))
-    ax = fig.add_axes([0.25,0.25,0.65,0.65])
-    for i in range(len(xdatas)):
-        xdata = xdatas[i]
-        ydata = ydatas[i]
-        ax.plot(xdata, ydata, 'o-', color=colors[i], label=labels[i], markersize=3)
-
-    plt.xlabel('Stim. Time (ms)',fontsize=7)
-    plt.ylim([-0.05,1.05])
-    plt.yticks([0, 0.5, 1])
-    if 'no_ylabel' in kwargs and kwargs['no_ylabel']:
-        plt.yticks([0, 0.5,1],['',''])
-    else:
-        plt.ylabel('Performance',fontsize=6)
-    plt.title(rule_name[kwargs['rule']], fontsize=6)
-    plt.locator_params(axis='x', nbins=5)
-    ax.tick_params(axis='both', which='major', labelsize=6)
-
-    bbox_to_anchor = (1.0, 0.6)
-    leg = plt.legend(title=kwargs['legtitle'],fontsize=6,frameon=False,
-                     bbox_to_anchor=bbox_to_anchor,labelspacing=0.2)
-    plt.setp(leg.get_title(),fontsize=6)
-    ax.spines["right"].set_visible(False)
-    ax.spines["top"].set_visible(False)
-    ax.xaxis.set_ticks_position('bottom')
-    ax.yaxis.set_ticks_position('left')
-    figname = 'figure/analyze_'+rule_name[kwargs['rule']].replace(' ','') + '_varyloc'
-    if 'figname_append' in kwargs:
-        figname += kwargs['figname_append']
-
-    if save:
-        plt.savefig(figname+'.pdf', transparent=True)
-    # plt.show()
 
 
 if __name__ == '__main__':
