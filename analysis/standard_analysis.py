@@ -479,7 +479,6 @@ def schematic_plot(model_dir, rule=None):
 
 def networkx_illustration(model_dir):
     import networkx as nx
-    import matplotlib as mpl
 
     model = Model(model_dir)
     with tf.Session() as sess:

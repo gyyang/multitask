@@ -12,19 +12,15 @@ from __future__ import division
 import os
 import numpy as np
 import pickle
-import time
-import copy
 from collections import OrderedDict
 import scipy.stats as stats
 from scipy.optimize import curve_fit, minimize
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-# import seaborn as sns # If you don't have this, then some colormaps won't work
 
 import tensorflow as tf
 
 from task import generate_trials, rule_name, get_dist
-from network import Model, get_perf
+from network import Model
 import tools
 
 
@@ -51,12 +47,15 @@ _rule_color = {
             'dmcnogo': 'peach'
             }
 
-# rule_color = {k: sns.xkcd_palette([v])[0] for k, v in _rule_color.items()}
 rule_color = {k: 'xkcd:'+v for k, v in _rule_color.items()}
 
 save = True
 THETA = 0.3 * np.pi
 
+# From sns.dark_palette("light blue", 3, input="xkcd")
+BLUES = [np.array([0.13333333, 0.13333333, 0.13333333, 1.        ]),
+         np.array([0.3597078 , 0.47584775, 0.56246059, 1.        ]),
+         np.array([0.58431373, 0.81568627, 0.98823529, 1.        ])]
 
 def plot_trainingprogress(model_dir, rule_plot=None, save=True):
     # Plot Training Progress
@@ -109,7 +108,7 @@ def plot_trainingprogress(model_dir, rule_plot=None, save=True):
     plt.show()
 
 
-def plot_performanceprogress(model_dir, rule_plot=None, save=False):
+def plot_performanceprogress(model_dir, rule_plot=None):
     # Plot Training Progress
     log = tools.load_log(model_dir)
     hp = tools.load_hp(model_dir)
@@ -149,8 +148,7 @@ def plot_performanceprogress(model_dir, rule_plot=None, save=False):
     lg = fig.legend(lines, labels, title='Task',ncol=2,bbox_to_anchor=(0.47,0.5),
                     fontsize=fs,labelspacing=0.3,loc=6,frameon=False)
     plt.setp(lg.get_title(),fontsize=fs)
-    if save:
-        plt.savefig('figure/Performance_Progresss.pdf', transparent=True)
+    plt.savefig('figure/Performance_Progresss.pdf', transparent=True)
     plt.show()
 
 
@@ -481,11 +479,11 @@ def psychometric_choice(model_dir, **kwargs):
     params_list = list()
     stim_times = [200, 400, 800]
     for stim_time in stim_times:
-        params = {'stim1_locs' : stim1_locs,
-                  'stim2_locs' : stim2_locs,
-                  'stim1_strengths' : stim1_strengths,
-                  'stim2_strengths' : stim2_strengths,
-                  'stim_time'    : stim_time}
+        params = {'stim1_locs': stim1_locs,
+                  'stim2_locs': stim2_locs,
+                  'stim1_strengths': stim1_strengths,
+                  'stim2_strengths': stim2_strengths,
+                  'stim_time': stim_time}
 
         params_list.append(params)
 
@@ -494,7 +492,7 @@ def psychometric_choice(model_dir, **kwargs):
 
     plot_psychometric_choice(xdatas, ydatas,
                               labels=[str(t) for t in stim_times],
-                              colors=sns.dark_palette("light blue", 3, input="xkcd"),
+                              colors=BLUES,
                               legtitle='Stim. time (ms)', rule=rule, **kwargs)
 
 
@@ -540,7 +538,7 @@ def psychometric_delaychoice(model_dir, **kwargs):
 
     plot_psychometric_choice(xdatas, ydatas,
                               labels=[str(t) for t in dtars],
-                              colors=sns.dark_palette("light blue", 3, input="xkcd"),
+                              colors=BLUES,
                               legtitle='Delay (ms)',rule=rule, **kwargs)
 
 
@@ -582,9 +580,13 @@ def psychometric_choiceattend_(model_dir, rule, **kwargs):
 
     labels = ['Attend', 'Ignore'] if rule=='contextdm1' else ['Ignore', 'Attend']
 
+    # from sns.color_palette("Set2",2)
+    colors = [(0.4, 0.7607843137254902, 0.6470588235294118),
+              (0.9882352941176471, 0.5529411764705883, 0.3843137254901961)]
+
     plot_psychometric_choice(xdatas, ydatas,
                               labels=labels,
-                              colors=sns.color_palette("Set2",2),
+                              colors=colors,
                               legtitle='Modality',rule=rule, **kwargs)
 
 
@@ -618,63 +620,18 @@ def psychometric_choiceint(model_dir, **kwargs):
     xdatas = [stim_cohs*2] * len(mod_strengths)
     ydatas = _psychometric_dm(model_dir, rule, params_list, batch_shape)
 
+    # sns.color_palette("Set2",3)
+    colors = [(0.4, 0.7607843137254902, 0.6470588235294118),
+              (0.9882352941176471, 0.5529411764705883, 0.3843137254901961),
+              (0.5529411764705883, 0.6274509803921569, 0.796078431372549)]
+
     fits = plot_psychometric_choice(xdatas, ydatas,
                                     labels=['1 only', '2 only', 'both'],
-                                    colors=sns.color_palette("Set2",3),
+                                    colors=colors,
                                     legtitle='Modality', rule=rule, **kwargs)
     sigmas = [fit[1] for fit in fits]
     print('Fit sigmas:')
     print(sigmas)
-
-
-def psychometric_intrepro(model_dir):
-    with Run(model_dir, fast_eval=fast_eval) as R:
-
-        n_stim_loc = 360
-        # intervals = [700]
-        # intervals = [500, 600, 700, 800, 900, 1000]
-        intervals = np.linspace(500, 1000, 10)
-        mean_sample_intervals = list()
-        for interval in intervals:
-            batch_size = n_stim_loc
-            stim_mod1_locs  = 2*np.pi*np.arange(n_stim_loc)/n_stim_loc
-
-            params = {'stim_mod1_locs'  : stim_mod1_locs,
-                      'interval'       : interval}
-
-            task  = generate_onebatch(INTREPRO, R.hp, 'psychometric', params=params)
-            h_test = R.f_h(task.x)
-            y = R.f_y(h_test)
-
-            sample_intervals = list() # sampled interval test
-            for i_batch in range(batch_size):
-                try: ##TODO: Temporary solution
-                    # Setting the threshold can be tricky, but doesn't impact the overall results
-                    sample_interval = np.argwhere(y[:,i_batch,0]<0.3)[0]-task.epochs['stim2'][1]
-                    sample_intervals.append(sample_interval)
-                except IndexError:
-                    # print i_batch
-                    pass
-            mean_sample_intervals.append(np.mean(sample_intervals))
-
-        fig = plt.figure(figsize=(2,1.5))
-        ax = fig.add_axes([0.25,0.25,0.65,0.65])
-        ax.plot(intervals, mean_sample_intervals, 'o-', markersize=3.5, color=sns.xkcd_palette(['blue'])[0])
-        ax.plot(intervals, intervals, color=sns.xkcd_palette(['black'])[0])
-        plt.xlim([intervals[0]-50,intervals[-1]+50])
-        plt.ylim([intervals[0]-50,intervals[-1]+50])
-        plt.xlabel('Sample Interval (ms)',fontsize=7)
-        plt.ylabel('Production interval (ms)',fontsize=7)
-        plt.title('Rule '+rule_name[INTREPRO], fontsize=7)
-        plt.locator_params(nbins=5)
-        ax.tick_params(axis='both', which='major', labelsize=7)
-
-        ax.spines["right"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.xaxis.set_ticks_position('bottom')
-        ax.yaxis.set_ticks_position('left')
-        plt.savefig('figure/analyze_'+rule_name[INTREPRO].replace(' ','')+'_performance.pdf', transparent=True)
-        plt.show()
 
 
 def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
@@ -709,11 +666,12 @@ def plot_psychometric_choice(xdatas, ydatas, labels, colors, **kwargs):
     plt.ylim([-0.05,1.05])
     plt.xlim([xdata[0]*1.1,xdata[-1]*1.1])
     plt.yticks([0,0.5,1])
+    plt.xticks([xdata[0], 0, xdata[-1]])
     if 'no_ylabel' in kwargs and kwargs['no_ylabel']:
         plt.yticks([0,0.5,1],['','',''])
     else:
         plt.ylabel('P(choice 1)',fontsize=fs)
-    plt.title(rule_name[kwargs['rule']], fontsize=fs)
+    plt.title(rule_name[kwargs['rule']], fontsize=fs, y=0.95)
     plt.locator_params(axis='x', nbins=5)
     ax.tick_params(axis='both', which='major', labelsize=fs)
 
@@ -1115,6 +1073,7 @@ def plot_psychometric_varytime(xdatas, ydatas, figname, labels, colors, **kwargs
 
 ################ Psychometric - Varying Stim Loc ##############################
 def psychometric_choice_varyloc(model_dir, **kwargs):
+    raise NotImplementedError
     print('Starting standard analysis of the CHOICE task...')
     with Run(model_dir, fast_eval=fast_eval) as R:
         n_rep = 100
@@ -1201,171 +1160,5 @@ def plot_psychometric_varyloc(xdatas, ydatas, labels, colors, **kwargs):
     # plt.show()
 
 
-################ Psychometric - Delay Matching Tasks ##########################
-def psychometric_delaymatching(model_dir, rule):
-    with Run(model_dir, fast_eval=True) as R:
-        psychometric_delaymatching_fromsession(R, rule)
-
-
-def psychometric_delaymatching_fromsession(R, rule):
-    # Input is a Run session
-    n_rep = 1
-    n_stim_loc = 10 # increase repeat by increasing this
-    batch_size = n_rep * n_stim_loc**2
-    batch_shape = (n_rep, n_stim_loc,n_stim_loc)
-    ind_rep, ind_stim_loc1, ind_stim_loc2 = np.unravel_index(range(batch_size),batch_shape)
-
-    # Looping target location
-    stim1_locs = 2*np.pi*ind_stim_loc1/n_stim_loc
-    stim2_locs = 2*np.pi*ind_stim_loc2/n_stim_loc
-
-    params = {'stim1_locs' : stim1_locs,
-              'stim2_locs' : stim2_locs}
-
-    # rule = DMSGO
-    # rule = DMCGO
-    task  = generate_onebatch(rule, R.hp, 'psychometric', params=params)
-    y_sample = R.f_y_from_x(task.x)
-
-    if rule in [DMSGO, DMCGO]:
-        match_response = y_sample[-1, :, 0] < 0.5 # Last time point, fixation unit, match if go
-    elif rule in [DMSNOGO, DMCNOGO]:
-        match_response = y_sample[-1, :, 0] > 0.5
-    match_response = match_response.reshape(batch_shape)
-    match_response = match_response.mean(axis=0)
-
-    kwargs = dict()
-    fs = 6
-    fig = plt.figure(figsize=(1.5,1.5))
-    ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
-    im = ax.imshow(match_response, cmap='BrBG', origin='lower',
-                   aspect='auto', interpolation='nearest', vmin=0, vmax=1)
-    ax.set_xlabel('Test loc.', fontsize=fs, labelpad=-3)
-    plt.xticks([0, n_stim_loc-1], ['0', '360'],
-               rotation=0, va='center', fontsize=fs)
-    if 'ylabel' in kwargs and kwargs['ylabel']==False:
-        plt.yticks([])
-    else:
-        ax.set_ylabel('Sample loc.', fontsize=fs, labelpad=-3)
-        plt.yticks([0, n_stim_loc-1], [0, 360],
-                   rotation=0, va='center', fontsize=fs)
-    # plt.title(rule_name[rule] + '\n' + lesion_group_name, fontsize=fs)
-    ax.tick_params('both', length=0)
-    for loc in ['bottom','top','left','right']:
-        ax.spines[loc].set_visible(False)
-
-    if 'colorbar' in kwargs and kwargs['colorbar']==False:
-        pass
-    else:
-        ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
-        cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
-        cb.outline.set_linewidth(0.5)
-        cb.set_label('Prop. of match', fontsize=fs, labelpad=-3)
-        plt.tick_params(axis='both', which='major', labelsize=fs)
-
-    # plt.savefig('figure/'+rule_name[rule].replace(' ','')+
-    #             '_perf2D_lesion'+str(lesion_group)+
-    #             self.model_dir+'.pdf', transparent=True)
-    plt.show()
-
-
-################ Psychometric - Anti Tasks ####################################
-def psychometric_goantifamily_2D(model_dir, rule, title=None, **kwargs):
-    n_rep = 20
-    n_stim_loc = 20 # increase repeat by increasing this
-    batch_size = n_rep * n_stim_loc
-    batch_shape = (n_rep, n_stim_loc)
-    ind_rep, ind_stim_loc = np.unravel_index(range(batch_size),batch_shape)
-
-    # Looping target location
-    stim_locs = 2*np.pi*ind_stim_loc/n_stim_loc
-
-    if rule in [REACTGO, REACTANTI]:
-        params = {'stim_locs' : stim_locs}
-    elif rule in [FDGO, FDANTI]:
-        params = {'stim_locs' : stim_locs,
-                  'stim_time' : 1000}
-    elif rule in [DELAYGO, DELAYANTI]:
-        params = {'stim_locs' : stim_locs,
-                  'stim_ons'  : 500,
-                  'stim_offs' : 800,
-                  'delay_time' : 1000}
-    else:
-        raise ValueError('Not supported rule value')
-
-    with Run(model_dir, fast_eval=True) as R:
-        task  = generate_onebatch(rule, R.hp, 'psychometric', params=params)
-        # response locations at last time points
-        y_hat_loc = R.f_y_loc_from_x(task.x)[-1]
-
-    y_hat_loc = np.reshape(y_hat_loc, batch_shape)
-    stim_locs_ = np.reshape(stim_locs, batch_shape)[0,:]
-    bins = np.concatenate((stim_locs_, np.array([2*np.pi])))
-    responses = np.zeros((n_stim_loc, n_stim_loc))
-
-    # Looping over input locations
-    for i in range(n_stim_loc):
-        hist, bins_edge = np.histogram(y_hat_loc[:,i], bins=bins)
-        responses[:,i] = hist/n_rep
-
-
-    fs = 6
-    fig = plt.figure(figsize=(1.5,1.5))
-    ax = fig.add_axes([0.2, 0.2, 0.6, 0.6])
-    im = ax.imshow(responses, cmap='hot', origin='lower',
-                   aspect='auto', interpolation='nearest', vmin=0, vmax=1)
-    ax.set_xlabel('input loc.', fontsize=fs, labelpad=-3)
-    plt.xticks([0, n_stim_loc-1], ['0', '360'],
-               rotation=0, va='center', fontsize=fs)
-    ax.set_ylabel('output loc.', fontsize=fs, labelpad=-3)
-    plt.yticks([0, n_stim_loc-1], ['0', '360'],
-               rotation=0, va='center', fontsize=fs)
-    if title is not None:
-        ax.set_title(title, fontsize=fs)
-    ax.tick_params('both', length=0)
-    for loc in ['bottom','top','left','right']:
-        ax.spines[loc].set_visible(False)
-
-    if 'colorbar' in kwargs and kwargs['colorbar']==False:
-        pass
-    else:
-        ax = fig.add_axes([0.82, 0.2, 0.03, 0.6])
-        cb = plt.colorbar(im, cax=ax, ticks=[0, 1])
-        cb.outline.set_linewidth(0.5)
-        cb.set_label('Prop. of responses', fontsize=fs, labelpad=-3)
-        plt.tick_params(axis='both', which='major', labelsize=fs)
-
-    if save:
-        if 'model_dir' not in kwargs:
-            model_dir = rule_name[rule].replace(' ','')+'_perf2D.pdf'
-        else:
-            model_dir = kwargs['model_dir']
-        plt.savefig(os.path.join('figure', model_dir), transparent=True)
-
-    plt.show()
-
-
 if __name__ == '__main__':
     pass
-    model_dir = '0_256migrate'
-
-    # plot_trainingprogress(model_dir)
-    # plot_performanceprogress(model_dir)
-    
-    # plot_trainingprogress_cont('cont_allrule_2_0_0_1intsynmain')
-    # plot_trainingprogress_cont('cont_allrule_4_0_1_1intsynthu')
-
-    # plot_finalperformance('allrule_softplus', '_300test')
-    # plot_finalperformance('cont_allrule', '_1_0_1intsynthu')
-    # plot_finalperformance('oicdmconly_strongnoise')
-    # plot_finalperformance_lr()
-
-    ################## Continual Learning Performance #########################
-    # get_allperformance('cont_allrule', 'intsynrelu')
-    # plot_performanceprogress_cont(('cont_allrule_4_0_0_0intsynrelu',
-    #                                'cont_allrule_4_0_1_1intsynrelu'))
-    # plot_finalperformance_cont('cont_allrule', '_0_0_0intsynrelu', '_0_1_1intsynrelu')
-
-    ################## Psychometric Performance ###############################
-    psychometric_choice(model_dir)
-    # psychometric_choiceattend(model_dir, no_ylabel=True)
