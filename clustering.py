@@ -11,7 +11,6 @@ import pickle
 from collections import OrderedDict
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 import tensorflow as tf
 
@@ -54,8 +53,9 @@ class Analysis(object):
 
         # If not computed, use variance.py
         fname = os.path.join(model_dir, 'variance_'+data_type)
-        with open(fname+'.pkl','rb') as f:
-            res = pickle.load(f)
+        with open(fname + '.pkl', 'rb') as f:
+            # res = pickle.load(f)
+            res = pickle.load(f, encoding='latin1')  # Python3 compatible
         h_var_all_ = res['h_var_all']
         self.keys  = res['keys']
 
@@ -427,7 +427,8 @@ class Analysis(object):
                       (_b_rec              , [l+(nh+6)*l0     ,l          ,l0       ,nh*l0]),
                       (_b_out              , [l+(nh+6)*l0     ,l-(ny+6)*l0,l0       ,ny*l0])]
 
-        cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
+        # cmap = sns.diverging_palette(220, 10, sep=80, as_cmap=True)
+        cmap = 'coolwarm'
         fig = plt.figure(figsize=(6, 6))
         for plot_info in plot_infos:
             ax = fig.add_axes(plot_info[1])

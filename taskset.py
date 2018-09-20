@@ -10,7 +10,6 @@ import numpy as np
 import pickle
 from collections import OrderedDict
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 import tensorflow as tf
 
@@ -246,13 +245,13 @@ class TaskSetAnalysis(object):
 
             if color_by_feature:
                 color = 'red' if feature in rule_features[rule] else 'black'
-                color = np.array(sns.xkcd_palette([color])[0])
+                color = 'xkcd:'+color
             else:
                 # Default coloring by rule_color
                 color = np.array(rule_color[rule])
 
             ax.plot(val[-1,dim0], val[-1,dim1], shape_mapping[epoch],
-                    color=color, mec=color*1, mew=1.0, ms=markersize)
+                    color=color, mec=color, mew=1.0, ms=markersize)
 
             if plot_text:
                 texts.append(ax.text(val[-1,dim0], val[-1,dim1], rule_name[rule],
@@ -371,7 +370,7 @@ def obsolete_plot_dim():
     
     fig = plt.figure(figsize=(1.5,5))
     ax = fig.add_axes([0.6,0.15,0.35,0.8])
-    ax.plot(dims,range(len(dims)), 'o-', color=sns.xkcd_palette(['cerulean'])[0], markersize=3)
+    ax.plot(dims,range(len(dims)), 'o-', color='xkcd:cerulean', markersize=3)
     plt.yticks(range(len(dims)),tick_names, rotation=0, ha='right', fontsize=6)
     plt.ylim([-0.5, len(dims)-0.5])
     ax.tick_params(axis='both', which='major', labelsize=7)
@@ -804,7 +803,7 @@ def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, fig
     fig = plt.figure(figsize=(1.6,2.2))
     ax = fig.add_axes([0.55,0.05,0.35,0.7])
     b0 = ax.barh(np.arange(len(perfs)), perfs[::-1],
-           height=width, color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+           height=width, color='xkcd:cerulean', edgecolor='none')
     if perfs_all is not None:
         n_net = perfs_all.shape[0]
         for i in range(len(perfs)):

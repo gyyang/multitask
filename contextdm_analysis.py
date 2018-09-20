@@ -11,7 +11,6 @@ from collections import OrderedDict
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 from task import generate_trials, rule_name, get_rule_index, get_dist
 from network import Model
@@ -20,7 +19,7 @@ import performance
 from slowpoints import search_slowpoints
 
 save = True # TEMP
-COLORS = sns.xkcd_palette(['orange', 'green', 'pink', 'sky blue'])
+COLORS = ['xkcd:'+c for c in ['orange', 'green', 'pink', 'sky blue']]
 
 
 def generate_surrogate_data():

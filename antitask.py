@@ -7,7 +7,6 @@ from __future__ import division
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
-import seaborn as sns # If you don't have this, then some colormaps won't work
 
 import tensorflow as tf
 from network import Model, get_perf
@@ -325,7 +324,7 @@ class Analysis(object):
         for i in range(n_bars):
             b = ax.bar(np.arange(2)+(1-n_bars)*width/2+width*i,
                        [perfs_nonanti[i], perfs_anti[i]], width=width,
-                       color=sns.xkcd_palette([colors[i]])[0], edgecolor='none')
+                       color='xkcd:'+colors[i], edgecolor='none')
             bars.append(b)
 
         ax.plot(np.arange(n_bars)*width+(1-n_bars)*width/2  , perfs_nonanti, '.-', color='gray', lw=0.75, ms=3)

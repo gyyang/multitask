@@ -19,7 +19,7 @@ import scipy.stats as stats
 from scipy.optimize import curve_fit, minimize
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn as sns # If you don't have this, then some colormaps won't work
+# import seaborn as sns # If you don't have this, then some colormaps won't work
 
 import tensorflow as tf
 
@@ -51,7 +51,8 @@ _rule_color = {
             'dmcnogo': 'peach'
             }
 
-rule_color = {k: sns.xkcd_palette([v])[0] for k, v in _rule_color.items()}
+# rule_color = {k: sns.xkcd_palette([v])[0] for k, v in _rule_color.items()}
+rule_color = {k: 'xkcd:'+v for k, v in _rule_color.items()}
 
 save = True
 THETA = 0.3 * np.pi
