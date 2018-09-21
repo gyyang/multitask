@@ -135,7 +135,7 @@ def _compute_hist_varprop(model_dir, rule_pair, random_rotation=False):
         compute_variance(model_dir, random_rotation=random_rotation)
 
     with open(fname,'rb') as f:
-        res = pickle.load(f)
+        res = pickle.load(f, encoding='latin1')  # TODO: check if this works in Python 2
     h_var_all = res['h_var_all']
     keys      = res['keys']
 
@@ -197,7 +197,6 @@ def _plot_hist_varprop(hist_plot, bins_edge, rule_pair, hist_example=None,
     if hist_example is not None:
         hist_example = hist_example/np.sum(hist_example)
 
-    import seaborn as sns
     fs = 6
     fig = plt.figure(figsize=(1.5,1.2))
     ax = fig.add_axes([0.2,0.3,0.6,0.5])
@@ -206,7 +205,7 @@ def _plot_hist_varprop(hist_plot, bins_edge, rule_pair, hist_example=None,
     if hist_example is not None:
         pass
         bar = ax.bar(bins_edge[:-1], hist_example, width=bins_edge[1]-bins_edge[0],
-               color=sns.xkcd_palette(['cerulean'])[0], edgecolor='none')
+               color='xkcd:cerulean', edgecolor='none')
         legends.append(bar)
         labels.append('Example network')
     pl, = ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_plot, color='black', linewidth=1.5)
@@ -283,14 +282,12 @@ def plot_hist_varprop_selection(model_dir, figname_extra=None):
                   ('dmcgo', 'dmcnogo'),
                   ('contextdm1', 'contextdelaydm1')]
     for rule_pair in rule_pair_list:
-        try:
-            plot_hist_varprop(model_dir=model_dir,
-                              rule_pair=rule_pair,
-                              plot_legend=(rule_pair==('dm1', 'fdanti')),
-                              plot_example=True,
-                              figname_extra=figname_extra)
-        except ValueError:
-            pass
+        plot_hist_varprop(model_dir=model_dir,
+                          rule_pair=rule_pair,
+                          plot_legend=(rule_pair==('dm1', 'fdanti')),
+                          plot_example=True,
+                          figname_extra=figname_extra)
+
 
 def plot_hist_varprop_all(model_dir, plot_control=True):
     '''

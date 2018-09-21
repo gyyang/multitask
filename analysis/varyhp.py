@@ -16,13 +16,10 @@ from analysis import standard_analysis
 
 mpl.rcParams.update({'font.size': 7})
 
-DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhp')
+
 FIGPATH = os.path.join(os.getcwd(), 'figure')
 
-model_dirs = tools.valid_model_dirs(DATAPATH)
-
-
-hp_name = {'activation': 'Activation Fun.',
+HP_NAME = {'activation': 'Activation Fun.',
            'rnn_type': 'Network type',
            'w_rec_init': 'Initialization',
            'l1_h': 'L1 rate',
@@ -46,7 +43,7 @@ standard_analysis.easy_activity_plot(root_dir, rule)
 print "easy_connectivity_plot"+root_dir
 """
 
-def compute_n_cluster():
+def compute_n_cluster(model_dirs):
     for model_dir in model_dirs:
         print(model_dir)
         log = tools.load_log(model_dir)
@@ -175,7 +172,8 @@ def plot_histogram():
     #plt.savefig('./figure/noofclusters_pt9_l1_weight_192nets.pdf')
 
 
-def get_n_clusters():
+def get_n_clusters(root_dir):
+    model_dirs = tools.valid_model_dirs(root_dir)
     hp_list = list()
     n_clusters = list()
     for i, model_dir in enumerate(model_dirs):
@@ -251,13 +249,13 @@ def plot_n_clusters(n_clusters, hp_list):
     ax.set_xticklabels([1, len(n_clusters)])
     ax.set_yticks(range(len(hp_plots)))
 
-    hp_plot_names = [hp_name[hp] for hp in hp_plots]
+    hp_plot_names = [HP_NAME[hp] for hp in hp_plots]
     ax.set_yticklabels(hp_plot_names, fontsize=7)
     ax.tick_params(length=0)
-    [i.set_linewidth(0.1) for i in ax.spines.itervalues()]
+    [i.set_linewidth(0.1) for i in ax.spines.values()]
     ax.set_xlabel('Networks', labelpad=-5)
     # plt.title('target perf-min 0.9, total:'+str(len(n_clusters))) #
-    plt.savefig(os.path.join(FIGPATH, 'NumClusters.eps'), transparent=True)
+    plt.savefig(os.path.join(FIGPATH, 'NumClusters.pdf'), transparent=True)
     
     val = n_clusters_sorted
     fig = plt.figure(figsize=(1.0, 0.8))
@@ -344,11 +342,11 @@ def _plot_n_cluster_hist(hp_plot, n_clusters=None, hp_list=None):
         ax.set_xlim([0, 30])
         ax.text(0.7, 0.7, label, fontsize=7, transform=ax.transAxes)
         if i == 0:
-            ax.set_title(hp_name[hp_plot], fontsize=7)
-    # ax.legend(loc=3, bbox_to_anchor=(1, 0), title=hp_name[hp_plot], frameon=False)
+            ax.set_title(HP_NAME[hp_plot], fontsize=7)
+    # ax.legend(loc=3, bbox_to_anchor=(1, 0), title=HP_NAME[hp_plot], frameon=False)
     ax.set_xlabel('Number of clusters')
     plt.tight_layout()
-    figname = os.path.join(FIGPATH, 'NumClustersHist' + hp_plot + '.eps')
+    figname = os.path.join(FIGPATH, 'NumClustersHist' + hp_plot + '.pdf')
     plt.savefig(figname, transparent=True)
 
     return n_cluster_dict
@@ -405,8 +403,11 @@ def activity_histogram(activation):
 
 if __name__ == '__main__':
     pass
+    DATAPATH = os.path.join(os.getcwd(), 'data', 'varyhp')
+    # model_dirs = tools.valid_model_dirs(DATAPATH)
+
     # compute_n_cluster()
-    # n_clusters, hp_list = get_n_clusters()
+    n_clusters, hp_list = get_n_clusters(DATAPATH)
     # plot_n_clusters(n_clusters, hp_list)
     plot_n_cluster_hist(n_clusters, hp_list)
     # pretty_singleneuron_plot('tanh')

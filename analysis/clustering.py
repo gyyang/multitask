@@ -8,8 +8,6 @@ from __future__ import division
 import os
 import numpy as np
 import pickle
-from collections import OrderedDict
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
@@ -190,8 +188,9 @@ class Analysis(object):
         ax.yaxis.set_ticks_position('left')
         if save:
             fig_name = 'cluster_score'
-            if save_name is not None:
-                fig_name = fig_name + save_name
+            if save_name is None:
+                save_name = self.hp['activation']
+            fig_name = fig_name + save_name
             plt.savefig('figure/'+fig_name+'.pdf', transparent=True)
         plt.show()
 
@@ -314,6 +313,8 @@ class Analysis(object):
             model = TSNE(n_components=2, random_state=0, init='pca',
                          verbose=1, method='exact',
                          learning_rate=100, perplexity=30)
+        else:
+            raise NotImplementedError
 
         Y = model.fit_transform(self.h_normvar_all)
 
@@ -358,7 +359,7 @@ class Analysis(object):
                 plt.savefig('figure/exampleunit_variance.pdf', transparent=True)
             plt.show()
 
-            from standard_analysis import pretty_singleneuron_plot
+            from analysis.standard_analysis import pretty_singleneuron_plot
             # Plot single example neuron in time
             pretty_singleneuron_plot(self.model_dir, ['fdgo'], [self.ind_active[ind]],
                                      epoch=None, save=save, ylabel_firstonly=True)
@@ -453,8 +454,7 @@ class Analysis(object):
             plt.savefig('figure/connectivity_by'+self.data_type+'.pdf', transparent=True)
         plt.show()
 
-    def plot_lesions(self):
-        """Lesion individual cluster and show performance."""
+    def lesions(self):
         labels = self.labels
 
         from network import get_perf
@@ -463,7 +463,7 @@ class Analysis(object):
         # The first will be the intact network
         lesion_units_list = [None]
         for il, l in enumerate(self.unique_labels):
-            ind_l = np.where(labels==l)[0]
+            ind_l = np.where(labels == l)[0]
             # In original indices
             lesion_units_list += [self.ind_active[ind_l]]
 
@@ -482,21 +482,9 @@ class Analysis(object):
                 perfs_store = list()
                 cost_store = list()
                 for rule in self.rules:
-                    # trial = generate_trials(rule=rule, hp=hp, mode='test')
-                    # trial = generate_trials(rule=rule, hp=hp, mode='random', batch_size=100)
-                    # y_hat_test = model.get_y(trial.x)
-                    # feed_dict = {model.x: trial.x,
-                    #              model.y: trial.y.reshape((-1,n_output)),
-                    #              model.c_mask: trial.c_mask}
-                    # c_lsq = sess.run(model.cost_lsq, feed_dict=feed_dict)
-                    # perf = np.mean(get_perf(y_hat_test, trial.y_loc))
-                    #
-                    # perfs_store.append(perf)
-                    # cost_store.append(c_lsq)
-                    #
                     n_rep = 16
                     batch_size_test = 256
-                    batch_size_test_rep = int(batch_size_test/n_rep)
+                    batch_size_test_rep = int(batch_size_test / n_rep)
                     clsq_tmp = list()
                     perf_tmp = list()
                     for i_rep in range(n_rep):
@@ -523,13 +511,19 @@ class Analysis(object):
             perfs_store_list.append(perfs_store)
             cost_store_list.append(cost_store)
 
-            if i>0:
-                perfs_changes.append(perfs_store-perfs_store_list[0])
-                cost_changes.append(cost_store-cost_store_list[0])
+            if i > 0:
+                perfs_changes.append(perfs_store - perfs_store_list[0])
+                cost_changes.append(cost_store - cost_store_list[0])
 
         perfs_changes = np.array(perfs_changes)
         cost_changes = np.array(cost_changes)
 
+        return perfs_changes, cost_changes
+
+    def plot_lesions(self):
+        """Lesion individual cluster and show performance."""
+
+        perfs_changes, cost_changes = self.lesions()
 
         cb_labels = ['Performance change after lesioning',
                      'Cost change after lesioning']
