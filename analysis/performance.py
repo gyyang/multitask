@@ -143,16 +143,10 @@ def _plot_performanceprogress_cont(model_dir, model_dir2=None, save=True):
         # Plot fills
         trials_rule_prev_end = 0  # end of previous rule training time
         for rule_ in rule_train_plot:
-            if hasattr(rule_, '__iter__'):
-                if rule in rule_:
-                    ec = 'black'
-                else:
-                    ec = (0, 0, 0, 0.1)
+            if rule == rule_:
+                ec = 'black'
             else:
-                if rule == rule_:
-                    ec = 'black'
-                else:
-                    ec = (0, 0, 0, 0.1)
+                ec = (0, 0, 0, 0.1)
             trials_rule_now = [trials_rule_prev_end] + [
                     trials[ii] for ii in range(len(rule_now))
                     if rule_now[ii] == rule_]
@@ -165,7 +159,7 @@ def _plot_performanceprogress_cont(model_dir, model_dir2=None, save=True):
         if model_dir2 is not None:
             ax.plot(trials2, log2['perf_'+rule], lw=1, color='red')
         lines.append(line[0])
-        if not hasattr(rule, '__iter__'):
+        if isinstance(rule, str):
             rule_name_print = rule_name[rule]
         else:
             rule_name_print = ' & '.join([rule_name[r] for r in rule])
@@ -230,8 +224,8 @@ def plot_finalperformance_cont(model_dirs1, model_dirs2):
     final_cost, final_perf2, rule_plot, training_time_plot = \
         get_finalperformance(model_dirs2)
 
-    final_perf_plot1 = np.array(final_perf1.values())
-    final_perf_plot2 = np.array(final_perf2.values())
+    final_perf_plot1 = np.array(list(final_perf1.values()))
+    final_perf_plot2 = np.array(list(final_perf2.values()))
 
     fig = plt.figure(figsize=(3.0,2.5))
     ax = fig.add_axes([0.2, 0.4, 0.7, 0.4])
