@@ -9,75 +9,37 @@ from __future__ import absolute_import
 import tools
 from analysis import performance
 from analysis import standard_analysis
-from analysis import antitask
 from analysis import clustering
 from analysis import variance
 from analysis import taskset
-import varyhp
-import data_analysis
+from analysis import varyhp
+from analysis import data_analysis
+from analysis import contextdm_analysis
 
 
 # Directories of the models and the sample model
 # Change these to your directories
 root_dir = './data/train_all'
-# root_dir = './data/tanhgru'
 model_dir = root_dir + '/0'
 
-# =============================================================================
-# root_dir = './data/varyhp'
-# hp_target = {'activation': 'softplus',
-#              'rnn_type': 'LeakyGRU',
-#              'w_rec_init': 'randortho',
-#              'l1_h': 0,
-#              'l1_weight': 0}
-# model_dir = tools.find_model(root_dir, hp_target)
-# =============================================================================
 
-# =============================================================================
-# root_dir = './data/varyhp'
-# hp_target = {'activation': 'tanh',
-#              'rnn_type': 'LeakyRNN',
-#              'w_rec_init': 'diag',
-#              'l1_h': 0}
-# root_dir = tools.find_all_models(root_dir, hp_target)
-# =============================================================================
-
-# root_dir = './data/mantetemp'
-# root_dir = model_dir
-
-# variance.compute_variance(root_dir)
-
-# Performance Analysis-----------------------------------------------------
-# standard_analysis.schematic_plot(model_dir=model_dir) # Generate schematic
-# performance.plot_performanceprogress(model_dir) # Plot performance during training
-# performance.psychometric_choice(model_dir) # Psychometric for dm
+## Performance Analysis-----------------------------------------------------
+# standard_analysis.schematic_plot(model_dir=model_dir)
+# performance.plot_performanceprogress(model_dir)
+# performance.psychometric_choice(model_dir)  # Psychometric for dm
 # performance.psychometric_choiceattend(model_dir, no_ylabel=True)
 # performance.psychometric_choiceint(model_dir, no_ylabel=True)
-
-# TODO(gryang): the following remains to be fixed
-# model_dirs = t
-# tools.valid_model_dirs('*256paper')
-# for model_dir in model_dirs[3:4]:
-#     for rule in ['dm1', 'contextdm1', 'multidm']:
-#         # performance.compute_choicefamily_varytime(model_dir, rule)
-#         performance.plot_choicefamily_varytime(model_dir, rule)
+#
+# for rule in ['dm1', 'contextdm1', 'multidm']:
+#     performance.plot_choicefamily_varytime(model_dir, rule)
 # performance.psychometric_delaychoice_varytime(model_dir, 'delaydm1')
 
-# Analysis of Anti tasks---------------------------------------------------
-# ATA = antitask.Analysis(model_dir)
-# ATA.plot_example_unit()
-# ATA.plot_lesions()
-# ATA.plot_inout_connections()
-# ATA.plot_rec_connections()
-# ATA.plot_rule_connections()
 
-# Clustering Analysis------------------------------------------------------
-
-CA = clustering.Analysis(model_dir, data_type='rule')
+## Clustering Analysis------------------------------------------------------
+# CA = clustering.Analysis(model_dir, data_type='rule')
 # CA.plot_example_unit()
 # CA.plot_cluster_score()
-# CA.plot_cluster_score(save_name=hp_target['activation'])
-CA.plot_variance()
+# CA.plot_variance()
 # CA.plot_2Dvisualization('PCA')
 # CA.plot_2Dvisualization('MDS')
 # CA.plot_2Dvisualization('tSNE')
@@ -87,40 +49,50 @@ CA.plot_variance()
 
 # CA = clustering.Analysis(model_dir, data_type='epoch')
 # CA.plot_variance()
-# CA.plot_2Dvisualization()
+# CA.plot_2Dvisualization('tSNE')
 
-# FTV Analysis-------------------------------------------------------------
+
+## Varying hyperparameter analysis------------------------------------------
+# varyhp_root_dir = './data/varyhp'
+# n_clusters, hp_list = varyhp.get_n_clusters(varyhp_root_dir)
+# varyhp.plot_n_clusters(n_clusters, hp_list)
+# varyhp.plot_n_cluster_hist(n_clusters, hp_list)
+
+
+## FTV Analysis-------------------------------------------------------------
 # variance.plot_hist_varprop_selection(root_dir)
-# variance.plot_hist_varprop_all(root_dir)
+# variance.plot_hist_varprop_selection('./data/tanhgru')
+# TODO: set plot_control=True later
+# variance.plot_hist_varprop_all(root_dir, plot_control=False)
 
-# Varying hyperparameter analysis------------------------------------------
-# varyhp.plot_n_clusters()
-# varyhp.plot_hist_varprop_tanh()
 
-# Task Representation------------------------------------------------------
+## ContextDM analysis-------------------------------------------------------
+# ua = contextdm_analysis.UnitAnalysis(model_dir)
+# ua.plot_inout_connections()
+# ua.plot_rec_connections()
+# ua.plot_rule_connections()
+# ua.prettyplot_hist_varprop()
+#
+# contextdm_analysis.plot_performance_choicetasks(model_dir, grouping='var')
+# contextdm_analysis.plot_performance_2D_all(model_dir, 'contextdm1')
+
+
+## Task Representation------------------------------------------------------
 # tsa = taskset.TaskSetAnalysis(model_dir)
-# tsa.compute_and_plot_taskspace(
-#         epochs=['stim1'], dim_reduction_type='PCA')
+# tsa.compute_and_plot_taskspace(epochs=['stim1'], dim_reduction_type='PCA')
 
-# Compositional Representation---------------------------------------------
-# setups = [1] # Go, Anti family
-# setups = [2] # Ctx DM family
-# =============================================================================
+
+## Compositional Representation---------------------------------------------
 # setups = [1, 2, 3]
 # for setup in setups:
-# #     pass
 #     taskset.plot_taskspace_group(root_dir, setup=setup,
 #                                  restore=True, representation='rate')
 #     taskset.plot_taskspace_group(root_dir, setup=setup,
 #                                  restore=True, representation='weight')
 #     taskset.plot_replacerule_performance_group(
 #             root_dir, setup=setup, restore=True)
-# =============================================================================
 
-# Continual Learning Analysis----------------------------------------------
-# model_dir = './data/seq_debug/c1_s2_small'
-# =============================================================================
-# model_dirs = ['data/seq_varyhp/58']
+## Continual Learning Analysis----------------------------------------------
 # hp_target0 = {'c_intsyn': 0, 'ksi_intsyn': 0.01,
 #               'activation': 'relu', 'max_steps': 4e5}
 # hp_target1 = {'c_intsyn': 1, 'ksi_intsyn': 0.01,
@@ -133,4 +105,11 @@ CA.plot_variance()
 # performance.plot_finalperformance_cont(model_dirs0, model_dirs1)
 # data_analysis.plot_fracvar_hist_byhp(hp_vary='c_intsyn', mode='all_var')
 # data_analysis.plot_fracvar_hist_byhp(hp_vary='p_weight_train', mode='all_var')
-# =============================================================================
+
+
+## Data analysis------------------------------------------------------------
+# Note that these wouldn't work without the data file
+# data_analysis.plot_all('mante_single_ar')
+# data_analysis.plot_all('mante_single_fe')
+# data_analysis.plot_all('mante_ar')
+# data_analysis.plot_all('mante_fe')
