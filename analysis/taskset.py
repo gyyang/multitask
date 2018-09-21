@@ -257,9 +257,7 @@ def compute_taskspace(model_dir, setup, restore=False, representation='rate'):
 
         if restore and os.path.isfile(fname):
             print('Reloading results from '+fname)
-            with open(fname, 'rb') as f:
-                h_trans = pickle.load(f, encoding='latin1')
-
+            h_trans = tools.load_pickle(fname)
         else:
             tsa = TaskSetAnalysis(model_dir, rules=rules)
             h_trans = tsa.compute_taskspace(rules=rules, epochs=['stim1'],
@@ -571,8 +569,7 @@ def compute_replacerule_performance(model_dir, setup, restore=False):
 
     if restore and os.path.isfile(fname):
         print('Reloading results from '+fname)
-        with open(fname, 'rb') as f:
-            r = pickle.load(f, encoding='latin1')
+        r = tools.load_pickle(fname)
         perfs, rule, names = r['perfs'], r['rule'], r['names']
 
     else:

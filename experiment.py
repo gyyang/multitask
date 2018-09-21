@@ -41,13 +41,29 @@ def mante_tanh(seed=0, model_dir='mante_tanh'):
     data_analysis.compute_var_all(model_dir)
 
 
-def train_all(seed=0, model_dir='train_all'):
+def train_all(seed=0, root_dir='train_all'):
     """Training of all tasks."""
-    model_dir = os.path.join(DATAPATH, model_dir, str(seed))
+    model_dir = os.path.join(DATAPATH, root_dir, str(seed))
     hp = {'activation': 'softplus', 'w_rec_init': 'diag'}  # TODO: change the default back to diag
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     train.train(model_dir, hp=hp, ruleset='all',
                 rule_prob_map=rule_prob_map, seed=seed)
+    train_all_analysis(seed=seed, root_dir=root_dir)
+
+
+def debug_train_all():
+    root_dir = 'debug_train_all'
+    seed = 0
+    model_dir = os.path.join(DATAPATH, root_dir, str(seed))
+    hp = {'activation': 'softplus', 'w_rec_init': 'diag'}
+    rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
+    train.train(model_dir, hp=hp, ruleset='all',
+                rule_prob_map=rule_prob_map, seed=seed, max_steps=1e3)
+    train_all_analysis(seed=seed, root_dir=root_dir)
+
+
+def train_all_analysis(seed=0, root_dir='train_all'):
+    model_dir = os.path.join(DATAPATH, root_dir, str(seed))
     # Analyses
     variance.compute_variance(model_dir)
     variance.compute_variance(model_dir, random_rotation=True)
@@ -297,17 +313,5 @@ def vary_p_weight_train_mante(i):
 
 
 if __name__ == '__main__':
-    """ 
-    train_mante()
-    # train_all()
-    # for i in range(10):
-    #     train_vary_hp(i)
-    """ 
-
-    #train_all()
-# =============================================================================
-#     for i in np.arange(0,3):
-#         #train_vary_hp(i)
-#         train_all(i)
-# =============================================================================
+    debug_train_all()
 

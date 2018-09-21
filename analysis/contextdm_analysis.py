@@ -24,9 +24,8 @@ class UnitAnalysis(object):
     def __init__(self, model_dir):
         """Analyze based on units."""
         data_type  = 'rule'
-        fname = os.path.join(model_dir, 'variance_' + data_type)
-        with open(fname + '.pkl', 'rb') as f:
-            res = pickle.load(f, encoding='latin1')  # Python 3 compatibility
+        fname = os.path.join(model_dir, 'variance_' + data_type + '.pkl')
+        res = tools.load_pickle(fname)
         h_var_all = res['h_var_all']
         keys      = res['keys']
 

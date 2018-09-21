@@ -4,6 +4,7 @@ import os
 import errno
 import six
 import json
+import pickle
 import numpy as np
 
 
@@ -105,6 +106,19 @@ def save_hp(hp, model_dir):
     hp_copy.pop('rng')  # rng can not be serialized
     with open(os.path.join(model_dir, 'hp.json'), 'w') as f:
         json.dump(hp_copy, f)
+
+
+def load_pickle(file):
+    try:
+        with open(file, 'rb') as f:
+            data = pickle.load(f)
+    except UnicodeDecodeError as e:
+        with open(file, 'rb') as f:
+            data = pickle.load(f, encoding='latin1')
+    except Exception as e:
+        print('Unable to load data ', file, ':', e)
+        raise
+    return data
 
 
 def find_all_models(root_dir, hp_target):

@@ -134,8 +134,7 @@ def _compute_hist_varprop(model_dir, rule_pair, random_rotation=False):
         # If not computed, compute now
         compute_variance(model_dir, random_rotation=random_rotation)
 
-    with open(fname,'rb') as f:
-        res = pickle.load(f, encoding='latin1')  # TODO: check if this works in Python 2
+    res = tools.load_pickle(fname)
     h_var_all = res['h_var_all']
     keys      = res['keys']
 

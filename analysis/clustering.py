@@ -50,10 +50,8 @@ class Analysis(object):
         hp = tools.load_hp(model_dir)
 
         # If not computed, use variance.py
-        fname = os.path.join(model_dir, 'variance_'+data_type)
-        with open(fname + '.pkl', 'rb') as f:
-            # res = pickle.load(f)
-            res = pickle.load(f, encoding='latin1')  # Python3 compatible
+        fname = os.path.join(model_dir, 'variance_' + data_type + '.pkl')
+        res = tools.load_pickle(fname)
         h_var_all_ = res['h_var_all']
         self.keys  = res['keys']
 
