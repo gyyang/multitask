@@ -44,10 +44,10 @@ def mante_tanh(seed=0, model_dir='mante_tanh'):
 def train_all(seed=0, model_dir='train_all'):
     """Training of all tasks."""
     model_dir = os.path.join(DATAPATH, model_dir, str(seed))
-    hp = {'activation': 'softplus'}
+    hp = {'activation': 'softplus', 'w_rec_init': 'diag'}  # TODO: change the default back to diag
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
-    # train.train(model_dir, hp=hp, ruleset='all',
-    #             rule_prob_map=rule_prob_map, seed=seed)
+    train.train(model_dir, hp=hp, ruleset='all',
+                rule_prob_map=rule_prob_map, seed=seed)
     # Analyses
     variance.compute_variance(model_dir)
     variance.compute_variance(model_dir, random_rotation=True)
@@ -305,7 +305,9 @@ if __name__ == '__main__':
     """ 
 
     #train_all()
-    for i in np.arange(0,3):
-        #train_vary_hp(i)
-        train_all(i)
+# =============================================================================
+#     for i in np.arange(0,3):
+#         #train_vary_hp(i)
+#         train_all(i)
+# =============================================================================
 

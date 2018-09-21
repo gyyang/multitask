@@ -92,6 +92,12 @@ model_dir = root_dir + '/0'
 #     taskset.plot_replacerule_performance_group(
 #             root_dir, setup=setup, restore=True)
 
+# setups = [1, 2, 3]
+# for setup in setups:
+#     taskset.plot_replacerule_performance_group(
+#         './data/tanhgru', setup=setup, restore=True, fig_name_addon='tanhgru')
+
+
 ## Continual Learning Analysis----------------------------------------------
 # hp_target0 = {'c_intsyn': 0, 'ksi_intsyn': 0.01,
 #               'activation': 'relu', 'max_steps': 4e5}

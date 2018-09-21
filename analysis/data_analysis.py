@@ -12,8 +12,6 @@ from scipy.io import loadmat
 
 from analysis import performance
 from analysis import variance
-from datasets import mante_dataset_preprocess
-from datasets import siegel_dataset_preprocess
 from analysis import contextdm_analysis
 import tools
 
@@ -33,6 +31,9 @@ def load_data(dataset='mante', smooth=True, model_dir=None):
         smooth: bool, whether to use smoothed data
         analyze_single_units: bool, whether to analyze single units
     """
+    from datasets import mante_dataset_preprocess
+    from datasets import siegel_dataset_preprocess
+
     if smooth:
         print('Loading smooth data')
     else:

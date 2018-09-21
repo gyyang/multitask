@@ -93,7 +93,7 @@ def write_jobfile(cmd, jobname, sbatchpath, scratchpath,
 
 
 if args.run == 'all':
-    for seed in range(0, 20):
+    for seed in range(0, 40):
         jobname = 'train_all_{:d}'.format(seed)
         train_arg = 'seed={:d}'.format(seed)
         cmd = r'''python -c "import experiment as e;e.train_all('''+\

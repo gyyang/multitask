@@ -2,10 +2,10 @@
 
 from __future__ import division
 
-import os
 import sys
 import time
 from collections import defaultdict
+
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -13,8 +13,7 @@ import tensorflow as tf
 import task
 from task import generate_trials
 from network import Model, get_perf
-import variance
-import clustering
+from analysis import variance
 import tools
 
 
@@ -520,4 +519,4 @@ if __name__ == '__main__':
             'target_perf': 0.95,
             'w_rec_init': 'randortho'}
     train(args.modeldir, seed=1, hp=hp, ruleset='mante',
-          display_step=2000, rich_output=True)
+          display_step=2000, rich_output=False)

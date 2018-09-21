@@ -640,7 +640,7 @@ def plot_replacerule_performance(
             perfs, rule, names, setup, perfs_all, fig_name)
 
 
-def plot_replacerule_performance_group(model_dir, setup=1, restore=True):
+def plot_replacerule_performance_group(model_dir, setup=1, restore=True, fig_name_addon=None):
     model_dirs = tools.valid_model_dirs(model_dir)
     print('Analyzing models : ')
     print(model_dirs)
@@ -654,6 +654,8 @@ def plot_replacerule_performance_group(model_dir, setup=1, restore=True):
     perfs_median = np.median(perfs_plot, axis=0)
 
     fig_name = 'taskset{:d}_perf'.format(setup)
+    if fig_name_addon is not None:
+        fig_name = fig_name + fig_name_addon
 
     print(perfs_median)
     _plot_replacerule_performance(perfs_median, rule, names, setup,
