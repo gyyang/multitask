@@ -92,7 +92,8 @@ def get_default_hp(ruleset):
             # learning rate
             'learning_rate': 0.001,
             # intelligent synapses parameters, tuple (c, ksi)
-            'param_intsyn': None
+            'c_intsyn': 0,
+            'ksi_intsyn': 0,
             }
 
     return hp
@@ -415,26 +416,17 @@ def train_sequential(
                 Omega0 = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
                 omega0 = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
                 v_delta = [np.zeros(v.shape, dtype='float32') for v in v_anc0]
-            else:
+            elif c > 0:
                 v_anc0_prev = v_anc0
                 v_anc0 = v_current
                 v_delta = [v-v_prev for v, v_prev in zip(v_anc0, v_anc0_prev)]
 
                 # Make sure all elements in omega0 are non-negative
                 # Penalty
-# =============================================================================
-#                 Omega0 = [(O + o * (o > 0.) / (v_d ** 2 + ksi))
-#                           for O, o, v_d in zip(Omega0, omega0, v_delta)]
-# =============================================================================
                 Omega0 = [relu(O + o / (v_d ** 2 + ksi))
                           for O, o, v_d in zip(Omega0, omega0, v_delta)]
                 
                 # Update cost
-                # extra_cost = tf.constant(0.)
-                # for v, w, v_val in zip(model.var_list, Omega0, v_current):
-                #     extra_cost += c * tf.reduce_sum(
-                #         tf.multiply(w, tf.square(v - v_val)))
-                # model.set_optimizer(extra_cost=extra_cost)
                 model.cost_reg = tf.constant(0.)
                 for v, w, v_val in zip(model.var_list, Omega0, v_current):
                     model.cost_reg += c * tf.reduce_sum(

@@ -214,6 +214,18 @@ elif args.run == 'mante_vary_pweighttrain':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
+elif args.run == 'dev_test_faster':
+    for seed in range(0, 5):
+        for setup in range(4):
+            jobname = 'dev_test_faster_{:d}_{:d}'.format(setup, seed)
+            train_arg = 'setup={:d},seed={:d}'.format(setup, seed)
+            cmd = r'''python -c "import experiment as e;e.dev_test_faster('''+\
+                  train_arg+''')"'''
+
+            jobfile = write_jobfile(
+                cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+            subprocess.call(['sbatch', jobfile])
+
 # Grid search
 elif args.run == 'grid':
     raise NotImplementedError()

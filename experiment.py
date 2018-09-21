@@ -312,6 +312,39 @@ def vary_p_weight_train_mante(i):
     _base_vary_hp_mante(i, hp_ranges, base_name='vary_pweighttrain_mante')
 
 
+def dev_test_faster(setup, seed):
+    hp = dict()
+    hp['learning_rate'] = 0.001
+    hp['w_rec_init'] = 'diag'
+    hp['easy_task'] = False
+    hp['activation'] = 'softplus'
+    hp['max_steps'] = 4e5
+    hp['c_intsyn'] = 0
+
+    model_dir = os.path.join(DATAPATH, 'dev_test_faster', 'setup'+str(setup), str(seed))
+    if setup == 0:
+        rule_trains = [['contextdm1', 'contextdm2', 'contextdelaydm2'], ['contextdelaydm1']]
+    elif setup == 1:
+        rule_trains = [['fdgo', 'fdanti', 'delaygo'], ['delayanti']]
+    elif setup == 2:
+        rule_trains = [['contextdm1', 'contextdm2', 'contextdelaydm2'], ['delayanti']]
+    elif setup == 3:
+        rule_trains = [['fdgo', 'fdanti', 'delaygo'], ['contextdelaydm1']]
+    else:
+        raise ValueError('Unknown setup')
+
+    train.train_sequential(
+        model_dir,
+        rule_trains,
+        hp=hp,
+        max_steps=hp['max_steps'],
+        display_step=500,
+        ruleset='all',
+        seed=seed,
+    )
+
+
 if __name__ == '__main__':
-    debug_train_all()
+    # debug_train_all()
+    dev_test_faster()
 
