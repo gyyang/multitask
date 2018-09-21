@@ -306,8 +306,7 @@ def plot_hist_varprop_all(model_dir, plot_control=True):
     figsize = (7, 7)
 
     # For testing
-    # rules = ['fdgo','reactgo','delaygo', 'fdanti', 'reactanti']
-    # figsize = (4, 4)
+    # rules, figsize = ['fdgo','reactgo','delaygo', 'fdanti', 'reactanti'], (4, 4)
 
     fs = 6 # fontsize
 
@@ -346,9 +345,7 @@ def plot_hist_varprop_all(model_dir, plot_control=True):
             ax.spines["top"].set_visible(False)
 
     # plt.tight_layout()
-    if save:
-        figname = ('figure/plot_hist_varprop_all.pdf').replace('*','')
-        plt.savefig(figname, transparent=True)
+    plt.savefig('figure/plot_hist_varprop_all.pdf', transparent=True)
 
 def plot_hist_varprop_selection_cont():
         save_type = 'cont_allrule'

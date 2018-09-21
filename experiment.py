@@ -50,6 +50,7 @@ def train_all(seed=0, model_dir='train_all'):
     #             rule_prob_map=rule_prob_map, seed=seed)
     # Analyses
     variance.compute_variance(model_dir)
+    variance.compute_variance(model_dir, random_rotation=True)
     log = tools.load_log(model_dir)
     analysis = clustering.Analysis(model_dir, 'rule')
     log['n_cluster'] = analysis.n_cluster
