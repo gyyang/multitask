@@ -48,14 +48,13 @@ class Trial(object):
     """Class representing a batch of trials."""
 
     def __init__(self, config, tdim, batch_size):
-        '''
-        Initialize
-        :param config: dictionary of configuration
-        :param tdim:
-        :param batch_size:
-        :return:
-        '''
+        """A batch of trials.
 
+        Args:
+            config: dictionary of configurations
+            tdim: int, number of time steps
+            batch_size: int, batch size
+        """
         self.float_type = 'float32' # This should be the default
         self.config = config
         self.dt = self.config['dt']
@@ -77,19 +76,27 @@ class Trial(object):
         self._sigma_x = config['sigma_x']*np.sqrt(2/config['alpha'])
 
     def expand(self, var):
+        """Expand an int/float to list."""
         if not hasattr(var, '__iter__'):
             var = [var] * self.batch_size
         return var
 
     def add(self, loc_type, locs=None, ons=None, offs=None, strengths=1, mods=None):
-        '''
-        Add an input or stimulus output
-        locs not needed for fix_in or fix_out loc_type
-        '''
-        ons         = self.expand(ons)
-        offs        = self.expand(offs)
-        strengths   = self.expand(strengths)
-        mods        = self.expand(mods)
+        """Add an input or stimulus output.
+
+        Args:
+            loc_type: str (fix_in, stim, fix_out, out), type of information to be added
+            locs: array of list of float (batch_size,), locations to be added, only for loc_type=stim or out
+            ons: int or list, index of onset time
+            offs: int or list, index of offset time
+            strengths: float or list, strength of input or target output
+            mods: int or list, modalities of input or target output
+        """
+
+        ons = self.expand(ons)
+        offs = self.expand(offs)
+        strengths = self.expand(strengths)
+        mods = self.expand(mods)
 
         for i in range(self.batch_size):
             if loc_type == 'fix_in':
@@ -116,20 +123,17 @@ class Trial(object):
                 raise ValueError('Unknown loc_type')
 
     def add_x_noise(self):
-        '''
-        Add input noise
-        :param sigma:
-        :return:
-        '''
+        """Add input noise."""
         self.x += self.config['rng'].randn(*self.x.shape)*self._sigma_x
 
     def add_c_mask(self, pre_offs, post_ons):
-        '''
-        Add a cost mask
+        """Add a cost mask.
+
         Usually there are two periods, pre and post response
         Scale the mask weight for the post period so in total it's as important
         as the pre period
-        '''
+        """
+
         pre_on   = int(100/self.dt) # never check the first 100ms
         pre_offs = self.expand(pre_offs)
         post_ons = self.expand(post_ons)
@@ -163,6 +167,7 @@ class Trial(object):
             self.c_mask /= self.c_mask.mean()
 
     def add_rule(self, rule, on=None, off=None, strength=1.):
+        """Add rule input."""
         if isinstance(rule, int):
             self.x[on:off, :, self.config['rule_start']+rule] = strength
         else:
@@ -170,15 +175,17 @@ class Trial(object):
             self.x[on:off, :, ind_rule] = strength
 
     def add_x_loc(self, x_loc):
-        dist = get_dist(x_loc-self.pref) # periodic boundary
+        """Input activity given location."""
+        dist = get_dist(x_loc-self.pref)  # periodic boundary
         dist /= np.pi/8
         return 0.8*np.exp(-dist**2/2)
 
     def add_y_loc(self, y_loc):
-        dist = get_dist(y_loc-self.pref) # periodic boundary
+        """Target response given location."""
+        dist = get_dist(y_loc-self.pref)  # periodic boundary
         if self.config['loss_type'] == 'lsq':
             dist /= np.pi/8
-            y    = 0.8*np.exp(-dist**2/2)
+            y = 0.8*np.exp(-dist**2/2)
         else:
             # One-hot output
             y = np.zeros_like(dist)
@@ -263,6 +270,9 @@ def delaygo_(config, mode, anti_response, **kwargs):
         stim_mod    = 1
 
         batch_size = len(stim_locs)
+
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
 
     check_ons= fix_offs + int(100/dt)
 
@@ -413,6 +423,9 @@ def _contextdm(config, mode, attend_mod, **kwargs):
         fix_offs = stim_offs
         tdim = int(500/dt) + fix_offs
 
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
     # time to check the saccade location
     check_ons  = fix_offs + int(100/dt)
 
@@ -510,6 +523,9 @@ def reactgo_(config, mode, anti_response, **kwargs):
         tdim = int(400/dt) + stim_ons
         stim_mod   = 1
 
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
     # time to check the saccade location
     check_ons  = stim_ons + int(100/dt)
 
@@ -601,6 +617,9 @@ def fdgo_(config, mode, anti_response, **kwargs):
         fix_offs  = stim_ons + stim_time
         tdim      = int(400/dt) + fix_offs
         stim_mod   = 1
+
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
 
     # time to check the saccade location
     check_ons  = fix_offs + int(100/dt)
@@ -721,6 +740,9 @@ def _dm(config, mode, stim_mod, **kwargs):
         fix_offs = int(300/dt) + stim_time
         tdim = int(400/dt) + fix_offs
 
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
     # time to check the saccade location
     check_ons  = fix_offs + int(100/dt)
 
@@ -840,6 +862,9 @@ def _delaydm(config, mode, stim_mod, **kwargs):
 
         fix_offs = int(200/dt) + stim2_offs
         tdim = int(300/dt) + fix_offs
+
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
 
     # time to check the saccade location
     check_ons  = fix_offs + int(100/dt)
@@ -989,6 +1014,9 @@ def _contextdelaydm(config, mode, attend_mod, **kwargs):
         fix_offs = int(200/dt) + stim2_offs
         tdim = int(300/dt) + fix_offs
 
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
     # time to check the saccade location
     check_ons  = fix_offs + int(100/dt)
 
@@ -1117,6 +1145,9 @@ def dms_(config, mode, matchnogo, **kwargs):
         stim1_mod = 1
         stim2_mod = 1
 
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
     # time to check the saccade location
     check_ons = stim2_ons + int(100/dt)
 
@@ -1240,6 +1271,9 @@ def dmc_(config, mode, matchnogo, **kwargs):
         stim1_mod = 1
         stim2_mod = 1
 
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
     # time to check the saccade location
     check_ons = stim2_ons + int(100/dt)
 
@@ -1341,6 +1375,9 @@ def oic(config, mode, **kwargs):
         fix_offs  = stim1_ons + int(1000/dt)
         tdim = fix_offs + int(500/dt)
 
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
     # time to check the saccade location
     check_ons = fix_offs + int(100/dt)
 
@@ -1431,6 +1468,9 @@ def delaymatchcategory_original(config, mode, **kwargs):
         stim1_offs = int(1500/dt)
         stim2_ons  = int(2500/dt)
 
+    else:
+        raise ValueError('Unknown mode: ' + str(mode))
+
     # time to check the saccade location
     check_ons = stim2_ons + int(100/dt)
 
@@ -1470,64 +1510,66 @@ def delaymatchcategory_original(config, mode, **kwargs):
 
 
 rule_mapping = {'testinit': test_init,
-                'fdgo'              : fdgo,
-                'reactgo'           : reactgo,
-                'delaygo'           : delaygo,
-                'fdanti'            : fdanti,
-                'reactanti'         : reactanti,
-                'delayanti'         : delayanti,
-                'dm1'               : dm1,
-                'dm2'               : dm2,
-                'contextdm1'        : contextdm1,
-                'contextdm2'        : contextdm2,
-                'multidm'           : multidm,
-                'delaydm1'          : delaydm1,
-                'delaydm2'          : delaydm2,
-                'contextdelaydm1'   : contextdelaydm1,
-                'contextdelaydm2'   : contextdelaydm2,
-                'multidelaydm'      : multidelaydm,
-                'dmsgo'             : dmsgo,
-                'dmsnogo'           : dmsnogo,
-                'dmcgo'             : dmcgo,
-                'dmcnogo'           : dmcnogo,
-                'oic'               : oic,
-                'dmc'               : delaymatchcategory_original}
+                'fdgo': fdgo,
+                'reactgo': reactgo,
+                'delaygo': delaygo,
+                'fdanti': fdanti,
+                'reactanti': reactanti,
+                'delayanti': delayanti,
+                'dm1': dm1,
+                'dm2': dm2,
+                'contextdm1': contextdm1,
+                'contextdm2': contextdm2,
+                'multidm': multidm,
+                'delaydm1': delaydm1,
+                'delaydm2': delaydm2,
+                'contextdelaydm1': contextdelaydm1,
+                'contextdelaydm2': contextdelaydm2,
+                'multidelaydm': multidelaydm,
+                'dmsgo': dmsgo,
+                'dmsnogo': dmsnogo,
+                'dmcgo': dmcgo,
+                'dmcnogo': dmcnogo,
+                'oic': oic,
+                'dmc': delaymatchcategory_original}
 
-rule_name    = {'reactgo'           : 'RT Go',
-                'delaygo'           : 'Dly Go',
-                'fdgo'              : 'Go',
-                'dm1'               : 'DM 1',
-                'dm2'               : 'DM 2',
-                'contextdm1'        : 'Ctx DM 1',
-                'contextdm2'        : 'Ctx DM 2',
-                'multidm'           : 'MultSen DM',
-                'delaydm1'          : 'Dly DM 1',
-                'delaydm2'          : 'Dly DM 2',
-                'contextdelaydm1'   : 'Ctx Dly DM 1',
-                'contextdelaydm2'   : 'Ctx Dly DM 2',
-                'multidelaydm'      : 'MultSen Dly DM',
-                'reactanti'         : 'RT Anti',
-                'delayanti'         : 'Dly Anti',
-                'fdanti'            : 'Anti',
-                'dmsgo'             : 'DMS',
-                'dmsnogo'           : 'DNMS',
-                'dmcgo'             : 'DMC',
-                'dmcnogo'           : 'DNMC',
-                'oic'               : '1IC',
-                'dmc'               : 'DMC'
+rule_name    = {'reactgo': 'RT Go',
+                'delaygo': 'Dly Go',
+                'fdgo': 'Go',
+                'dm1': 'DM 1',
+                'dm2': 'DM 2',
+                'contextdm1': 'Ctx DM 1',
+                'contextdm2': 'Ctx DM 2',
+                'multidm': 'MultSen DM',
+                'delaydm1': 'Dly DM 1',
+                'delaydm2': 'Dly DM 2',
+                'contextdelaydm1': 'Ctx Dly DM 1',
+                'contextdelaydm2': 'Ctx Dly DM 2',
+                'multidelaydm': 'MultSen Dly DM',
+                'reactanti': 'RT Anti',
+                'delayanti': 'Dly Anti',
+                'fdanti': 'Anti',
+                'dmsgo': 'DMS',
+                'dmsnogo': 'DNMS',
+                'dmcgo': 'DMC',
+                'dmcnogo': 'DNMC',
+                'oic': '1IC',
+                'dmc': 'DMC'
                 }
 
 
 def generate_trials(rule, hp, mode, noise_on=True, **kwargs):
-    '''
-    Generate one batch of data
-    :param rule: the rule for this batch
-    :param mode: the mode of generating. Options: 'random', 'explicit'...
-    Optional:
-    :param batch_size: Batch size (number of trials)
-    :param param: a dictionary of parameters
-    :return: dictionary of list of data.
-    '''
+    """Generate one batch of data.
+
+    Args:
+        rule: str, the rule for this batch
+        hp: dictionary of hyperparameters
+        mode: str, the mode of generating. Options: random, test, psychometric
+        noise_on: bool, whether input noise is given
+
+    Return:
+        trial: Trial class instance, containing input and target output
+    """
     config = hp
     trial = rule_mapping[rule](config, mode, **kwargs)
 
