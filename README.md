@@ -1,12 +1,12 @@
 # MultiTask Network
 
 ## Dependencies
-The training code is only tested in Tensorflow 1.5.0 and Python 2.7.
+The code is tested in Tensorflow 1.8.0, Python 2.7 and Python 3.6, and on MacOS 10.13 and Ubuntu 16.04.
 
 Scikit-learn (http://scikit-learn.org/stable/) is necessary for many analyses.
 
 The seaborn package (https://seaborn.pydata.org/) is needed to correctly
-plot some analysis results.
+plot a few analysis results.
 
 ## Reproducing results from the paper
 All analysis results from the paper can be reproduced from paper.py
@@ -25,13 +25,13 @@ Train a default network with:
     train.train(model_dir='debug', hp={'learning_rate': 0.001}, ruleset='mante')
 
 These lines will train a default network for the Mante task, and store the
-results in your_working_directory/debug/
+results in your_working_directory/debug/.
 
 ## Get started with some simple analyses
 After training (you can interrupt at any time), you can visualize the neural
 activity using
 
-    import standard_analysis
+    from analysis import standard_analysis
     model_dir = 'debug'
     rule = 'contextdm1'
     standard_analysis.easy_activity_plot(model_dir, rule)
