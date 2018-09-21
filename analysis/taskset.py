@@ -258,7 +258,7 @@ def compute_taskspace(model_dir, setup, restore=False, representation='rate'):
         if restore and os.path.isfile(fname):
             print('Reloading results from '+fname)
             with open(fname, 'rb') as f:
-                h_trans = pickle.load(f)
+                h_trans = pickle.load(f, encoding='latin1')
 
         else:
             tsa = TaskSetAnalysis(model_dir, rules=rules)
@@ -318,15 +318,14 @@ def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
     for key, val in h_trans.items():
         rule, epoch = key
         # Default coloring by rule_color
-        color = np.array(rule_color[rule])
+        color = rule_color[rule]
 
         if plot_example:
             xplot, yplot = val[i_example,dim0], val[i_example,dim1]
         else:
             xplot, yplot = val[:,dim0], val[:,dim1]
 
-        ax.plot(xplot, yplot, 'o',
-                color=color, mec=color*1, mew=1.0, ms=2)
+        ax.plot(xplot, yplot, 'o', color=color, mec=color, mew=1.0, ms=2)
 
 
         xtext = np.mean(val[:,dim0])
@@ -436,12 +435,14 @@ def plot_taskspace_group(root_dir, setup=1, restore=True,
             print('Skipping model at ' + model_dir)
             continue
 
+        h_trans_values = list(h_trans.values())
+
         if flip_sign:
             if setup in [1, 3]:
                 # When PC1 and PC2 capture similar variances, allow for a rotation
                 # rotation_matrix, clock wise
                 get_angle = lambda vec : np.arctan2(vec[1], vec[0])
-                theta = get_angle(h_trans.values()[0][0])
+                theta = get_angle(h_trans_values[0][0])
                 # theta = 0
                 rot_mat = np.array([[np.cos(theta), -np.sin(theta)],
                                     [np.sin(theta),  np.cos(theta)]])
@@ -449,12 +450,12 @@ def plot_taskspace_group(root_dir, setup=1, restore=True,
                 for key, val in h_trans.items():
                     h_trans[key] = np.dot(val, rot_mat)
 
-                if get_angle(h_trans.values()[1][0]) < 0:
+                if get_angle(h_trans_values[1][0]) < 0:
                     for key, val in h_trans.items():
                         h_trans[key] = val*np.array([1, -1])
             else:
                 # # The first data point should have all positive coordinate values
-                signs = ((h_trans.values()[0]>0)*2.-1)
+                signs = ((h_trans_values[0]>0)*2.-1)
                 for key, val in h_trans.items():
                     h_trans[key] = val*signs
 
@@ -571,7 +572,7 @@ def compute_replacerule_performance(model_dir, setup, restore=False):
     if restore and os.path.isfile(fname):
         print('Reloading results from '+fname)
         with open(fname, 'rb') as f:
-            r = pickle.load(f)
+            r = pickle.load(f, encoding='latin1')
         perfs, rule, names = r['perfs'], r['rule'], r['names']
 
     else:
