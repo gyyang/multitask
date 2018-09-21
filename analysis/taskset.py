@@ -19,26 +19,6 @@ from network import Model
 from network import get_perf
 import tools
 
-save = True
-
-
-def get_dim(h, zero_mean=False):
-    # Get effective dimension
-    # h : (n_samples, n_features)
-
-    # Abbott, Rajan, Sompolinsky 2011
-    # N_eff = (\sum \lambda_i)^2 / \sum (\lambda_i^2)
-    # \lambda_i is the i-th eigenvalue
-
-    if zero_mean:
-        h = h - h.mean(axis=0) # Do not change it in-place
-
-    _, s, _ = np.linalg.svd(h)
-    l = s**2 # get eigenvalues
-    N_eff = (np.sum(l)**2) / np.sum(l**2)
-
-    return N_eff
-
 
 class TaskSetAnalysis(object):
     """Analyzing the representation of tasks."""
@@ -140,13 +120,16 @@ class TaskSetAnalysis(object):
 
         return h_new
 
+    def compute_and_plot_taskspace(self, rules=None, epochs=None, **kwargs):
+        h_trans = self.compute_taskspace(rules=rules, epochs=epochs, **kwargs)
+        self.plot_taskspace(h_trans, **kwargs)
 
     def compute_taskspace(self, rules=None, epochs=None, dim_reduction_type='MDS', **kwargs):
         # Only get last time points for each epoch
         h = self.filter(self.h_stimavg_byepoch, epochs=epochs, rules=rules, **kwargs)
 
         # Concatenate across rules to create dataset
-        data = np.concatenate(h.values(), axis=0)
+        data = np.concatenate(list(h.values()), axis=0)
         data = data.astype(dtype='float64')
 
         # First reduce dimension to dimension of data points
@@ -187,18 +170,9 @@ class TaskSetAnalysis(object):
 
         return h_trans
 
-    def compute_and_plot_taskspace(self,
-               rules=None, epochs=None, **kwargs):
-
-        h_trans = self.compute_taskspace(rules=rules, epochs=epochs, **kwargs)
-        self.plot_taskspace(h_trans, **kwargs)
-
     def plot_taskspace(self, h_trans, epochs=None, dim_reduction_type='MDS',
-                       plot_text=True, color_by_feature=False, feature=None,
-                       figsize=(4,4), markersize=5, plot_label=True,
-                       plot_special_point=False, plot_arrow=False, **kwargs):
+                       plot_text=True, figsize=(4,4), markersize=5, plot_label=True):
         # Plot tasks in space
-
         shape_mapping = {'stim1' : 'o',
                          'stim2' : 'o',
                          'delay1' : 'v',
@@ -206,7 +180,7 @@ class TaskSetAnalysis(object):
                          'go1'  : 's',
                          'fix1' : 'p'}
 
-        from performance import rule_color
+        from analysis.performance import rule_color
 
         fs = 6 # fontsize
         dim0, dim1 = (0, 1) # plot dimensions
@@ -216,49 +190,21 @@ class TaskSetAnalysis(object):
         fig = plt.figure(figsize=figsize)
         ax = fig.add_axes([0.05, 0.05, 0.9, 0.9])
 
-        # if plot_arrow:
-        #     if rules == ['fdgo', 'fdanti', 'delaygo', 'delayanti']:
-        #         arrow_starts = [h[('fdanti','stim1')], h[('fdgo','stim1')]]
-        #         arrow_ends   = [h[('delayanti','stim1')],
-        #                         -(h[('fdanti','stim1')] - h[('delayanti','stim1')]) + h[('fdgo','stim1')]]
-        #     elif rules == ['dmcgo', 'dmcnogo', 'dmsgo', 'dmsnogo']:
-        #         arrow_starts = [h[('dmsgo','stim1')], h[('dmcgo','stim1')]]
-        #         arrow_ends   = [h[('dmsnogo','stim1')],
-        #                         -(h[('dmsgo','stim1')] - h[('dmsnogo','stim1')]) + h[('dmcgo','stim1')]]
-        #
-        #     elif rules == ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']:
-        #         arrow_starts = [h[('multidm','stim1')], h[('multidm','stim1')]]
-        #         arrow_ends   = [h[('contextdm1','stim1')], h[('contextdm2','stim1')]]
-        #     else:
-        #         ValueError('Arrows not provided')
-        #
-        #     for arrow_start, arrow_end in zip(arrow_starts, arrow_ends):
-        #         arrow_start = model.transform(arrow_start)
-        #         arrow_end   = model.transform(arrow_end)
-        #
-        #         ax.annotate("", xy=arrow_start[-1,:2], xytext=arrow_end[-1,:2],
-        #             arrowprops=dict(arrowstyle="<-", ec='gray'))
-
-
         for key, val in h_trans.items():
             rule, epoch = key
 
-            if color_by_feature:
-                color = 'red' if feature in rule_features[rule] else 'black'
-                color = 'xkcd:'+color
-            else:
-                # Default coloring by rule_color
-                color = np.array(rule_color[rule])
+            # Default coloring by rule_color
+            color = rule_color[rule]
 
-            ax.plot(val[-1,dim0], val[-1,dim1], shape_mapping[epoch],
+            ax.plot(val[-1, dim0], val[-1, dim1], shape_mapping[epoch],
                     color=color, mec=color, mew=1.0, ms=markersize)
 
             if plot_text:
-                texts.append(ax.text(val[-1,dim0], val[-1,dim1], rule_name[rule],
-                                     fontsize=6, color=color*0.5))
+                texts.append(ax.text(val[-1, dim0]+0.03, val[-1, dim1]+0.03, rule_name[rule],
+                                     fontsize=6, color=color))
 
             if 'fix' not in epoch:
-                ax.plot(val[:,dim0], val[:,dim1], color=color, alpha=0.5)
+                ax.plot(val[:, dim0], val[:, dim1], color=color, alpha=0.5)
 
         if plot_label:
             if dim_reduction_type == 'PCA':
@@ -279,160 +225,13 @@ class TaskSetAnalysis(object):
         # ax.xaxis.set_ticks_position('bottom')
         # ax.yaxis.set_ticks_position('left')
 
-        # Plot special points:
-        # if plot_special_point:
-        #     if rules == ['fdgo', 'fdanti', 'delaygo', 'delayanti']:
-        #         special_point = -(h[('fdanti','stim1')] - h[('delayanti','stim1')]) + h[('fdgo','stim1')]
-        #
-        #     elif rules == ['dmcgo', 'dmcnogo', 'dmsgo', 'dmsnogo']:
-        #         special_point = -(h[('dmsgo','stim1')] - h[('dmsnogo','stim1')]) + h[('dmcgo','stim1')]
-        #
-        #     elif rules == ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']:
-        #         special_point = np.concatenate(
-        #             ((h[('contextdm1','stim1')] + h[('multidm','stim1')])/2,
-        #             (h[('contextdm2','stim1')] + h[('multidm','stim1')])/2), axis=0)
-        #
-        #     else:
-        #         ValueError('Special points not provided')
-        #
-        # if plot_special_point:
-        #     assert dim_reduction_type == 'PCA'
-        #     special_point_trans = model.transform(special_point)
-        #     ax.plot(special_point_trans[:,dim0], special_point_trans[:,dim1], '*',
-        #             color=sns.xkcd_palette(['black'])[0], markersize=4)
-
-
-        if color_by_feature:
-            ax.set_title('{:s} vs. others'.format(feature_names[feature]), fontsize=fs)
-
-        if plot_text:
-            from adjustText import adjust_text
-            adjust_text(texts, arrowprops=dict(arrowstyle="-", color='k', lw=0.5))
-
         save_name = 'taskspace'+dim_reduction_type
 
         if epochs is not None:
             save_name = save_name + ''.join(epochs)
 
-        if color_by_feature:
-            save_name = save_name + '_' + feature_names[feature]
-
-        if 'save_append' in kwargs:
-            save_name = save_name + kwargs['save_append']
-
-        if save:
-            plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
+        plt.savefig(os.path.join('figure', save_name+'.pdf'), transparent=True)
         plt.show()
-
-
-    def compute_dim(self, **kwargs):
-        # compute dimensions of each epoch
-        print('Computing dimensions of rule/epochs')
-        self.dim_lastt_byepoch = OrderedDict()
-        for key, val in self.h_lastt_byepoch.items():
-            self.dim_lastt_byepoch[key] = get_dim(val, **kwargs)
-
-    def compute_dim_pair(self, **kwargs):
-        # Compute dimension of each pair of epochs, and the dimension ratio
-
-        print('Computing dimensions of pairs of rule/epochs')
-
-        self.dimpair_lastt_byepoch = OrderedDict()
-        self.dimpairratio_lastt_byepoch = OrderedDict()
-
-        for key1, val1 in self.h_lastt_byepoch.items():
-            for key2, val2 in self.h_lastt_byepoch.items():
-
-                #TODO: TEMP
-                val1 = val1 - val1.mean(axis=0)
-                val2 = val2 - val2.mean(axis=0)
-
-                h_pair = np.concatenate((val1, val2), axis=0)
-
-                dim_pair = get_dim(h_pair, **kwargs)
-                dim1, dim2 = self.dim_lastt_byepoch[key1], self.dim_lastt_byepoch[key2]
-
-                self.dimpair_lastt_byepoch[(key1, key2)] = dim_pair
-                self.dimpairratio_lastt_byepoch[(key1, key2)] = dim_pair/(dim1 + dim2)
-
-
-def obsolete_plot_dim():
-    model_dir = 'allrule_weaknoise_400'
-    tsa = TaskSetAnalysis(model_dir)
-    tsa.compute_dim()
-    
-    epoch_names = tsa.dim_lastt_byepoch.keys()
-    dims = tsa.dim_lastt_byepoch.values()
-    
-    ind_sort = np.argsort(dims)
-    tick_names = [rule_name[epoch_names[i][0]] +' '+ epoch_names[i][1] for i in ind_sort]
-    dims = [dims[i] for i in ind_sort]
-    
-    fig = plt.figure(figsize=(1.5,5))
-    ax = fig.add_axes([0.6,0.15,0.35,0.8])
-    ax.plot(dims,range(len(dims)), 'o-', color='xkcd:cerulean', markersize=3)
-    plt.yticks(range(len(dims)),tick_names, rotation=0, ha='right', fontsize=6)
-    plt.ylim([-0.5, len(dims)-0.5])
-    ax.tick_params(axis='both', which='major', labelsize=7)
-    ax.spines["right"].set_visible(False)
-    ax.spines["top"].set_visible(False)
-    ax.xaxis.set_ticks_position('bottom')
-    ax.yaxis.set_ticks_position('left')
-    plt.xlabel('Task Dim.', fontsize=7, labelpad=1)
-    plt.locator_params(axis='x',nbins=3)
-    plt.savefig('figure/temp.pdf', transparent=True)
-    plt.show()
-
-
-def obsolete_plot_dimpair():
-    model_dir = 'allrule_weaknoise_400'
-    tsa = TaskSetAnalysis(model_dir)
-    tsa.compute_dim()
-    tsa.compute_dim_pair()
-
-
-    epoch_names = tsa.h_lastt_byepoch.keys()
-
-    # Arbitrarily define sort order for epochs
-    epoch_map = dict(zip(['stim1', 'stim2', 'delay1', 'delay2', 'go1'], range(5)))
-    epoch_names_forsort = [(en[0], epoch_map[en[1]]) for en in epoch_names]
-    ind_sort = np.lexsort(zip(*epoch_names_forsort)) # sort epoch_names first by epoch then by rule
-    epoch_names = [epoch_names[i] for i in ind_sort]
-
-
-    dimratio_pair_matrix = np.zeros((len(epoch_names), len(epoch_names)))
-    for i1, key1 in enumerate(epoch_names):
-        for i2, key2 in enumerate(epoch_names):
-            dimratio_pair_matrix[i1, i2] = tsa.dimpairratio_lastt_byepoch[(key1, key2)]
-
-
-    figsize = (5,5)
-    rect = [0.2,0.2,0.7,0.7]
-    tick_names = [rule_name[en[0]] +' '+ en[1] for en in epoch_names]
-
-    fig = plt.figure(figsize=figsize)
-    ax = fig.add_axes(rect)
-    # cmap = sns.cubehelix_palette(light=1, as_cmap=True, rot=0)
-    im = ax.imshow(2-2*dimratio_pair_matrix, aspect='equal', cmap='hot',
-                   vmin=0,vmax=1.0,interpolation='nearest',origin='lower')
-
-    if len(tick_names)<20:
-        tick_fontsize = 7
-    elif len(tick_names)<30:
-        tick_fontsize = 6
-    else:
-        tick_fontsize = 5
-
-    _ = plt.xticks(range(len(tick_names)), tick_names,
-               rotation=90, ha='left', fontsize=tick_fontsize)
-    _ = plt.yticks(range(len(tick_names)), tick_names,
-               rotation=0, va='center', fontsize=tick_fontsize)
-
-    cax = fig.add_axes([rect[0]+rect[2]+0.05, rect[1], 0.05, rect[3]])
-    cb = plt.colorbar(im, cax=cax, ticks=[0,0.5,1])
-    cb.set_label('Similarity', fontsize=7, labelpad=3)
-    plt.tick_params(axis='both', which='major', labelsize=7)
-    plt.savefig('figure/temp.pdf',transparent=True)
 
 
 def compute_taskspace(model_dir, setup, restore=False, representation='rate'):
@@ -503,7 +302,7 @@ def compute_taskspace(model_dir, setup, restore=False, representation='rate'):
 
 def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
                     plot_arrow=True, **kwargs):
-    from performance import rule_color
+    from analysis.performance import rule_color
     figsize = (1.7,1.7)
     fs = 7 # fontsize
     dim0, dim1 = (0, 1) # plot dimensions
@@ -597,8 +396,7 @@ def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
     ax.set_xlabel(pc_name+' {:d}'.format(dim0+1), fontsize=fs, labelpad=-5)
     ax.set_ylabel(pc_name+' {:d}'.format(dim1+1), fontsize=fs, labelpad=-5)
 
-    if save:
-        plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
+    plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
     plt.show()
 
     return (lx, ly)
