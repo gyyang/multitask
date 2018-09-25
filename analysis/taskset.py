@@ -350,6 +350,11 @@ def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
                         h_trans[('contextdelaydm1','stim1')]]
         arrow_ends   = [h_trans[('contextdm2','stim1')],
                         h_trans[('contextdelaydm2','stim1')]]
+    elif kwargs['setup'] == 3:
+        arrow_starts = [h_trans[('dmsgo','stim1')],
+                        h_trans[('dmsnogo','stim1')]]
+        arrow_ends   = [h_trans[('dmcgo','stim1')],
+                        h_trans[('dmcnogo','stim1')]]
     else:
         plot_arrow = False
 
@@ -386,10 +391,7 @@ def _plot_taskspace(h_trans, fig_name='temp', plot_example=False, lxy=None,
     ax.set_yticks([-ly,ly])
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-    if kwargs['setup'] == 1:
-        pc_name = 'rPC'
-    else:
-        pc_name = 'PC'
+    pc_name = 'rPC'
     ax.set_xlabel(pc_name+' {:d}'.format(dim0+1), fontsize=fs, labelpad=-5)
     ax.set_ylabel(pc_name+' {:d}'.format(dim1+1), fontsize=fs, labelpad=-5)
 
@@ -407,16 +409,15 @@ def plot_taskspace(model_dir, setup=1, restore=True, representation='rate'):
 
 
 def plot_taskspace_group(root_dir, setup=1, restore=True,
-                         representation='rate', flip_sign=True):
-    '''Plot task space for a group of networks.
+                         representation='rate', fig_name_addon=None):
+    """Plot task space for a group of networks.
 
     Args:
         root_dir : the root directory for all models to analyse
         setup: int, the combination of rules to use
         restore: bool, whether to restore results
         representation: 'rate' or 'weight'
-        flip_sign: bool, whether to flip signs for consistency
-    '''
+    """
 
     model_dirs = tools.valid_model_dirs(root_dir)
     print('Analyzing models : ')
@@ -435,27 +436,21 @@ def plot_taskspace_group(root_dir, setup=1, restore=True,
 
         h_trans_values = list(h_trans.values())
 
-        if flip_sign:
-            if setup in [1, 3]:
-                # When PC1 and PC2 capture similar variances, allow for a rotation
-                # rotation_matrix, clock wise
-                get_angle = lambda vec : np.arctan2(vec[1], vec[0])
-                theta = get_angle(h_trans_values[0][0])
-                # theta = 0
-                rot_mat = np.array([[np.cos(theta), -np.sin(theta)],
-                                    [np.sin(theta),  np.cos(theta)]])
+        # When PC1 and PC2 capture similar variances, allow for a rotation
+        # rotation_matrix, clock wise
+        get_angle = lambda vec : np.arctan2(vec[1], vec[0])
+        theta = get_angle(h_trans_values[0][0])
+        # theta = 0
+        rot_mat = np.array([[np.cos(theta), -np.sin(theta)],
+                            [np.sin(theta),  np.cos(theta)]])
 
-                for key, val in h_trans.items():
-                    h_trans[key] = np.dot(val, rot_mat)
+        for key, val in h_trans.items():
+            h_trans[key] = np.dot(val, rot_mat)
 
-                if get_angle(h_trans_values[1][0]) < 0:
-                    for key, val in h_trans.items():
-                        h_trans[key] = val*np.array([1, -1])
-            else:
-                # # The first data point should have all positive coordinate values
-                signs = ((h_trans_values[0]>0)*2.-1)
-                for key, val in h_trans.items():
-                    h_trans[key] = val*signs
+        h_trans_values = list(h_trans.values())
+        if h_trans_values[1][0][1] < 0:
+            for key, val in h_trans.items():
+                h_trans[key] = val*np.array([1, -1])
 
         if i == 0:
             for key, val in h_trans.items():
@@ -464,8 +459,9 @@ def plot_taskspace_group(root_dir, setup=1, restore=True,
             for key, val in h_trans.items():
                 h_trans_all[key] = np.concatenate((h_trans_all[key], val), axis=0)
         i += 1
-
     fig_name = 'taskset{:d}_{:s}space'.format(setup, representation)
+    if fig_name_addon is not None:
+        fig_name = fig_name + fig_name_addon
 
     lxy = _plot_taskspace(h_trans_all, fig_name, setup=setup)
     fig_name = fig_name + '_example'
