@@ -587,26 +587,30 @@ def compute_replacerule_performance(model_dir, setup, restore=False):
     return perfs, rule, names
 
 
-def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, fig_name=None):
-    save = True
-
+def _plot_replacerule_performance(perfs_all, rule, names, setup, fig_name=None):
+    perfs_all = perfs_all.T  # make it (4, n_nets)
+    n_condition, n_net = perfs_all.shape
     fs = 7
-    width = 0.3
     fig = plt.figure(figsize=(1.6,2.2))
     ax = fig.add_axes([0.55,0.05,0.35,0.7])
-    b0 = ax.barh(np.arange(len(perfs)), perfs[::-1],
-           height=width, color='xkcd:cerulean', edgecolor='none')
-    if perfs_all is not None:
-        n_net = perfs_all.shape[0]
-        for i in range(len(perfs)):
-            ax.plot(perfs_all[:,-i-1], [i]*n_net, 'o',
-                    color='black', alpha=0.15, markersize=2)
-    ax.set_yticks(np.arange(len(perfs)))
+
+    bp = ax.boxplot(list(perfs_all[::-1]), notch=True, vert=False, bootstrap=10000,
+               showcaps=False, patch_artist=True, widths=0.4,
+               flierprops={'markersize': 2}, whiskerprops={'linewidth': 1.5})
+    for element in ['boxes', 'whiskers', 'fliers']:
+        plt.setp(bp[element], color='xkcd:cerulean')
+    for patch in bp['boxes']:
+        patch.set_facecolor('xkcd:cerulean')
+    for element in ['means', 'medians']:
+        plt.setp(bp[element], color='white')
+
+    ax.set_yticks(np.arange(1, 1+n_condition))
     ax.set_yticklabels(names[::-1], rotation=0, horizontalalignment='right')
     ax.set_ylabel('Rule input', fontsize=fs, labelpad=3)
     # ax.set_ylabel('performance', fontsize=fs)
     title = 'Performance on\n'+rule_name[rule]
     if perfs_all is not None:
+        n_net = perfs_all.shape[1]
         title = title + ' (n={:d})'.format(n_net)
     ax.set_title(title, fontsize=fs, y=1.13)
     ax.tick_params(axis='both', which='major', labelsize=fs)
@@ -616,12 +620,11 @@ def _plot_replacerule_performance(perfs, rule, names, setup, perfs_all=None, fig
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.grid(True)
     ax.set_xticks([0,0.5,1.0])
-    ax.set_xlim([0,1.05])
-    ax.set_ylim([-0.5,len(perfs)-0.5])
+    ax.set_xlim([0, 1.05])
+    ax.set_ylim([0.5, n_condition+0.5])
     if fig_name is None:
         fig_name = 'taskset{:d}_perf'.format(setup)
-    if save:
-        plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
+    plt.savefig(os.path.join('figure', fig_name+'.pdf'), transparent=True)
     plt.show()
 
 
@@ -630,7 +633,7 @@ def plot_replacerule_performance(
     perfs, rule, names = compute_replacerule_performance(
             model_dir, setup, restore)
     _plot_replacerule_performance(
-            perfs, rule, names, setup, perfs_all, fig_name)
+        perfs_all, rule, names, setup, fig_name)
 
 
 def plot_replacerule_performance_group(model_dir, setup=1, restore=True, fig_name_addon=None):
@@ -651,8 +654,7 @@ def plot_replacerule_performance_group(model_dir, setup=1, restore=True, fig_nam
         fig_name = fig_name + fig_name_addon
 
     print(perfs_median)
-    _plot_replacerule_performance(perfs_median, rule, names, setup,
-                                  perfs_all=perfs_plot, fig_name=fig_name)
+    _plot_replacerule_performance(perfs_plot, rule, names, setup, fig_name=fig_name)
 
 
 if __name__ == '__main__':
