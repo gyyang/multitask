@@ -128,27 +128,22 @@ class LeakyRNNCell(RNNCell):
 
         if activation == 'softplus':
             self._activation = tf.nn.softplus
-            self._bias_start = 0.
             self._w_in_start = 1.0
             self._w_rec_start = 0.5
         elif activation == 'tanh':
             self._activation = tf.tanh
-            self._bias_start = 0.
             self._w_in_start = 1.0
             self._w_rec_start = 1.0
         elif activation == 'relu':
             self._activation = tf.nn.relu
-            self._bias_start = 0.5
             self._w_in_start = 1.0
             self._w_rec_start = 0.5
         elif activation == 'power':
             self._activation = lambda x: tf.square(tf.nn.relu(x))
-            self._bias_start = 0.5
             self._w_in_start = 1.0
             self._w_rec_start = 0.01
         elif activation == 'retanh':
             self._activation = lambda x: tf.tanh(tf.nn.relu(x))
-            self._bias_start = 0.5
             self._w_in_start = 1.0
             self._w_rec_start = 0.5
         else:
@@ -486,7 +481,8 @@ class Model(object):
         self.set_optimizer()
 
         # Variable saver
-        self.saver = tf.train.Saver(self.var_list)
+        # self.saver = tf.train.Saver(self.var_list)
+        self.saver = tf.train.Saver()
 
         self.model_dir = model_dir
         self.hp = hp
@@ -524,11 +520,18 @@ class Model(object):
         sess = tf.get_default_session()
         sess.run(tf.global_variables_initializer())
 
-    def restore(self):
+    def restore(self, load_dir=None):
         """restore the model"""
         sess = tf.get_default_session()
-        save_path = os.path.join(self.model_dir, 'model.ckpt')
-        self.saver.restore(sess, save_path)
+        if load_dir is None:
+            load_dir = self.model_dir
+        save_path = os.path.join(load_dir, 'model.ckpt')
+        try:
+            self.saver.restore(sess, save_path)
+        except:
+            # Some earlier checkpoints only stored trainable variables
+            self.saver = tf.train.Saver(self.var_list)
+            self.saver.restore(sess, save_path)
         print("Model restored from file: %s" % save_path)
 
     def save(self):
@@ -538,20 +541,27 @@ class Model(object):
         self.saver.save(sess, save_path)
         print("Model saved in file: %s" % save_path)
 
-    def set_optimizer(self, extra_cost=None):
+    def set_optimizer(self, extra_cost=None, var_list=None):
         """Recompute the optimizer to reflect the latest cost function.
 
         This is useful when the cost function is modified throughout training
 
         Args:
-            extra_cost : tensorflow variable, 
+            extra_cost : tensorflow variable,
             added to the lsq and regularization cost
         """
         cost = self.cost_lsq + self.cost_reg
         if extra_cost is not None:
             cost += extra_cost
 
-        self.grads_and_vars = self.opt.compute_gradients(cost, self.var_list)
+        if var_list is None:
+            var_list = self.var_list
+
+        print('Variables being optimized:')
+        for v in var_list:
+            print(v)
+
+        self.grads_and_vars = self.opt.compute_gradients(cost, var_list)
         # gradient clipping
         capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var)
                       for grad, var in self.grads_and_vars]
@@ -590,3 +600,225 @@ class Model(object):
         if verbose:
             print('Lesioned units:')
             print(units)
+
+
+class LeakyRNNCellSeparateInput(RNNCell):
+    """The most basic RNN cell with external inputs separated.
+
+    Args:
+        num_units: int, The number of units in the RNN cell.
+        activation: Nonlinearity to use.    Default: `tanh`.
+        reuse: (optional) Python boolean describing whether to reuse variables
+         in an existing scope.    If not `True`, and the existing scope already has
+         the given variables, an error is raised.
+        name: String, the name of the layer. Layers with the same name will
+            share weights, but to avoid mistakes we require reuse=True in such
+            cases.
+    """
+
+    def __init__(self,
+                 num_units,
+                 alpha,
+                 sigma_rec=0,
+                 activation='softplus',
+                 w_rec_init='diag',
+                 rng=None,
+                 reuse=None,
+                 name=None):
+        super(LeakyRNNCellSeparateInput, self).__init__(_reuse=reuse, name=name)
+
+        # Inputs must be 2-dimensional.
+        # self.input_spec = base_layer.InputSpec(ndim=2)
+
+        self._num_units = num_units
+        self._w_rec_init = w_rec_init
+        self._reuse = reuse
+
+        if activation == 'softplus':
+            self._activation = tf.nn.softplus
+            self._w_in_start = 1.0
+            self._w_rec_start = 0.5
+        elif activation == 'relu':
+            self._activation = tf.nn.relu
+            self._w_in_start = 1.0
+            self._w_rec_start = 0.5
+        else:
+            raise ValueError('Unknown activation')
+        self._alpha = alpha
+        self._sigma = np.sqrt(2 / alpha) * sigma_rec
+        if rng is None:
+            self.rng = np.random.RandomState()
+        else:
+            self.rng = rng
+
+        # Generate initialization matrix
+        n_hidden = self._num_units
+
+        if self._w_rec_init == 'diag':
+            w_rec0 = self._w_rec_start*np.eye(n_hidden)
+        elif self._w_rec_init == 'randortho':
+            w_rec0 = self._w_rec_start*tools.gen_ortho_matrix(n_hidden,
+                                                              rng=self.rng)
+        elif self._w_rec_init == 'randgauss':
+            w_rec0 = (self._w_rec_start *
+                      self.rng.randn(n_hidden, n_hidden)/np.sqrt(n_hidden))
+        else:
+            raise ValueError
+
+        self.w_rnn0 = w_rec0
+        self._initializer = tf.constant_initializer(w_rec0, dtype=tf.float32)
+
+    @property
+    def state_size(self):
+        return self._num_units
+
+    @property
+    def output_size(self):
+        return self._num_units
+
+    def build(self, inputs_shape):
+        self._kernel = self.add_variable(
+                'kernel',
+                shape=[self._num_units, self._num_units],
+                initializer=self._initializer)
+        self._bias = self.add_variable(
+                'bias',
+                shape=[self._num_units],
+                initializer=init_ops.zeros_initializer(dtype=self.dtype))
+
+        self.built = True
+
+    def call(self, inputs, state):
+        """output = new_state = act(input + U * state + B)."""
+
+        gate_inputs = math_ops.matmul(state, self._kernel)
+        gate_inputs = gate_inputs + inputs  # directly add inputs
+        gate_inputs = nn_ops.bias_add(gate_inputs, self._bias)
+
+        noise = tf.random_normal(tf.shape(state), mean=0, stddev=self._sigma)
+        gate_inputs = gate_inputs + noise
+
+        output = self._activation(gate_inputs)
+
+        output = (1-self._alpha) * state + self._alpha * output
+
+        return output, output
+
+
+class ModelDEV(Model):
+    """The model."""
+
+    def __init__(self,
+                 model_dir,
+                 hp=None,
+                 sigma_rec=None,
+                 dt=None):
+        """
+        Initializing the model with information from hp
+
+        Args:
+            model_dir: string, directory of the model
+            hp: a dictionary or None
+            sigma_rec: if not None, overwrite the sigma_rec passed by hp
+        """
+
+        # Reset tensorflow graphs
+        tf.reset_default_graph()  # must be in the beginning
+
+        if hp is None:
+            hp = tools.load_hp(model_dir)
+            if hp is None:
+                raise ValueError(
+                    'No hp found for model_dir {:s}'.format(model_dir))
+
+        tf.set_random_seed(hp['seed'])
+        rng = np.random.RandomState(hp['seed'])
+
+        if sigma_rec is not None:
+            print('Overwrite sigma_rec with {:0.3f}'.format(sigma_rec))
+            hp['sigma_rec'] = sigma_rec
+
+        if dt is not None:
+            print('Overwrite original dt with {:0.1f}'.format(dt))
+            hp['dt'] = dt
+
+        hp['alpha'] = 1.0*hp['dt']/hp['tau']
+
+        # Input, target output, and cost mask
+        # Shape: [Time, Batch, Num_units]
+        n_input = hp['n_input']
+        n_rnn = hp['n_rnn']
+        n_output = hp['n_output']
+
+        self.x = tf.placeholder("float", [None, None, n_input])
+        self.y = tf.placeholder("float", [None, None, n_output])
+        self.c_mask = tf.placeholder("float", [None, n_output])
+
+        sensory_inputs, rule_inputs = tf.split(
+            self.x, [hp['rule_start'], hp['n_rule']], axis=-1)
+
+        sensory_rnn_inputs = tf.layers.dense(sensory_inputs, n_rnn, name='sen_input')
+        rule_rnn_inputs = tf.layers.dense(rule_inputs, n_rnn, name='rule_input', use_bias=False)
+
+        rnn_inputs = sensory_rnn_inputs + rule_rnn_inputs
+
+        # Recurrent activity
+        cell = LeakyRNNCellSeparateInput(
+            n_rnn, hp['alpha'],
+            sigma_rec=hp['sigma_rec'],
+            activation=hp['activation'],
+            w_rec_init=hp['w_rec_init'],
+            rng=rng)
+
+        # Dynamic rnn with time major
+        self.h, states = rnn.dynamic_rnn(
+                cell, rnn_inputs, dtype=tf.float32, time_major=True)
+
+        # Output
+        h_shaped = tf.reshape(self.h, (-1, n_rnn))
+        y_shaped = tf.reshape(self.y, (-1, n_output))
+        # y_hat shape (n_time*n_batch, n_unit)
+        y_hat = tf.layers.dense(
+            h_shaped, n_output, activation=tf.nn.sigmoid, name='output')
+        # Least-square loss
+        self.cost_lsq = tf.reduce_mean(
+                tf.square((y_shaped-y_hat)*self.c_mask))
+
+        self.y_hat = tf.reshape(y_hat,
+                                (-1, tf.shape(self.h)[1], n_output))
+        y_hat_fix, y_hat_ring = tf.split(
+            self.y_hat, [1, n_output-1], axis=-1)
+        self.y_hat_loc = tf_popvec(y_hat_ring)
+
+        self.var_list = tf.trainable_variables()
+        self.weight_list = [v for v in self.var_list if is_weight(v)]
+
+        # Regularization terms
+        self.cost_reg = tf.constant(0.)
+        if hp['l1_h'] > 0:
+            self.cost_reg += tf.reduce_sum(tf.abs(self.h))*hp['l1_h']
+        if hp['l2_h'] > 0:
+            self.cost_reg += tf.nn.l2_loss(self.h)*hp['l2_h']
+
+        if hp['l1_weight'] > 0:
+            self.cost_reg += hp['l1_weight']*tf.add_n(
+                [tf.reduce_sum(tf.abs(v)) for v in self.weight_list])
+        if hp['l2_weight'] > 0:
+            self.cost_reg += hp['l2_weight']*tf.add_n(
+                [tf.nn.l2_loss(v) for v in self.weight_list])
+
+        # Create an optimizer.
+        if 'optimizer' not in hp or hp['optimizer'] == 'adam':
+            self.opt = tf.train.AdamOptimizer(
+                learning_rate=hp['learning_rate'])
+        elif hp['optimizer'] == 'sgd':
+            self.opt = tf.train.GradientDescentOptimizer(
+                learning_rate=hp['learning_rate'])
+        # Set cost
+        self.set_optimizer()
+
+        # Variable saver
+        self.saver = tf.train.Saver()
+
+        self.model_dir = model_dir
+        self.hp = hp

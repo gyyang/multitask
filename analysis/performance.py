@@ -785,11 +785,10 @@ def compute_choicefamily_varytime(model_dir, rule):
 def plot_choicefamily_varytime(model_dir, rule):
     import seaborn as sns
     assert rule in ['dm1', 'dm2', 'contextdm1', 'contextdm2', 'multidm']
-    savename = os.path.join(model_dir, 'varytime_' + rule)
+    savename = os.path.join(model_dir, 'varytime_' + rule + '.pkl')
 
     try:
-        with open(savename+'.pkl','rb') as f:
-            result = pickle.load(f)
+        result = tools.load_pickle(savename)
     except FileNotFoundError:
         raise FileNotFoundError('Run performance.compute_choicefamily_varytime first.')
 

@@ -12,7 +12,7 @@ import tensorflow as tf
 
 import task
 from task import generate_trials
-from network import Model, get_perf
+from network import Model, get_perf, ModelDEV
 from analysis import variance
 import tools
 
@@ -149,6 +149,7 @@ def do_eval(sess, model, log, rule_train):
               '  | perf {:0.2f}'.format(np.mean(perf_tmp)))
         sys.stdout.flush()
 
+    # TODO: This needs to be fixed since now rules are strings
     if hasattr(rule_train, '__iter__'):
         rule_tmp = rule_train
     else:
@@ -188,6 +189,9 @@ def train(model_dir,
           rule_prob_map=None,
           seed=0,
           rich_output=False,
+          use_separate_input=False,
+          load_dir=None,
+          trainables=None,
           ):
     """Train the network.
 
@@ -238,7 +242,10 @@ def train(model_dir,
     tools.save_hp(hp, model_dir)
 
     # Build the model
-    model = Model(model_dir, hp=hp)
+    if not use_separate_input:
+        model = Model(model_dir, hp=hp)
+    else:
+        model = ModelDEV(model_dir, hp=hp)
 
     # Display hp
     for key, val in hp.items():
@@ -252,7 +259,25 @@ def train(model_dir,
     t_start = time.time()
 
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+        if load_dir is not None:
+            model.restore(load_dir)  # complete restore
+        else:
+            # Assume everything is restored
+            sess.run(tf.global_variables_initializer())
+
+        # Set trainable parameters
+        if trainables is None or trainables == 'all':
+            var_list = model.var_list  # train everything
+        elif trainables == 'input':
+            # train all nputs
+            var_list = [v for v in model.var_list
+                        if ('input' in v.name) and ('rnn' not in v.name)]
+        elif trainables == 'rule':
+            # train rule inputs only
+            var_list = [v for v in model.var_list if 'rule_input' in v.name]
+        else:
+            raise ValueError('Unknown trainables')
+        model.set_optimizer(var_list=var_list)
 
         # penalty on deviation from initial weight
         if hp['l2_weight_init'] > 0:
@@ -261,7 +286,7 @@ def train(model_dir,
                 model.cost_reg += (hp['l2_weight_init'] *
                                    tf.nn.l2_loss(w - w_val))
 
-            model.set_optimizer()
+            model.set_optimizer(var_list=var_list)
 
         # partial weight training
         if ('p_weight_train' in hp and
@@ -278,7 +303,7 @@ def train(model_dir,
                 w_mask = tf.constant(w_mask)
                 w_mask = tf.reshape(w_mask, w.shape)
                 model.cost_reg += tf.nn.l2_loss((w - w_val) * w_mask)
-            model.set_optimizer()
+            model.set_optimizer(var_list=var_list)
 
         step = 0
         while step * hp['batch_size_train'] <= max_steps:
@@ -300,7 +325,7 @@ def train(model_dir,
 
                 # Training
                 rule_train_now = hp['rng'].choice(hp['rule_trains'],
-                                                       p=hp['rule_probs'])
+                                                  p=hp['rule_probs'])
                 # Generate a random batch of trials.
                 # Each batch has the same trial length
                 trial = generate_trials(
@@ -489,6 +514,127 @@ def train_sequential(
         print("Optimization Finished!")
 
 
+def train_rule_only(
+        model_dir,
+        rule_trains,
+        max_steps,
+        hp=None,
+        ruleset='all',
+        seed=0,
+):
+    '''Customized training function.
+
+    The network sequentially but only train rule for the second set.
+    First train the network to perform tasks in group 1, then train on group 2.
+    When training group 2, only rule connections are being trained.
+
+    Args:
+        model_dir: str, training directory
+        rule_trains: a list of list of tasks to train sequentially
+        hp: dictionary of hyperparameters
+        max_steps: int, maximum number of training steps for each list of tasks
+        display_step: int, display steps
+        ruleset: the set of rules to train
+        seed: int, random seed to be used
+
+    Returns:
+        model is stored at model_dir/model.ckpt
+        training configuration is stored at model_dir/hp.json
+    '''
+
+    tools.mkdir_p(model_dir)
+
+    # Network parameters
+    default_hp = get_default_hp(ruleset)
+    if hp is not None:
+        default_hp.update(hp)
+    hp = default_hp
+    hp['seed'] = seed
+    hp['rng'] = np.random.RandomState(seed)
+    hp['rule_trains'] = rule_trains
+    # Get all rules by flattening the list of lists
+    hp['rules'] = [r for rs in rule_trains for r in rs]
+
+    # Number of training iterations for each rule
+    if hasattr(max_steps, '__iter__'):
+        rule_train_iters = max_steps
+    else:
+        rule_train_iters = [len(r) * max_steps for r in rule_trains]
+
+    tools.save_hp(hp, model_dir)
+    # Display hp
+    for key, val in hp.items():
+        print('{:20s} = '.format(key) + str(val))
+
+    # Build the model
+    model = ModelDEV(model_dir, hp=hp)
+
+    # Store results
+    log = defaultdict(list)
+    log['model_dir'] = model_dir
+
+    # Record time
+    t_start = time.time()
+
+    # Use customized session that launches the graph as well
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+
+        # penalty on deviation from initial weight
+        if hp['l2_weight_init'] > 0:
+            raise NotImplementedError()
+
+        # Looping
+        step_total = 0
+        for i_rule_train, rule_train in enumerate(hp['rule_trains']):
+            step = 0
+
+            if i_rule_train == 0:
+                display_step = 200
+            else:
+                display_step = 50
+
+            if i_rule_train > 0:
+                # var_list = [v for v in model.var_list
+                #             if ('input' in v.name) and ('rnn' not in v.name)]
+                var_list = [v for v in model.var_list if 'rule_input' in v.name]
+                model.set_optimizer(var_list=var_list)
+
+            # Keep training until reach max iterations
+            while (step * hp['batch_size_train'] <=
+                   rule_train_iters[i_rule_train]):
+                # Validation
+                if step % display_step == 0:
+                    trial = step_total * hp['batch_size_train']
+                    log['trials'].append(trial)
+                    log['times'].append(time.time() - t_start)
+                    log['rule_now'].append(rule_train)
+                    log = do_eval(sess, model, log, rule_train)
+                    if log['perf_avg'][-1] > model.hp['target_perf']:
+                        print('Perf reached the target: {:0.2f}'.format(
+                            hp['target_perf']))
+                        break
+
+                # Training
+                rule_train_now = hp['rng'].choice(rule_train)
+                # Generate a random batch of trials.
+                # Each batch has the same trial length
+                trial = generate_trials(
+                    rule_train_now, hp, 'random',
+                    batch_size=hp['batch_size_train'])
+
+                # Generating feed_dict.
+                feed_dict = tools.gen_feed_dict(model, trial, hp)
+
+                # This will compute the gradient BEFORE train step
+                _ = sess.run(model.train_step, feed_dict=feed_dict)
+
+                step += 1
+                step_total += 1
+
+        print("Optimization Finished!")
+
+
 if __name__ == '__main__':
     import argparse
     import os
@@ -499,16 +645,60 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    run_analysis = []
-    hp = {'rnn_type': 'LeakyRNN',
-            'n_rnn': 128,
-            'activation': 'relu',
-            'l1_h': 0,
-            'l2_h': 0,
-            'l1_weight': 0,
-            'l2_weight': 0,
-            'l2_weight_init': 0,
-            'target_perf': 0.95,
-            'w_rec_init': 'randortho'}
-    train(args.modeldir, seed=1, hp=hp, ruleset='mante',
-          display_step=2000, rich_output=False)
+    # train(args.modeldir, seed=1, hp={}, ruleset='mante',
+    #       display_step=2000, rich_output=False)
+
+    setup = 1
+    if setup == 0:
+        rule_trains = [['contextdm1', 'contextdm2', 'contextdelaydm2'], ['contextdelaydm1']]
+    elif setup == 1:
+        rule_trains = [['fdgo', 'fdanti', 'delaygo'], ['delayanti']]
+    elif setup == 2:
+        rule_trains = [['contextdm1', 'contextdm2', 'contextdelaydm2'], ['delayanti']]
+    elif setup == 3:
+        rule_trains = [['fdgo', 'fdanti', 'delaygo'], ['contextdelaydm1']]
+    else:
+        raise ValueError('Unknown setup')
+    max_steps = [100000, 20000]
+    # max_steps = [200000, 10000]
+    # train_rule_only(args.modeldir, rule_trains=rule_trains, max_steps=max_steps,
+    #                 seed=1,
+    #                 hp={'n_rnn': 128, 'l1_h': 1e-6, 'target_perf': 0.97}
+    #                 )
+
+    # train('data/debug_pretrain',
+    #       hp={'n_rnn': 128, 'l1_h': 1e-8, 'target_perf': 0.97, 'activation': 'relu'},
+    #       max_steps=100000,
+    #       display_step=500,
+    #       ruleset='all',
+    #       rule_trains=rule_trains[0],
+    #       rule_prob_map=None,
+    #       seed=1,
+    #       use_separate_input=True,
+    #       )
+
+    train('data/debug2',
+          hp={'n_rnn': 128, 'l1_h': 1e-6, 'target_perf': 0.97, 'activation': 'relu'},
+          max_steps=1e7,
+          display_step=50,
+          ruleset='all',
+          rule_trains=['fdgo', 'fdanti', 'delaygo', 'delayanti'],
+          rule_prob_map={'fdgo': 0, 'fdanti': 0, 'delaygo': 0, 'delayanti': 1},
+          # rule_trains=['delayanti'],
+          seed=0,
+          use_separate_input=True,
+          load_dir='data/pretrain/setup1/0',
+          trainables='rule',
+          )
+
+    # train('data/debug2',
+    #       hp={'n_rnn': 128, 'l1_h': 1e-6, 'target_perf': 0.97, 'learning_rate': 1e-3},
+    #       max_steps=1e7,
+    #       display_step=50,
+    #       ruleset='all',
+    #       rule_trains=['fdgo', 'fdanti', 'delaygo', 'delayanti'],
+    #       rule_prob_map={'fdgo': 0, 'fdanti': 0, 'delaygo': 0, 'delayanti': 1},
+    #       # rule_trains=['delayanti'],
+    #       seed=0,
+    #       use_separate_input=True,
+    #       )

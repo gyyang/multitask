@@ -214,17 +214,33 @@ elif args.run == 'mante_vary_pweighttrain':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
-elif args.run == 'dev_test_faster':
-    for seed in range(0, 5):
-        for setup in range(4):
-            jobname = 'dev_test_faster_{:d}_{:d}'.format(setup, seed)
+elif args.run == 'pretrain':
+    for seed in range(0, 20):
+        for setup in range(2):
+            jobname = 'pt_{:d}_{:d}'.format(setup, seed)
             train_arg = 'setup={:d},seed={:d}'.format(setup, seed)
-            cmd = r'''python -c "import experiment as e;e.dev_test_faster('''+\
+            cmd = r'''python -c "import experiment as e;e.pretrain('''+\
                   train_arg+''')"'''
 
             jobfile = write_jobfile(
                 cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
             subprocess.call(['sbatch', jobfile])
+
+elif args.run == 'posttrain':
+    for seed in range(0, 20):
+        for pretrain_setup in range(2):
+            for posttrain_setup in range(2):
+                for trainables in range(2):
+                    jobname = 'pt{:d}{:d}{:d}{:d}'.format(
+                        pretrain_setup, posttrain_setup, trainables, seed)
+                    train_arg = '{:d}, {:d}, {:d}, {:d}'.format(
+                        pretrain_setup, posttrain_setup, trainables, seed)
+                    cmd = r'''python -c "import experiment as e;e.posttrain('''+\
+                          train_arg+''')"'''
+
+                    jobfile = write_jobfile(
+                        cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+                    subprocess.call(['sbatch', jobfile])
 
 # Grid search
 elif args.run == 'grid':

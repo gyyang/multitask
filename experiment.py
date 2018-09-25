@@ -312,39 +312,80 @@ def vary_p_weight_train_mante(i):
     _base_vary_hp_mante(i, hp_ranges, base_name='vary_pweighttrain_mante')
 
 
-def dev_test_faster(setup, seed):
+def pretrain(setup, seed):
+    """Get pre-trained networks."""
     hp = dict()
     hp['learning_rate'] = 0.001
     hp['w_rec_init'] = 'diag'
     hp['easy_task'] = False
-    hp['activation'] = 'softplus'
-    hp['max_steps'] = 4e5
-    hp['c_intsyn'] = 0
+    hp['activation'] = 'relu'
+    hp['max_steps'] = 2*1e6
+    hp['l1_h'] = 1e-8
+    hp['target_perf'] = 0.97
+    hp['n_rnn'] = 128
 
-    model_dir = os.path.join(DATAPATH, 'dev_test_faster', 'setup'+str(setup), str(seed))
+    model_dir = os.path.join(DATAPATH, 'pretrain', 'setup'+str(setup), str(seed))
     if setup == 0:
-        rule_trains = [['contextdm1', 'contextdm2', 'contextdelaydm2'], ['contextdelaydm1']]
+        rule_trains = ['contextdm1', 'contextdm2', 'contextdelaydm2']
     elif setup == 1:
-        rule_trains = [['fdgo', 'fdanti', 'delaygo'], ['delayanti']]
-    elif setup == 2:
-        rule_trains = [['contextdm1', 'contextdm2', 'contextdelaydm2'], ['delayanti']]
-    elif setup == 3:
-        rule_trains = [['fdgo', 'fdanti', 'delaygo'], ['contextdelaydm1']]
+        rule_trains = ['fdgo', 'fdanti', 'delaygo']
     else:
-        raise ValueError('Unknown setup')
+        raise ValueError
 
-    train.train_sequential(
-        model_dir,
-        rule_trains,
-        hp=hp,
-        max_steps=hp['max_steps'],
-        display_step=500,
-        ruleset='all',
-        seed=seed,
-    )
+    train.train(model_dir,
+          hp=hp,
+          max_steps=hp['max_steps'],
+          display_step=500,
+          ruleset='all',
+          rule_trains=rule_trains,
+          rule_prob_map=None,
+          seed=seed,
+          use_separate_input=True,
+          )
+
+
+def posttrain(pretrain_setup, posttrain_setup, trainables, seed):
+    """Training based on pre-trained networks."""
+    hp = {'n_rnn': 128,
+          'l1_h': 1e-8,
+          'target_perf': 0.97,
+          'activation': 'relu',
+          'max_steps': 1e6}
+
+    if posttrain_setup == 0:
+        rule_trains = ['contextdelaydm1']
+    elif posttrain_setup == 1:
+        rule_trains = ['delayanti']
+    else:
+        raise ValueError
+
+    if trainables == 0:
+        hp['trainables'] = 'all'
+    elif trainables == 1:
+        hp['trainables'] = 'rule'
+    else:
+        raise ValueError
+
+    name = (str(pretrain_setup) + '_' + str(posttrain_setup) +
+            '_' + str(trainables) + '_' + str(seed))
+    model_dir = os.path.join(DATAPATH, 'posttrain', name)
+    load_dir = os.path.join(DATAPATH, 'pretrain',
+                            'setup' + str(pretrain_setup), str(seed))
+    hp['load_dir'] = load_dir
+    hp['pretrain_setup'] = pretrain_setup
+    hp['posttrain_setup'] = posttrain_setup
+    train.train(model_dir,
+          hp=hp,
+          max_steps=hp['max_steps'],
+          display_step=50,
+          ruleset='all',
+          rule_trains=rule_trains,
+          seed=seed,
+          use_separate_input=True,
+          load_dir=load_dir,
+          trainables=hp['trainables'],
+          )
 
 
 if __name__ == '__main__':
-    # debug_train_all()
-    dev_test_faster()
-
+    debug_train_all()
