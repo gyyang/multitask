@@ -193,32 +193,52 @@ class UnitAnalysis(object):
         rules = ['contextdm1', 'contextdm2', 'dm1', 'dm2', 'multidm']
 
         w_stores = OrderedDict()
-
-        for group in groups:
+        w_all_stores = OrderedDict()
+        pos = list()
+        width = 0.15
+        colors = list()
+        for i_group, group in enumerate(groups):
             w_store_tmp = list()
             ind = self.group_ind_orig[group]
-            for rule in rules:
+            for i_rule, rule in enumerate(rules):
                 ind_rule = get_rule_index(rule, hp)
                 w_conn = w_in[ind, ind_rule].mean(axis=0)
                 w_store_tmp.append(w_conn)
-
+                w_all_stores[(group, rule)] = w_in[ind, ind_rule].flatten()
+                pos.append(i_rule+(i_group-1.5)*width)
+                colors.append(self.colors[group])
             w_stores[group] = w_store_tmp
 
+
         fs = 6
-        width = 0.15
         fig = plt.figure(figsize=(2.5, 1.2))
         ax = fig.add_axes([0.17,0.45,0.8,0.4])
-        for i, group in enumerate(groups):
-            x = np.arange(len(rules))+(i-1.5)*width
-            b0 = ax.bar(x, w_stores[group],
-                        width=width, color=self.colors[group], edgecolor='none')
+        # for i, group in enumerate(groups):
+        #     x = np.arange(len(rules))+(i-1.5)*width
+        #     b0 = ax.bar(x, w_stores[group],
+        #                 width=width, color=self.colors[group], edgecolor='none')
+
+        bp = ax.boxplot([w for w in w_all_stores.values()], notch=True, sym='',
+                        bootstrap=10000,
+                        showcaps=False, patch_artist=True, widths=width, positions=pos,
+                        whiskerprops={'linewidth': 1.0})
+        # for element in ['boxes', 'whiskers', 'fliers']:
+        #     plt.setp(bp[element], color='xkcd:cerulean')
+
+        for patch, c in zip(bp['boxes'], colors):
+            plt.setp(patch, color=c)
+        for i_whisker, patch in enumerate(bp['whiskers']):
+            plt.setp(patch, color=colors[int(i_whisker/2)])
+        for element in ['means', 'medians']:
+            plt.setp(bp[element], color='white')
+
         ax.set_xticks(np.arange(len(rules)))
         ax.set_xticklabels([rule_name[r] for r in rules], rotation=25)
         ax.set_xlabel('Input from rule units', fontsize=fs, labelpad=3)
         ax.set_ylabel('Conn. weight', fontsize=fs)
-        lg = ax.legend(groups, fontsize=fs, ncol=3, bbox_to_anchor=(1,1.5),
-                       labelspacing=0.2, loc=1, frameon=False, title='To group')
-        plt.setp(lg.get_title(),fontsize=fs)
+        # lg = ax.legend(groups, fontsize=fs, ncol=3, bbox_to_anchor=(1,1.5),
+        #                labelspacing=0.2, loc=1, frameon=False, title='To group')
+        # plt.setp(lg.get_title(),fontsize=fs)
         ax.tick_params(axis='both', which='major', labelsize=fs)
         plt.locator_params(axis='y',nbins=2)
         ax.spines["right"].set_visible(False)
