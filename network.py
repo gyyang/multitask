@@ -758,6 +758,12 @@ class ModelDEV(Model):
             self.x, [hp['rule_start'], hp['n_rule']], axis=-1)
 
         sensory_rnn_inputs = tf.layers.dense(sensory_inputs, n_rnn, name='sen_input')
+
+        if 'mix_rule' in hp and hp['mix_rule'] is True:
+            # rotate rule matrix
+            rule_inputs = tf.layers.dense(rule_inputs, hp['n_rule'],
+                                          name='mix_rule', use_bias=False, trainable=False)
+
         rule_rnn_inputs = tf.layers.dense(rule_inputs, n_rnn, name='rule_input', use_bias=False)
 
         rnn_inputs = sensory_rnn_inputs + rule_rnn_inputs

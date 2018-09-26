@@ -114,12 +114,22 @@ elif args.run == 'analysis_all':
             cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
         subprocess.call(['sbatch', jobfile])
 
-
 elif args.run == 'tanhgru':
     for seed in range(0, 20):
         jobname = 'tanhgru_{:d}'.format(seed)
         train_arg = 'seed={:d}'.format(seed)
         cmd = r'''python -c "import experiment as e;e.train_all_tanhgru('''+\
+              train_arg+''')"'''
+
+        jobfile = write_jobfile(
+            cmd, jobname, sbatchpath, scratchpath, ppn=1, gpus=0)
+        subprocess.call(['sbatch', jobfile])
+
+elif args.run == 'mixrule':
+    for seed in range(0, 20):
+        jobname = 'mr_{:d}'.format(seed)
+        train_arg = 'seed={:d}'.format(seed)
+        cmd = r'''python -c "import experiment as e;e.train_all_mixrule('''+\
               train_arg+''')"'''
 
         jobfile = write_jobfile(

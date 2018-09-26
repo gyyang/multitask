@@ -219,6 +219,7 @@ def train(model_dir,
     hp = default_hp
     hp['seed'] = seed
     hp['rng'] = np.random.RandomState(seed)
+    hp['use_separate_input'] = use_separate_input
 
     # Rules to train and test. Rules in a set are trained together
     if rule_trains is None:
@@ -645,60 +646,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    # train(args.modeldir, seed=1, hp={}, ruleset='mante',
-    #       display_step=2000, rich_output=False)
-
-    setup = 1
-    if setup == 0:
-        rule_trains = [['contextdm1', 'contextdm2', 'contextdelaydm2'], ['contextdelaydm1']]
-    elif setup == 1:
-        rule_trains = [['fdgo', 'fdanti', 'delaygo'], ['delayanti']]
-    elif setup == 2:
-        rule_trains = [['contextdm1', 'contextdm2', 'contextdelaydm2'], ['delayanti']]
-    elif setup == 3:
-        rule_trains = [['fdgo', 'fdanti', 'delaygo'], ['contextdelaydm1']]
-    else:
-        raise ValueError('Unknown setup')
-    max_steps = [100000, 20000]
-    # max_steps = [200000, 10000]
-    # train_rule_only(args.modeldir, rule_trains=rule_trains, max_steps=max_steps,
-    #                 seed=1,
-    #                 hp={'n_rnn': 128, 'l1_h': 1e-6, 'target_perf': 0.97}
-    #                 )
-
-    # train('data/debug_pretrain',
-    #       hp={'n_rnn': 128, 'l1_h': 1e-8, 'target_perf': 0.97, 'activation': 'relu'},
-    #       max_steps=100000,
-    #       display_step=500,
-    #       ruleset='all',
-    #       rule_trains=rule_trains[0],
-    #       rule_prob_map=None,
-    #       seed=1,
-    #       use_separate_input=True,
-    #       )
-
-    train('data/debug2',
-          hp={'n_rnn': 128, 'l1_h': 1e-6, 'target_perf': 0.97, 'activation': 'relu'},
-          max_steps=1e7,
-          display_step=50,
-          ruleset='all',
-          rule_trains=['fdgo', 'fdanti', 'delaygo', 'delayanti'],
-          rule_prob_map={'fdgo': 0, 'fdanti': 0, 'delaygo': 0, 'delayanti': 1},
-          # rule_trains=['delayanti'],
-          seed=0,
-          use_separate_input=True,
-          load_dir='data/pretrain/setup1/0',
-          trainables='rule',
-          )
-
-    # train('data/debug2',
-    #       hp={'n_rnn': 128, 'l1_h': 1e-6, 'target_perf': 0.97, 'learning_rate': 1e-3},
-    #       max_steps=1e7,
-    #       display_step=50,
-    #       ruleset='all',
-    #       rule_trains=['fdgo', 'fdanti', 'delaygo', 'delayanti'],
-    #       rule_prob_map={'fdgo': 0, 'fdanti': 0, 'delaygo': 0, 'delayanti': 1},
-    #       # rule_trains=['delayanti'],
-    #       seed=0,
-    #       use_separate_input=True,
-    #       )
+    hp = {'activation': 'softplus', 'n_rnn': 64, 'mix_rule': True, 'l1_h': 1e-8}
+    train(args.modeldir, seed=1, hp=hp, ruleset='mante',
+          display_step=500, use_separate_input=True)
