@@ -12,7 +12,7 @@ import tensorflow as tf
 
 import task
 from task import generate_trials
-from network import Model, get_perf, ModelDEV
+from network import Model, get_perf
 from analysis import variance
 import tools
 
@@ -565,7 +565,7 @@ def train_rule_only(
         print('{:20s} = '.format(key) + str(val))
 
     # Build the model
-    model = ModelDEV(model_dir, hp=hp)
+    model = Model(model_dir, hp=hp)
 
     # Store results
     log = defaultdict(list)
