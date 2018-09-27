@@ -111,11 +111,11 @@ def train_all_tanhgru(seed=0, model_dir='tanhgru'):
 def train_all_mixrule(seed=0, root_dir='mixrule'):
     """Training of all tasks."""
     model_dir = os.path.join(DATAPATH, root_dir, str(seed))
-    hp = {'activation': 'softplus', 'w_rec_init': 'diag', 'mix_rule': True}
+    hp = {'activation': 'relu', 'w_rec_init': 'diag',
+          'use_separate_input': True, 'mix_rule': True}
     rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
     train.train(model_dir, hp=hp, ruleset='all',
-                rule_prob_map=rule_prob_map, seed=seed,
-                use_separate_input=True)
+                rule_prob_map=rule_prob_map, seed=seed)
 
     # Analyses
     variance.compute_variance(model_dir)
@@ -347,6 +347,7 @@ def pretrain(setup, seed):
     hp['l1_h'] = 1e-8
     hp['target_perf'] = 0.97
     hp['n_rnn'] = 128
+    hp['use_separate_input'] = True
 
     model_dir = os.path.join(DATAPATH, 'pretrain', 'setup'+str(setup), str(seed))
     if setup == 0:
@@ -364,7 +365,6 @@ def pretrain(setup, seed):
           rule_trains=rule_trains,
           rule_prob_map=None,
           seed=seed,
-          use_separate_input=True,
           )
 
 
@@ -374,7 +374,8 @@ def posttrain(pretrain_setup, posttrain_setup, trainables, seed):
           'l1_h': 1e-8,
           'target_perf': 0.97,
           'activation': 'relu',
-          'max_steps': 1e6}
+          'max_steps': 1e6,
+          'use_separate_input': True}
 
     if posttrain_setup == 0:
         rule_trains = ['contextdelaydm1']
@@ -405,7 +406,6 @@ def posttrain(pretrain_setup, posttrain_setup, trainables, seed):
           ruleset='all',
           rule_trains=rule_trains,
           seed=seed,
-          use_separate_input=True,
           load_dir=load_dir,
           trainables=hp['trainables'],
           )

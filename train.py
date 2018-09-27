@@ -39,6 +39,8 @@ def get_default_hp(ruleset):
             'in_type': 'normal',
             # Type of RNNs: LeakyRNN, LeakyGRU, EILeakyGRU, GRU, LSTM
             'rnn_type': 'LeakyRNN',
+            # whether rule and stimulus inputs are represented separately
+            'use_separate_input': False,
             # Type of loss functions
             'loss_type': 'lsq',
             # Optimizer
@@ -189,7 +191,6 @@ def train(model_dir,
           rule_prob_map=None,
           seed=0,
           rich_output=False,
-          use_separate_input=False,
           load_dir=None,
           trainables=None,
           ):
@@ -219,7 +220,6 @@ def train(model_dir,
     hp = default_hp
     hp['seed'] = seed
     hp['rng'] = np.random.RandomState(seed)
-    hp['use_separate_input'] = use_separate_input
 
     # Rules to train and test. Rules in a set are trained together
     if rule_trains is None:
@@ -243,10 +243,7 @@ def train(model_dir,
     tools.save_hp(hp, model_dir)
 
     # Build the model
-    if not use_separate_input:
-        model = Model(model_dir, hp=hp)
-    else:
-        model = ModelDEV(model_dir, hp=hp)
+    model = Model(model_dir, hp=hp)
 
     # Display hp
     for key, val in hp.items():
