@@ -488,13 +488,13 @@ class Model(object):
         # Regularization terms
         self.cost_reg = tf.constant(0.)
         if hp['l1_h'] > 0:
-            self.cost_reg += tf.reduce_sum(tf.abs(self.h)) * hp['l1_h']
+            self.cost_reg += tf.reduce_mean(tf.abs(self.h)) * hp['l1_h']
         if hp['l2_h'] > 0:
             self.cost_reg += tf.nn.l2_loss(self.h) * hp['l2_h']
 
         if hp['l1_weight'] > 0:
             self.cost_reg += hp['l1_weight'] * tf.add_n(
-                [tf.reduce_sum(tf.abs(v)) for v in self.weight_list])
+                [tf.reduce_mean(tf.abs(v)) for v in self.weight_list])
         if hp['l2_weight'] > 0:
             self.cost_reg += hp['l2_weight'] * tf.add_n(
                 [tf.nn.l2_loss(v) for v in self.weight_list])
