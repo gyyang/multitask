@@ -485,6 +485,11 @@ class Model(object):
         self.var_list = tf.trainable_variables()
         self.weight_list = [v for v in self.var_list if is_weight(v)]
 
+        if 'use_separate_input' in hp and hp['use_separate_input']:
+            pass
+        else:
+            self._set_weights(hp)
+
         # Regularization terms
         self.cost_reg = tf.constant(0.)
         if hp['l1_h'] > 0:
@@ -601,6 +606,12 @@ class Model(object):
             self.y_hat, [1, n_output - 1], axis=-1)
         self.y_hat_loc = tf_popvec(y_hat_ring)
 
+    def _set_weights(self, hp):
+        """Set model attributes for several weight variables."""
+        n_input = hp['n_input']
+        n_rnn = hp['n_rnn']
+        n_output = hp['n_output']
+
         for v in self.var_list:
             if 'rnn' in v.name:
                 if 'kernel' in v.name or 'weight' in v.name:
@@ -620,7 +631,7 @@ class Model(object):
         if self.w_out.shape != (n_rnn, n_output):
             raise ValueError('Shape of w_out should be ' +
                              str((n_rnn, n_output)) + ', but found ' +
-                             str(w_out.shape))
+                             str(self.w_out.shape))
         if self.w_rec.shape != (n_rnn, n_rnn):
             raise ValueError('Shape of w_rec should be ' +
                              str((n_rnn, n_rnn)) + ', but found ' +
@@ -648,8 +659,11 @@ class Model(object):
 
         if 'mix_rule' in hp and hp['mix_rule'] is True:
             # rotate rule matrix
-            rule_inputs = tf.layers.dense(rule_inputs, hp['n_rule'],
-                                          name='mix_rule', use_bias=False, trainable=False)
+            kernel_initializer = tf.orthogonal_initializer()
+            rule_inputs = tf.layers.dense(
+                rule_inputs, hp['n_rule'], name='mix_rule',
+                use_bias=False, trainable=False,
+                kernel_initializer=kernel_initializer)
 
         rule_rnn_inputs = tf.layers.dense(rule_inputs, n_rnn, name='rule_input', use_bias=False)
 
