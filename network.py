@@ -486,9 +486,9 @@ class Model(object):
         self.weight_list = [v for v in self.var_list if is_weight(v)]
 
         if 'use_separate_input' in hp and hp['use_separate_input']:
-            pass
+            self._set_weights_separate(hp)
         else:
-            self._set_weights(hp)
+            self._set_weights_fused(hp)
 
         # Regularization terms
         self.cost_reg = tf.constant(0.)
@@ -592,7 +592,6 @@ class Model(object):
             y_hat = tf.sigmoid(y_hat_)
             self.cost_lsq = tf.reduce_mean(
                 tf.square((y_shaped - y_hat) * self.c_mask))
-            # TODO(gryang): mean or sum?
         else:
             y_hat = tf.nn.softmax(y_hat_)
             # Cross-entropy loss
@@ -606,7 +605,7 @@ class Model(object):
             self.y_hat, [1, n_output - 1], axis=-1)
         self.y_hat_loc = tf_popvec(y_hat_ring)
 
-    def _set_weights(self, hp):
+    def _set_weights_fused(self, hp):
         """Set model attributes for several weight variables."""
         n_input = hp['n_input']
         n_rnn = hp['n_rnn']
@@ -696,6 +695,50 @@ class Model(object):
         y_hat_fix, y_hat_ring = tf.split(
             self.y_hat, [1, n_output - 1], axis=-1)
         self.y_hat_loc = tf_popvec(y_hat_ring)
+
+    def _set_weights_separate(self, hp):
+        """Set model attributes for several weight variables."""
+        n_input = hp['n_input']
+        n_rnn = hp['n_rnn']
+        n_output = hp['n_output']
+
+        for v in self.var_list:
+            if 'rnn' in v.name:
+                if 'kernel' in v.name or 'weight' in v.name:
+                    self.w_rec = v
+                else:
+                    self.b_rec = v
+            elif 'sen_input' in v.name:
+                if 'kernel' in v.name or 'weight' in v.name:
+                    self.w_sen_in = v
+                else:
+                    self.b_in = v
+            elif 'rule_input' in v.name:
+                self.w_rule = v
+            else:
+                assert 'output' in v.name
+                if 'kernel' in v.name or 'weight' in v.name:
+                    self.w_out = v
+                else:
+                    self.b_out = v
+
+        # check if the recurrent and output connection has the correct shape
+        if self.w_out.shape != (n_rnn, n_output):
+            raise ValueError('Shape of w_out should be ' +
+                             str((n_rnn, n_output)) + ', but found ' +
+                             str(self.w_out.shape))
+        if self.w_rec.shape != (n_rnn, n_rnn):
+            raise ValueError('Shape of w_rec should be ' +
+                             str((n_rnn, n_rnn)) + ', but found ' +
+                             str(self.w_rec.shape))
+        if self.w_sen_in.shape != (hp['rule_start'], n_rnn):
+            raise ValueError('Shape of w_sen_in should be ' +
+                             str((hp['rule_start'], n_rnn)) + ', but found ' +
+                             str(self.w_sen_in.shape))
+        if self.w_rule.shape != (hp['n_rule'], n_rnn):
+            raise ValueError('Shape of w_in should be ' +
+                             str((hp['n_rule'], n_rnn)) + ', but found ' +
+                             str(self.w_rule.shape))
 
     def initialize(self):
         """Initialize the model for training."""
