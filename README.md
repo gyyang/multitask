@@ -17,6 +17,7 @@ model files, uncomment the analyses you want to run, and run the file.
 ## Pretrained models
 We provide 20 pretrained models and their auxillary data files for
 analyses.
+https://drive.google.com/drive/folders/1L8v-OZgYHVcKh1UKtCJl5QVlz8mkaRxr?usp=sharing
 
 ## Get started with training
 Train a default network with:
