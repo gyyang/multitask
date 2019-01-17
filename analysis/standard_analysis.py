@@ -257,7 +257,7 @@ def pretty_singleneuron_plot(model_dir,
                 figname = 'figure/trace_unit'+str(neuron)+rule_name[rule]+save_name+'.pdf'
 
             plt.ylim(np.array([-0.1, 1.2])*h_max)
-            plt.xticks([0,np.floor(np.max(t_plot)+0.01)])
+            plt.xticks([0, 1.5])
             plt.xlabel('Time (s)', fontsize=fs, labelpad=-5)
             plt.locator_params(axis='y', nbins=4)
             if j>0 and ylabel_firstonly:

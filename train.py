@@ -643,6 +643,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    hp = {'activation': 'softplus', 'n_rnn': 64, 'mix_rule': True, 'l1_h': 1e-8}
-    train(args.modeldir, seed=1, hp=hp, ruleset='mante',
-          display_step=500, use_separate_input=True)
+    hp = {'activation': 'softplus',
+          'n_rnn': 64,
+          'mix_rule': True,
+          'l1_h': 0.,
+          'use_separate_input': True}
+    train(args.modeldir,
+          seed=1,
+          hp=hp,
+          ruleset='all',
+          rule_trains=['contextdelaydm1', 'contextdelaydm2',
+                                 'contextdm1', 'contextdm2'],
+          display_step=500)

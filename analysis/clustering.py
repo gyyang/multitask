@@ -184,6 +184,7 @@ class Analysis(object):
         ax.spines["top"].set_visible(False)
         ax.xaxis.set_ticks_position('bottom')
         ax.yaxis.set_ticks_position('left')
+        ax.set_ylim([0, 0.32])
         if save:
             fig_name = 'cluster_score'
             if save_name is None:
@@ -203,6 +204,7 @@ class Analysis(object):
             rect_cb = [0.87, 0.2, 0.03, 0.7]
             tick_names = [rule_name[r] for r in self.rules]
             fs = 6
+            labelpad = 13
         elif self.data_type == 'epoch':
             figsize = (3.5,4.5)
             rect = [0.25, 0.1, 0.6, 0.85]
@@ -210,6 +212,7 @@ class Analysis(object):
             rect_cb = [0.87, 0.1, 0.03, 0.85]
             tick_names = [rule_name[key[0]]+' '+key[1] for key in self.keys]
             fs = 5
+            labelpad = 20
         else:
             raise ValueError
 
@@ -224,7 +227,7 @@ class Analysis(object):
                    rotation=0, va='center', fontsize=fs)
         plt.xticks([])
         plt.title('Units', fontsize=7, y=0.97)
-        plt.xlabel('Clusters', fontsize=7, labelpad=13)
+        plt.xlabel('Clusters', fontsize=7, labelpad=labelpad)
         ax.tick_params('both', length=0)
         for loc in ['bottom','top','left','right']:
             ax.spines[loc].set_visible(False)

@@ -319,29 +319,45 @@ def plot_hist_varprop_all(model_dir, plot_control=True):
                 ax.set_title(rule_name[rules[j]], fontsize=fs, rotation=45, va='bottom')
             if j == 0:
                 ax.set_ylabel(rule_name[rules[i]], fontsize=fs, rotation=45, ha='right')
+            
+            ax.spines["right"].set_visible(False)
+            ax.spines["left"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            if i == j:
+                ax.spines["bottom"].set_visible(False)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                continue
 
             hists, bins_edge = compute_hist_varprop(model_dir, (rules[i], rules[j]))
             hist_low, hist_med, hist_high = np.percentile(hists, [10, 50, 90], axis=0)
+            hist_med /= hist_med.sum()
 
             # Control case
             if plot_control:
                 hists_ctrl, _ = compute_hist_varprop(model_dir, (rules[i], rules[j]), random_rotation=True)
                 _, hist_med_ctrl, _ = np.percentile(hists_ctrl, [10, 50, 90], axis=0)
-                ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med_ctrl, color='gray', lw=0.75)
+                hist_med_ctrl /= hist_med_ctrl.sum()
+                ax.plot((bins_edge[:-1]+bins_edge[1:])/2,
+                        hist_med_ctrl, color='gray', lw=0.75)
 
             ax.plot((bins_edge[:-1]+bins_edge[1:])/2, hist_med, color='black')
             plt.locator_params(nbins=3)
 
-            ax.set_ylim(bottom=-0.02*hist_med.max())
+            # ax.set_ylim(bottom=-0.02*hist_med.max())
+            ax.set_ylim([-0.01, 0.6])
+            print(hist_med.max())
             ax.set_xticks([-1,1])
             ax.set_xticklabels([])
-            ax.set_yticks([])
+            if i == 0 and j == 1:
+                ax.set_yticks([0, 0.6])
+                ax.spines["left"].set_visible(True)
+            else:
+                ax.set_yticks([])
             ax.set_xlim([-1,1])
             ax.xaxis.set_ticks_position('bottom')
             ax.tick_params(axis='both', which='major', labelsize=fs, length=2)
-            ax.spines["right"].set_visible(False)
-            ax.spines["left"].set_visible(False)
-            ax.spines["top"].set_visible(False)
+            
 
     # plt.tight_layout()
     plt.savefig('figure/plot_hist_varprop_all.pdf', transparent=True)

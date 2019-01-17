@@ -800,7 +800,7 @@ def plot_rate_distribution(data):
     plt.ylabel('Activity at end')
 
 
-def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var'):
+def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var', legend=True):
     """Plot how fractional variance distribution depends on hparams."""
     hp_target = {'activation': 'softplus',
                  'rnn_type': 'LeakyRNN',
@@ -897,9 +897,10 @@ def plot_fracvar_hist_byhp(hp_vary, save_name=None, mode='all_var'):
     for i in range(n):
         ax.plot(xs[i], hists[i], color=colors[i], label=labels[i])
         ax.fill_between(xs[i], bottoms[i], tops[i], alpha=0.2, color=colors[i])
-    lg = ax.legend(title=title, fontsize=fs, frameon=False,
-                   loc=1, bbox_to_anchor=(1.2, 1.2))
-    plt.setp(lg.get_title(), fontsize=fs)
+    if legend:
+        lg = ax.legend(title=title, fontsize=fs, frameon=False,
+                       loc=1, bbox_to_anchor=(1.2, 1.2))
+        plt.setp(lg.get_title(), fontsize=fs)
     ax.set_ylim(ylim)
     ax.set_xlim([-1.1, 1.1])
     ax.tick_params(axis='both', which='major', labelsize=fs)

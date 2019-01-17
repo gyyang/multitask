@@ -132,6 +132,30 @@ def train_all_mixrule(seed=0, root_dir='mixrule'):
         taskset.compute_replacerule_performance(model_dir, setup, False)
 
 
+def train_all_mixrule_softplus(seed=0, root_dir='mixrule_softplus'):
+    """Training of all tasks."""
+    model_dir = os.path.join(DATAPATH, root_dir, str(seed))
+    hp = {'activation': 'softplus', 'w_rec_init': 'diag',
+          'use_separate_input': True, 'mix_rule': True}
+    rule_prob_map = {'contextdm1': 5, 'contextdm2': 5}
+    train.train(model_dir, hp=hp, ruleset='all',
+                rule_prob_map=rule_prob_map, seed=seed)
+
+    # Analyses
+    variance.compute_variance(model_dir)
+    log = tools.load_log(model_dir)
+    analysis = clustering.Analysis(model_dir, 'rule')
+    log['n_cluster'] = analysis.n_cluster
+    tools.save_log(log)
+
+    setups = [1, 2, 3]
+    for setup in setups:
+        taskset.compute_taskspace(model_dir, setup,
+                                  restore=False,
+                                  representation='rate')
+        taskset.compute_replacerule_performance(model_dir, setup, False)
+
+
 def train_seq(i):
     # Ranges of hyperparameters to loop over
     hp_ranges = OrderedDict()

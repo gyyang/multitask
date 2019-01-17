@@ -589,6 +589,10 @@ def compute_replacerule_performance(model_dir, setup, restore=False):
 
 def _plot_replacerule_performance(perfs_all, rule, names, setup, fig_name=None):
     perfs_all = perfs_all.T  # make it (4, n_nets)
+    from scipy.stats import mannwhitneyu
+    print(mannwhitneyu(perfs_all[-1], perfs_all[-2]))
+    print(mannwhitneyu(perfs_all[-1], perfs_all[-3]))
+    
     n_condition, n_net = perfs_all.shape
     fs = 7
     fig = plt.figure(figsize=(1.6,2.2))
